@@ -2,6 +2,7 @@
 ImageJ macro for the analysis of foci (e.g. DNA damage) in nuclei/cells
 
 ImageJ macro to quantify foci in nuclei/cells. Works on 2D/3D images, including multiseries files, as long as all series have the same dimensions etc.
+Foci can be measured in two channels, as well as colocalization.
 
 More details on the workflow will follow soon.
 
