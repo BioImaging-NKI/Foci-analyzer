@@ -46,7 +46,7 @@ version = 1.0;
 
 /* Macro to quantify foci in nuclei/cells. More info will follow :-)
  * Works on 2D/3D images, including multiseries files, as long as all series have the same specs
- *   
+ * 
  * ► Requires the following Fiji update sites:
  * - 3D ImageJ Suite
  * - CLIJ
@@ -63,12 +63,11 @@ version = 1.0;
  * - PTBIOP update site, with proper settings. See https://github.com/BIOP/ijl-utilities-wrappers/blob/master/README.md#cellpose
  * 
  * 
- *	Author: Bram van den Broek, The Netherlands Cancer Institute, b.vd.broek@nki.nl
+ * Author: Bram van den Broek, The Netherlands Cancer Institute, b.vd.broek@nki.nl
  * 
  * 
  * 
- * Changelog
- * 
+ * Changelog 
  * ---------
  * version 0.94, April 2022:
  * - Invert foci before MorpholibJ marker-controlled watershed -> get rid of holes in the foci.
@@ -92,8 +91,12 @@ version = 1.0;
  * Version 0.99, June 2022:
  * - Updated the parameters saved in the metadata of the output images
  * 
- * * Version 1.0, July 2022:
+ * Version 1.0, July 2022:
  * - Added possibility to manually remove segmented nuclei by clicking. Masks are saved and can be loaded for re-analysis.
+ * 
+ * Version 1.01, July 2022:
+ * - Fixed a small bug: nuclear intensity in foci channel B is now measured also when detectFociChannelB is false.
+ * 
  */
 
 
@@ -880,9 +883,7 @@ function detectFoci(image, channel, fociSize, anisotropyFactor, firstTimeProcess
 		showImagefromGPU(foci_filtered);
 		if(bits == 8) run("16-bit");
 	}
-//TO DO: For 3D, make max projection (see older versions)
-//TO DO: Check Labelmap_detected_foci for 8-bit images. (no values >255)
-//TO DO: Check fill holes (creates new labels in holes?)
+//TO DO: Check Labelmap_detected_foci for 8-bit images? (no values >255)
 	threshold = medianNucleiStddev * thresholdMultiplier;	//Set default threshold at n times the stddev (of the outlier-removed foci, which is a bit lower than the actual stddev, but less dependent on many foci being present)
 	threshold = threshold*exp(thresholdFactor);
 	print("Threshold default multiplier at "+thresholdMultiplier+", exponential bias set at "+thresholdFactor+": Threshold used: "+threshold);
@@ -1187,7 +1188,8 @@ function measureFoci(original, channel, nrNuclei, labelmap_nuclei_3D, labelmap_f
 function measure_nuclear_intensities(original, nrNuclei, labelmap_nuclei_3D, gchannels, fociChannelA, fociChannelB, resultTable) {
 	background_ = newArray(nrNuclei);
 	for(c=1; c<=gchannels; c++) {
-		if(c != fociChannelA && c != fociChannelB) {
+		if(c == fociChannelA || detectFociChannelB == true && c == fociChannelB) continue;
+		else {
 			selectWindow(original);
 			run("Clear Results");
 			Stack.setChannel(c);
