@@ -14,11 +14,12 @@ Author: Bram van den Broek, The Netherlands Cancer Institute, b.vd.broek@nki.nl 
 2. Foci are detected in each nucleus in 2D or 3D. After Difference of Gaussians background subtraction, local maxima are detected and used as seeds for [MorpholibJ](https://imagej.net/plugins/morpholibj)'s [marker-controlled watershed](https://imagej.net/plugins/marker-controlled-watershed) (executed on the GPU using [CLIJ2/CLIJx](https://clij.github.io/)). Additionally, AreaMaxima local maxima detection can by used as detection method.
 Thresholds are automatically calculated as 3 times the median of the standard deviations of the (outlier-removed) nuclei, and can be adapted using the threshold bias parameters.
 
-2. Foci are quantified in a single channel A, or in two channels A and B.
-For each nucleus the foci count is reported in a table, as well as mean/median values for foci intensity, area/volume, and whole nucleus intensity.
+3. Foci are quantified in a single channel A, or in two channels A and B.
+For each nucleus a number of metrics are reported in a table: foci count, as well as mean/median values for foci intensity, area/volume, and whole nucleus intensity.
 If two channels are selected, foci colocalization between channels is automatically calculated.
+The table is saved as a `.tsv` file, which can be easily opened in other programs (e.g. Excel).
 
-3. Segmented nuclei and foci are visualized as overlays on the original images for easy inspection. If enabled, foci detection settings (threshold bias, min/max size) can be adapted, after which all images can be processed with the new settings.
+4. Segmented nuclei and foci are visualized as overlays on the original images for easy inspection. If desired, foci detection settings (threshold bias, min/max size) can be adapted before processing all input images. A colocalization map is also created when two channels are measured.
 
 ## Installation / Requirements
 In order to run the macro, download the [latest release](https://github.com/BioImaging-NKI/Foci-analyzer/releases/tag/v1.0), then drag&drop `Foci_analyzer.ijm` on the Fiji window. This will open the editor. Click 'Run' in the bottom left.
