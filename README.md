@@ -39,7 +39,7 @@ In order to run the macro, download the [latest release](https://github.com/BioI
 - A working Cellpose 2.0 environment in Python
 - PTBIOP update site, with proper settings. See https://github.com/BIOP/ijl-utilities-wrappers/blob/master/README.md#cellpose
 
-## Short manual for using the macro in Fiji
+## Short usage manual
 
 The macro starts with a large dialog with options and parameters (click to enlarge):
 
