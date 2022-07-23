@@ -45,3 +45,4 @@ The macro starts with a large dialog with options and parameters (click to enlar
 
 <img src="https://user-images.githubusercontent.com/68109112/180569141-d6b79331-8ee5-4561-b9a3-0e1a7e9ba659.png" width="400">
 
+...more info will follow soon...
