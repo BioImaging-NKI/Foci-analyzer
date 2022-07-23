@@ -9,7 +9,7 @@ Author: Bram van den Broek, The Netherlands Cancer Institute, b.vd.broek@nki.nl 
 
 ## Workflow summary
 1. Nuclei are segmented (in a 2D projection) using the pre-trained deep learning network [StarDist](https://imagej.net/plugins/stardist). Alternatively, classic thresholding + watershedding can be used (though no parameters can be changed). As a third option, the deep learning network [Cellpose](https://github.com/MouseLand/cellpose) can be used to segment whole cells, thanks to the [Cellpose wrapper for Fiji](https://github.com/BIOP/ijl-utilities-wrappers) by BIOP.[^1]
-[^1]: Currently, Cellpose is run using the 2D 'cyto' model on a single channel, with the default options. Look for `run("Cellpose Advanced")` in the code and change parameters as seen fit.
+[^1]: Currently, Cellpose is run using the 2D 'cyto' model on a single channel, with the default options and automatic diameter detection. Look for `run("Cellpose Advanced")` in the code and change parameters as seen fit.
 
 2. Foci are detected in each nucleus in 2D or 3D. After Difference of Gaussians background subtraction, local maxima are detected and used as seeds for [MorpholibJ](https://imagej.net/plugins/morpholibj)'s [marker-controlled watershed](https://imagej.net/plugins/marker-controlled-watershed) (executed on the GPU using [CLIJ2/CLIJx](https://clij.github.io/)). Additionally, AreaMaxima local maxima detection can be used as detection method.
 Thresholds are automatically calculated as 3 times the median of the standard deviations of the (outlier-removed) nuclei, and can be adapted using the threshold bias parameters.
@@ -36,7 +36,7 @@ In order to run the macro, download the [latest release](https://github.com/BioI
 - StarDist
 
 ► In order to run Cellpose segmentation you also need:
-- A working Cellpose Python environment
+- A working Cellpose 2.0 environment in Python
 - PTBIOP update site, with proper settings. See https://github.com/BIOP/ijl-utilities-wrappers/blob/master/README.md#cellpose
 
 ## Short manual for using the macro in Fiji
