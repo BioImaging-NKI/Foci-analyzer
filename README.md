@@ -24,7 +24,7 @@ The table is saved as a `.tsv` file, which can be easily opened in other program
 ## Installation / Requirements
 In order to run the macro, download the [latest release](https://github.com/BioImaging-NKI/Foci-analyzer/releases/download/v1.1/Foci_Analyzer_1_1.ijm) into a sensible folder, then drag&drop the `.ijm` file on the Fiji window. This will open the editor. Click 'Run' in the bottom left.
 
-► Requires the following [Fiji update sites](https://imagej.net/update-sites/following) to be installed:
+► [Install](https://imagej.net/update-sites/following) the following Fiji update sites:
 - 3D ImageJ Suite
 - CLIJ
 - CLIJ2
@@ -35,7 +35,7 @@ In order to run the macro, download the [latest release](https://github.com/BioI
 - SCF MPI CBG
 - StarDist
 
-► In order to run Cellpose segmentation you also need:
+► If you want to also use Cellpose segmentation you also need:
 - A working Cellpose 2.0 environment in Python
 - PTBIOP update site, with proper settings. See https://github.com/BIOP/ijl-utilities-wrappers/blob/master/README.md#cellpose
 
