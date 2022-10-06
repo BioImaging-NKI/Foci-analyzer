@@ -9,8 +9,8 @@
 #@ Integer (label = "Image XY binning before analysis [0-n]", value = 1, min=1, description="Image binning will greatly shorten the analysis time") XYBinning
 
 #@ String (value="Nuclei detection settings", visibility="MESSAGE") nuclei_message
-#@ String (label = "Nuclei segmentation method", choices={"StarDist nuclei segmentation","Cellpose cytoplasm segmentation", "Classic nuclei segmentation"}, style="listBox") nucleiSegmentationChoice
-#@ Integer (label = "Nuclei binning factor [0-n] (StarDist)", value = 2, min=1, description="A binning >1 for high-resolution input images can prevent 'oversegmentation', and will also somewhat speed up processing.") downsampleFactorStarDist
+#@ String (label = "Nuclei segmentation method", choices={"StarDist nuclei segmentation (recommended)","Cellpose cytoplasm segmentation", "Classic nuclei segmentation"}, style="listBox") nucleiSegmentationChoice
+#@ Integer (label = "Stardist nuclei binning factor [0-n]", value = 1, min=1, description="A binning >1 for high-resolution input images can prevent 'oversegmentation', and will also somewhat speed up processing.") downsampleFactorStarDist
 #@ Double (label = "Probablility threshold [0.0-1.0] (StarDist/Cellpose)", value = 0.5, min=0, max=1, description="lower values will accept more nuclei") probabilityThreshold
 
 #@ Integer (label = "Remove nulei with diameter smaller than (units)", value = 4) minNucleusSize_setting
@@ -22,14 +22,14 @@
 #@ Boolean (label = "Enable foci parameters optimization mode?", value=true) optimizationMode
 #@ String (label = "Foci size channel A", choices={"tiny","small","average","large","huge","other"}, style="listBox", value="average", description="Simplified foci detection parameter") fociSizeA
 #@ String (label = "Foci size channel B", choices={"tiny","small","average","large","huge","other"}, style="listBox", value="average", description="Simplified foci detection parameter") fociSizeB
-#@ String (label = "Foci detection method", choices={"Marker-controlled watershed","AreaMaxima local maximum detection"}, style="listBox") foci_method
+#@ String (label = "Foci detection method", choices={"Marker-controlled watershed (recommended)","AreaMaxima local maximum detection"}, style="listBox") foci_method
 
 #@ Double (label = "Foci intensity threshold bias channel A", value = 0.0, min=-2.5, max=2.5, style="scroll bar", stepSize=0.01) thresholdFactorA
 #@ Double (label = "Foci intensity threshold bias channel B", value = 0.0, min=-2.5, max=2.5, style="scroll bar", stepSize=0.01) thresholdFactorB
-#@ Double (label = "Minimum foci size (pixels/voxels)", value = 1) minFociSize
+#@ Double (label = "Minimum foci size (pixels/voxels)", value = 3) minFociSize
 #@ Double (label = "Maximum foci size (pixels/voxels)", value = 9999) maxFociSize
 
-#@ Boolean (label = "[3D only] Do foci detection on maximum intensity projection only?", value=false) maxProject
+#@ Boolean (label = "[3D only] Detect foci on the Maximum Intensity Projection?", value=false) maxProject
 #@ Boolean (label = "[3D only] Use quasi-2D foci detection? (detect foci in every Z-slice)", value=false, description="For 3D stacks with large spacing between the z-slices") quasi2D
 #@ Integer (label = "[3D only] Process a single z-slice only: slice nr (-1 for full stack)", value=-1, min=-1) singleSlice
 
@@ -42,7 +42,6 @@
 
 #@ Boolean (label = "Debug mode (show intermediate images)", value=false) debugMode
 
-version = 1.0;
 
 /* Macro to quantify foci in nuclei/cells. More info will follow :-)
  * Works on 2D/3D images, including multiseries files, as long as all series have the same specs
@@ -94,12 +93,20 @@ version = 1.0;
  * Version 1.0, July 2022:
  * - Added possibility to manually remove segmented nuclei by clicking. Masks are saved and can be loaded for re-analysis.
  * 
- * Version 1.01, July 2022:
+ * Version 1.1, July 2022:
  * - Fixed a small bug: nuclear intensity in foci channel B is now measured also when detectFociChannelB is false.
+ * - Changes in AreaMaximum detection (minimum foci size) 
+ * - Now asks to create output folder if it doesn't exist.
+ * - Classic nuclei segmentation works again
+ * - Fixed a bug where the nucleus area was not correctly reported when Stardist nuclei binning factor > 1
  * 
+ * Version 1.2, October 2022:
+ * - Fixed critical bug where after threshold optimization of the second image Fiji would crash (because an image was released from the GPU)
+ * - Improved log window readability
+ * - Fixed a bug (in debug mode) where Fiji crashed after threshold optimization if the overlay image was not selected
  */
 
-
+version = 1.2;
 
 /* TODO / IDEAS
  *  
@@ -108,8 +115,6 @@ version = 1.0;
  * Currently, pressing ALT during opening the image allows for making a selection.
  * 
  * Upscale and smooth ROIs (spline interpolate met Roi.setPolygonSplineAnchors(x, y)?)
- * 
- * Create log file with settings and/or save metadata in the output image
  * 
  * Add description="..." to the options (onmouseover)
  * 
@@ -139,8 +144,7 @@ maxFociSize = maxFociSize;
 
 H_max_peak_flooding = 100;	//Percentage of the peak
 thickOutlines = false;		//Width of nuclei outlines, 1 or 2 pixels
-thickOutlinesThresholdSize = 1000;	//Above this image size nuclei outlines are thick
-hideImages = false;
+thickOutlinesThresholdSize = 1200;	//Above this image size nuclei outlines are thick
 
 labelOpacity = 100;			//opacity of outlines
 addNumbersOverlay = true;
@@ -149,7 +153,7 @@ labelFontSize = 12;
 var processAllOtherImages = false;
 var doneOptimizing;
 var displayMode = "composite";
-var activeChannels = "111";
+var activeChannels = "1110";
 var maxDisplaySetting;
 var processTime = 0;
 var threshold = 0;
@@ -185,11 +189,18 @@ setBatchMode(true);
 
 run("Close All");
 nrOfImages = files.length;
+if(!File.exists(outputFolder)) {
+	createOutputFolder = getBoolean("The output folder '"+outputFolder+"' does not exist. Create?", "Yes please", "See if I care!");
+	if(createOutputFolder) File.makeDirectory(outputFolder);
+	else exit("Yes you do.");
+}
 for (f = 0; f < nrOfImages; f++) {
-	print("\nProcessing file "+f+1+"/"+nrOfImages+": "+files[f]);
+	print("\nProcessing file "+f+1+"/"+nrOfImages+": "+files[f] + "\n");
 	processFile(f, files[f], outputFolder);
 }
-print("\nFinished processing "+nrOfImages+" files in "+processTime*60+" seconds ("+d2s(processTime,1)+" minutes).");
+print("\n-------------------------------------------------------------------------");
+print("Finished processing "+nrOfImages+" files in "+processTime*60+" seconds ("+d2s(processTime,1)+" minutes).");
+print("Average speed: "+d2s((nrOfImages)/processTime,1)+" images per minute.");
 print("\\Update3:Finished processing "+nrOfImages+" files in "+processTime*60+" seconds ("+d2s(processTime,1)+" minutes).");
 
 restoreSettings();
@@ -252,7 +263,10 @@ function process_current_series(image, nameHasExtension) {
 	//Initialize image and table
 	getDimensions(gwidth, gheight, gchannels, gslices, gframes); // global variables
 	getVoxelSize(pixelWidth, pixelHeight, pixelDepth, unit);
-	if(gwidth > thickOutlinesThresholdSize && gheight > thickOutlinesThresholdSize) thickOutlines = true;
+	if(gwidth > thickOutlinesThresholdSize && gheight > thickOutlinesThresholdSize) {
+		thickOutlines = true;
+		labelFontSize = labelFontSize / 1.5;
+	}
 	
 	if(gslices > 1) anisotropyFactor = pixelWidth / pixelDepth;
 	else anisotropyFactor = 0;
@@ -276,10 +290,8 @@ function process_current_series(image, nameHasExtension) {
 	}
 
 	//Segment and label nuclei
-	if(nucleiSegmentationChoice == "Classic nuclei segmentation") {
-		nuclei_info = segmentNuclei(original, nucleiChannel, nucleiBlurRadiusXY, nucleiBlurRadiusZ, nucleiMedian3DradiusXY, nucleiMedian3DradiusZ);
-	}
-	else if (nucleiSegmentationChoice == "StarDist nuclei segmentation") nuclei_info = segmentNucleiStarDist(original, nucleiChannel, probabilityThreshold, pixelWidth, unit, resultTable);
+	if (nucleiSegmentationChoice == "StarDist nuclei segmentation (recommended)") nuclei_info = segmentNucleiStarDist(original, nucleiChannel, probabilityThreshold, pixelWidth, unit, resultTable);
+	else if(nucleiSegmentationChoice == "Classic nuclei segmentation") nuclei_info = segmentNucleiClassic(original, nucleiChannel, nucleiBlurRadiusXY, nucleiBlurRadiusZ, nucleiMedian3DradiusXY, nucleiMedian3DradiusZ);
 	else if (nucleiSegmentationChoice == "Cellpose cytoplasm segmentation") nuclei_info = segmentCytoplasmCellpose(original, nucleiChannel, probabilityThreshold, pixelWidth, unit, resultTable);
 	labelmap_nuclei = nuclei_info[0];
 	nuclei_outlines = nuclei_info[1];
@@ -299,13 +311,13 @@ function process_current_series(image, nameHasExtension) {
 		Ext.CLIJ2_statisticsOfLabelledPixels(labelmap_nuclei, labelmap_nuclei);
 		nucleus_id_ = Table.getColumn("IDENTIFIER", "Results");
 		nucleus_area_ = Table.getColumn("PIXEL_COUNT", "Results");
-		nucleus_area_ = multiplyArraywithScalar(nucleus_area_, pixelWidth / Math.sqr(downsampleFactorStarDist));
+		nucleus_area_ = multiplyArraywithScalar(nucleus_area_, Math.sqr(pixelWidth));
 		Table.setColumn("Nucleus ID", nucleus_id_, resultTable);
 		Table.setColumn("Nucleus area 2D ("+unit+"^2)", nucleus_area_, resultTable);
-	
+
 		//Create a 3D version of the 2D nuclei labelmap
 		labelmap_nuclei_3D = createLabelmapNuclei3D(labelmap_nuclei);
-	
+
 		//Foci filtering and detection - in a loop to enable parameter optimization 
 		firstTimeProcessing = true;
 	//	activeChannels = "111";
@@ -313,12 +325,12 @@ function process_current_series(image, nameHasExtension) {
 		do {
 			//Foci channel A
 //			filtered_fociA = filterFoci(original, fociChannelA, fociSizeA, anisotropyFactor, ROFtheta, firstTimeProcessing);
+
 			labelmap_fociA = detectFoci(original, fociChannelA, fociSizeA, anisotropyFactor, firstTimeProcessing, labelmap_nuclei, labelmap_nuclei_3D, thresholdFactorA);
 			if(firstTimeProcessing == false) call("ij.gui.ImageWindow.setNextLocation", x_image, y_image);
 			mergeOriginalAndDetection(original, nrNuclei, nuclei_outlines, "Mask_foci_ch"+fociChannelA, "foci_spots_ch"+fociChannelA, fociChannelA);
 			overlay_image = getTitle();
 			if(firstTimeProcessing == false && detectFociChannelB == false) close("Processing...");
-
 			//Foci channel B
 			if(detectFociChannelB == true) {
 //				filtered_fociB = filterFoci(original, fociChannelB, fociSizeB, anisotropyFactor, ROFtheta, firstTimeProcessing);
@@ -361,7 +373,7 @@ function process_current_series(image, nameHasExtension) {
 				Dialog.createNonBlocking("Optimize settings for foci detection");
 				Dialog.addChoice("Foci size channel "+fociChannelA, newArray("tiny","small","average","large","huge","other"), fociSizeA);
 				if(detectFociChannelB) Dialog.addChoice("Foci size channel "+fociChannelB, newArray("tiny","small","average","large","huge","other"), fociSizeB);
-				Dialog.addChoice("Detection method", newArray("Marker-controlled watershed","AreaMaxima local maximum detection"), foci_method);
+				Dialog.addChoice("Detection method", newArray("Marker-controlled watershed (recommended)","AreaMaxima local maximum detection"), foci_method);
 				Dialog.addSlider("Threshold bias channel "+fociChannelA+" (higher is more strict)", -2.5, 2.5, thresholdFactorA);
 				if(detectFociChannelB) Dialog.addSlider("Threshold bias channel "+fociChannelB+" (higher is more strict)", -2.5, 2.5, thresholdFactorB);
 				if(gslices > 1) {
@@ -400,6 +412,7 @@ function process_current_series(image, nameHasExtension) {
 				if (processAllOtherImages == true) doneOptimizing = true;
 
 				//get image display properties
+				selectWindow(overlay_image);
 				getLocationAndSize(x_image, y_image, imageWidth, imageHeight);
 				Stack.getActiveChannels(activeChannels);
 				Stack.getDisplayMode(displayMode);
@@ -471,7 +484,7 @@ function process_current_series(image, nameHasExtension) {
 		boundingBox_height = Table.getColumn("BOUNDING_BOX_HEIGHT");
 		Array.getStatistics(boundingBox_width, minWidth, maxWidth);
 		Array.getStatistics(boundingBox_height, minHeight, maxHeight);
-		print("Maximum nucleus bounding box: "+maxWidth+", "+maxHeight);		
+		if(debugMode) print("\nMaximum nucleus bounding box: "+maxWidth+", "+maxHeight);		
 
 		//Measure the foci 
 		measureFoci(original, fociChannelA, nrNuclei, labelmap_nuclei_3D, labelmap_fociA, boundingBox_X, boundingBox_Y, maxWidth, maxHeight);
@@ -545,7 +558,7 @@ function process_current_series(image, nameHasExtension) {
 //		Ext.CLIJ2_reportMemory();
 	}
 	else print("WARNING: 0 nuclei detected in "+ image +" !");
-	
+
 	//Ext.CLIJx_organiseWindows(Number startX, Number startY, Number tilesX, Number tilesY, Number tileWidth, Number tileHeight);
 	
 	cleanup();
@@ -559,11 +572,11 @@ function process_current_series(image, nameHasExtension) {
 
 
 
-function segmentNuclei(image, channel, nucleiBlurRadiusXY, nucleiBlurRadiusZ, nucleiMedian3DradiusXY, nucleiMedian3DradiusZ) {
+function segmentNucleiClassic(image, channel, nucleiBlurRadiusXY, nucleiBlurRadiusZ, nucleiMedian3DradiusXY, nucleiMedian3DradiusZ) {
 	selectWindow(image);
 	getDimensions(width, height, channels, slices, frames);
-	minNucleusSize = PI*pow((minNucleusSize_setting / pixelWidth / 2),2);	//Calculate the nucleus area as if it were a circle
-	maxNucleusSize = PI*pow((maxNucleusSize_setting / pixelWidth / 2),2);
+	minNucleusSize = PI*Math.sqr((minNucleusSize_setting / pixelWidth / 2));	//Calculate the nucleus area as if it were a circle
+	maxNucleusSize = PI*Math.sqr((maxNucleusSize_setting / pixelWidth / 2));
 	
 	nuclei = "nuclei";
 	run("Duplicate...", "title=nuclei duplicate channels=&channel");
@@ -579,23 +592,34 @@ function segmentNuclei(image, channel, nucleiBlurRadiusXY, nucleiBlurRadiusZ, nu
 
 	Ext.CLIJ2_maximumZProjection(nuclei_filtered1, nuclei_filtered_MAX);
 
-	Ext.CLIJ2_automaticThreshold(nuclei_filtered_MAX, thresholded, "Huang");
+	Ext.CLIJ2_automaticThreshold(nuclei_filtered_MAX, thresholded, "Otsu");
 	Ext.CLIJ2_pullBinary(thresholded);
-	run("Watershed");
+	run("Watershed");	//Not on GPU becayse results are not so good.
 	run("Properties...", "unit=&unit pixel_width=&pixelWidth pixel_height=&pixelHeight voxel_depth=1.0000");
+
 	if(excludeOnEdges) run("Analyze Particles...", "size=" + minNucleusSize + "-" + maxNucleusSize + " circularity=0.25-1.00 show=[Count Masks] exclude include add");
-	else run("Analyze Particles...", "size=" + minNucleusSize + "-" + maxNucleusSize + " circularity=0.25-1.00 show=[Count Masks] include add");
-	rename("nucleiCountMask");
-	Ext.CLIJ2_push("nucleiCountMask");
-
-	close("nuclei_filtered_MAX_blur");
-	nrNuclei = roiManager("count");
-
-	selectWindow(image);
-	roiManager("Show All without labels");
-	run("ROI Manager to LabelMap(2D)");
+	else run("Analyze Particles...", "size=" + minNucleusSize + "-" + maxNucleusSize + " pixel circularity=0.25-1.00 show=[Count Masks] include add");
 	rename("Labelmap_nuclei");
-	return newArray("Labelmap_nuclei", nrNuclei);
+	labelmap_nuclei = "Labelmap_nuclei";
+	Ext.CLIJ2_push(labelmap_nuclei);
+	Ext.CLIJ2_getMaximumOfAllPixels(labelmap_nuclei, nrNuclei);	//Count the number of nuclei
+
+	//Create nuclei outlines from nuclei labelmap
+	Ext.CLIJ2_detectLabelEdges(labelmap_nuclei, labelmap_edges);
+	if(thickOutlines == false) {
+		Ext.CLIJ2_mask(labelmap_nuclei, labelmap_edges, labelmap_outlines);
+		Ext.CLIJ2_release(labelmap_edges);
+	}
+	else labelmap_outlines = labelmap_edges;
+	Ext.CLIJ2_pullBinary(labelmap_outlines);
+	Ext.CLIJ2_release(labelmap_outlines);
+	rename("nuclei_outlines");
+	run("Cyan");
+	
+	nuclei_outlines = "nuclei_outlines";
+	labelmap_nuclei = "Labelmap_nuclei";
+	
+	return newArray(labelmap_nuclei, nuclei_outlines, nrNuclei);
 }
 
 
@@ -652,6 +676,12 @@ function segmentNucleiStarDist (image, channel, probabilityThreshold, pixelWidth
 	Ext.CLIJ2_release(labelmap_nuclei_edges_excluded);
 	labelmap_nuclei_final = "Labelmap_nuclei";
 	Ext.CLIJ2_closeIndexGapsInLabelMap(labelmap_nuclei_filtered, labelmap_nuclei_final);
+//	if(downsampleFactorStarDist > 1) {
+//		labelmap_nuclei_final = "Labelmap_nuclei";
+//		Ext.CLIJ2_greyscaleOpeningSphere(labelmap_nuclei_gapsClosed, labelmap_nuclei_final, downsampleFactorStarDist + 1, downsampleFactorStarDist + 1, 0);	//Smooth labels a bit
+//		Ext.CLIJ2_release(labelmap_nuclei_gapsClosed);
+//	}
+//	else labelmap_nuclei_final = labelmap_nuclei_gapsClosed;
 	Ext.CLIJ2_release(labelmap_nuclei_filtered);
 	Ext.CLIJ2_getMaximumOfAllPixels(labelmap_nuclei_final, nrNuclei);	//Count the number of nuclei
 
@@ -677,14 +707,22 @@ function segmentNucleiStarDist (image, channel, probabilityThreshold, pixelWidth
 
 function segmentCytoplasmCellpose (image, channel, probabilityThreshold, pixelWidth, unit, resultTable) {
 	selectWindow(image);
+	
 	getDimensions(width, height, channels, slices, frames);
 	minNucleusSize = PI*Math.sqr((minNucleusSize_setting / pixelWidth / 2));	//Calculate the nucleus area as if it were a circle
 	maxNucleusSize = PI*Math.sqr((maxNucleusSize_setting / pixelWidth / 2));
 
-	run("Duplicate...", "title=nuclei duplicate channels=" +channel);	//Get nucleus channel
-	setBatchMode("show");
+	run("Duplicate...", "title=nuclei duplicate channels=" +channel);	//Get nuclei (cells) for segmentation
+	cellpose_input_image = getTitle();
 
-	setBatchMode(false);
+	if(slices>1) {
+		run("Z Project...", "projection=[Max Intensity]");
+		rename("forCellpose_Zprojected");
+		cellpose_input_image = getTitle();
+	}
+
+	setBatchMode("exit and display"); //Cellpose doesn't work in batch mode
+	selectWindow(cellpose_input_image);
 	run("Cellpose Advanced", "diameter=0 cellproba_threshold=0 flow_threshold="+probabilityThreshold+" anisotropy=1.0 diam_threshold=12.0 model=cyto nuclei_channel=0 cyto_channel=1 dimensionmode=2D stitch_threshold=-1.0 omni=false cluster=false additionnal_flags=-");
 	labelmap_nuclei = getTitle();
 //	selectWindow(image);
@@ -692,8 +730,10 @@ function segmentCytoplasmCellpose (image, channel, probabilityThreshold, pixelWi
 	setBatchMode("hide");
 	selectWindow("nuclei");
 	setBatchMode("hide");
-
 	
+	//Close unused images
+	if(slices>1) close("forCellpose_Zprojected");
+
 	//Exclude nuclei on edges and count nr of nuclei
 	Ext.CLIJ2_push(labelmap_nuclei);
 	close(labelmap_nuclei);
@@ -818,7 +858,6 @@ function detectFoci(image, channel, fociSize, anisotropyFactor, firstTimeProcess
 	//Determine threshold on the maximum projection (more robust), only where nuclei are present
 	// Small FLAW: the area outside the nuclei is set to zero, but is included in the threshold calculation. (Could be fixed by setting 0 to NaN, but how to do that on the GPU?)
 	// On the other hand: there is almost no difference, it seems.
-
 	selectWindow(image);
 	foci = "foci_ch"+channel;
 	if(firstTimeProcessing == true) {
@@ -829,12 +868,12 @@ function detectFoci(image, channel, fociSize, anisotropyFactor, firstTimeProcess
 		//Ext.CLIJ2_release(foci);
 		if(debugMode) showImagefromGPU(foci);
 	}
-//	else if(debugMode) showImagefromGPU(foci);
+	else if(debugMode) showImagefromGPU(foci);
 
 	//Determine filter sizes
 	if(fociSize == "tiny")	{ fociFilterSizeXY = 0;	fociSizeXY = 0.5;		}
 	if(fociSize == "small")	{ fociFilterSizeXY = 0.5;	fociSizeXY = 1;		}
-	if(fociSize == "average"){ fociFilterSizeXY = 1;	fociSizeXY = 1.5;	}
+	if(fociSize == "average"){ fociFilterSizeXY = 1.0;	fociSizeXY = 1.5;	}
 	if(fociSize == "large")	{ fociFilterSizeXY = 2;	fociSizeXY = 2;			}
 	if(fociSize == "huge")	{ fociFilterSizeXY = 4;	fociSizeXY = 4;			}
 	if(fociSize == "other") {
@@ -843,6 +882,7 @@ function detectFoci(image, channel, fociSize, anisotropyFactor, firstTimeProcess
 		fociSizeXY = fociSize;
 	}
 
+	//pull from GPU, remove outliers, push to GPU
 	Ext.CLIJ2_convertFloat(foci, foci_32bit);
 	Ext.CLIJ2_pull(foci_32bit);
 	rename(foci+"_outliers_removed");
@@ -859,9 +899,10 @@ function detectFoci(image, channel, fociSize, anisotropyFactor, firstTimeProcess
 	Ext.CLIJ2_statisticsOfLabelledPixels(foci_outliers_removed, labelmap_nuclei);
 	nucleiStddev_ = Table.getColumn("STANDARD_DEVIATION_INTENSITY", "Results");
 	medianNucleiStddev = medianOfArray(nucleiStddev_);
+	print("Detecting foci in channel "+channel); 
 	print("Median of the Standard Deviations of all nuclei: "+medianNucleiStddev);
 
-	fociFilterSizeZ = 2*anisotropyFactor * fociFilterSizeXY;
+	fociFilterSizeZ = 2*anisotropyFactor * fociFilterSizeXY;	//semi-arbitrary setting
 	fociSizeZ = 2*anisotropyFactor * fociSizeXY;
 	//Filter the foci - Difference of Gaussians, but then subtracting a blurred outlier-removed image
 	if(gslices>1) Ext.CLIJ2_gaussianBlur3D(foci_32bit, foci_blurred, fociFilterSizeXY/2, fociFilterSizeXY/2, fociFilterSizeZ/2);
@@ -881,14 +922,15 @@ function detectFoci(image, channel, fociSize, anisotropyFactor, firstTimeProcess
 	if(debugMode) {
 		print("Foci filter size XY: "+fociFilterSizeXY+", Z: "+fociFilterSizeZ);
 		showImagefromGPU(foci_filtered);
-		if(bits == 8) run("16-bit");
+		//if(bits == 8) run("16-bit");
 	}
 //TO DO: Check Labelmap_detected_foci for 8-bit images? (no values >255)
 	threshold = medianNucleiStddev * thresholdMultiplier;	//Set default threshold at n times the stddev (of the outlier-removed foci, which is a bit lower than the actual stddev, but less dependent on many foci being present)
 	threshold = threshold*exp(thresholdFactor);
 	print("Threshold default multiplier at "+thresholdMultiplier+", exponential bias set at "+thresholdFactor+": Threshold used: "+threshold);
-	maxDisplaySetting = threshold * 10;
-
+	maxDisplaySetting = minOf(pow(2,bits), threshold * 5);
+//logWindow = split(getInfo("log"),"\n");
+//waitForUser(logWindow.length);
 	if(foci_method == "AreaMaxima local maximum detection") {
 		Ext.CLIJ2_pull(foci_filtered);
 		selectWindow(foci_filtered);
@@ -897,15 +939,22 @@ function detectFoci(image, channel, fociSize, anisotropyFactor, firstTimeProcess
 		//setBatchMode(false);	//H-watershed does not work in batch mode if this image is not shown.
 //		run("H_Watershed", "impin=["+foci+"] hmin="+hMin+" thresh="+threshold+" peakflooding="+H_max_peak_flooding + " outputmask=false allowsplitting=false");
 //		print(getTitle);
-		minSize = fociFilterSizeXY * fociFilterSizeXY * fociFilterSizeZ;
-		run("AreaMaxima local maximum detection (2D, 3D)", "minimum="+minSize+" threshold="+threshold);
+		run("AreaMaxima local maximum detection (2D, 3D)", "minimum="+minFociSize+" threshold="+threshold/2);
 		rename("Labelmap_detected_foci_ch"+channel);
 		Ext.CLIJ2_push("Labelmap_detected_foci_ch"+channel);
+
+		labeledSpots = "labeledSpots_ch"+channel;
+		Ext.CLIJ2_reduceLabelsToCentroids("Labelmap_detected_foci_ch"+channel, labeledSpots);
+		Ext.CLIJ2_mask(labeledSpots, labelmap_nuclei_3D, labeledSpots_masked);
+		Ext.CLIJ2_pullBinary(labeledSpots_masked);
+		rename("foci_spots_ch"+channel);
+		Ext.CLIJ2_release(labeledSpots);
+		Ext.CLIJ2_release(labeledSpots_masked);
 		close(foci_filtered);
 		close("Labelmap_detected_foci_ch"+channel);
 	}
 
-	else if(foci_method == "Marker-controlled watershed") {
+	else if(foci_method == "Marker-controlled watershed (recommended)") {
 		//	Alternative function - could be faster: 
 		//	Ext.CLIJx_detectAndLabelMaximaAboveThreshold(foci, detectedMaxima, 0, 0, 0, threshold, false)
 		//	Ext.CLIJ2_pull(detectedMaxima);
@@ -974,7 +1023,17 @@ function detectFoci(image, channel, fociSize, anisotropyFactor, firstTimeProcess
 	Ext.CLIJ2_closeIndexGapsInLabelMap(labelmapDetectedFociFilteredInsideNuclei, labelmap_foci_final);
 	Ext.CLIJ2_release(labelmapDetectedFociFilteredInsideNuclei);
 	Ext.CLIJ2_getMaximumOfAllPixels(labelmap_foci_final, max);
-	print("\n"+max+" foci detected in "+nrNuclei+" nuclei in channel "+channel + "\n");
+
+	//Remove some lines in the log window (unnecessary info by MorphoLibJ)
+	logWindowContents = getInfo("log");
+	logWindowLines = split(logWindowContents, "\n");
+	logWindowLines = Array.trim(logWindowLines, logWindowLines.length - 7);
+	logWindowLines = arrayToString(logWindowLines);
+	print("\\Clear");
+	print(logWindowLines);
+
+	print("\\Update:Channel "+channel+": "+max+" foci detected in "+nrNuclei+" nuclei ("+d2s(max/nrNuclei,1)+" foci per nucleus)" + "\n");
+
 	Ext.CLIJ2_pull(labelmap_foci_final);
 	if(debugMode) {
 		run("glasbey on dark");
@@ -1019,10 +1078,12 @@ function mergeOriginalAndDetection(original, nrNuclei, nuclei_outlines, foci_mas
 	selectWindow("nuclei");
 	run(bits+"-bit");	//convert to allow merging
 	foci_RAW = "foci_ch"+channel;
+//	foci_RAW_8or16bit = "foci_RAW_8or16bit";
 	if(bits == 16) Ext.CLIJ2_convertUInt16(foci_RAW, foci_RAW_8or16bit);
 	else if(bits == 8) Ext.CLIJ2_convertUInt8(foci_RAW, foci_RAW_8or16bit);
+
 	Ext.CLIJ2_pull(foci_RAW_8or16bit);	//Still in GPU memory
-	if(optimizationMode == true && doneOptimizing == true) Ext.CLIJ2_release(foci_RAW);
+//	if(optimizationMode == true && doneOptimizing == true) Ext.CLIJ2_release(foci_RAW);
 	Ext.CLIJ2_release(foci_RAW_8or16bit);
 
 	selectWindow(foci_mask);
@@ -1157,7 +1218,7 @@ function measureFoci(original, channel, nrNuclei, labelmap_nuclei_3D, labelmap_f
 	Ext.CLIJ2_release(labelmap_foci_cropped);
 	Ext.CLIJ2_release(labelmap_foci_nucleus_relabeled);
 	Ext.CLIJ2_release(labelmap_foci_nucleus);
-	print("Measuring all foci in channel "+channel+" took "+ getTime() - startTime +" ms.");
+	if(debugMode) print("Measuring all foci in channel "+channel+" took "+ getTime() - startTime +" ms.");
 
 	//Measure overall nuclear intensity
 	run("Clear Results");
@@ -1305,7 +1366,7 @@ function computeOverlap(mask_fociA, mask_fociB, nrNuclei, labelmap_nuclei_3D, bo
 	Ext.CLIJ2_release(overlap_fraction_map);
 	Ext.CLIJ2_release(overlap_count_map_8or16bit);
 
-	print("Measuring colocalization took "+ getTime() - startTime +" ms.");
+	if(debugMode) print("Measuring colocalization took "+ getTime() - startTime +" ms.");
 
 	//Create foci mask overlap image 
 	run("Merge Channels...", "c1="+mask_fociA+" c2="+mask_fociB+" c3="+overlap_fraction_map+" create");
@@ -1356,6 +1417,16 @@ function color_to_hex(color) {
 	colorArray = split(color,",,");
 	hexcolor = "#" + IJ.pad(toHex(colorArray[0]),2) + IJ.pad(toHex(colorArray[1]),2) + IJ.pad(toHex(colorArray[2]),2);
 	return hexcolor;
+}
+
+
+//Converts an array into a string, elements separated by "\n"
+function arrayToString(array) {
+	outputString = "";
+	for (i = 0; i < array.length; i++) {
+		outputString += array[i] + "\n";
+	}
+	return outputString;
 }
 
 
