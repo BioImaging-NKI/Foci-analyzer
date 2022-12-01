@@ -41,8 +41,9 @@ In order to run the macro, download the [latest release](https://github.com/BioI
 
 ## Short usage manual
 
-The macro starts with a large dialog with options and parameters (click to enlarge):
+The macro starts with a large dialog containing all options and parameters (click to enlarge):
 
-<img src="https://user-images.githubusercontent.com/68109112/180569141-d6b79331-8ee5-4561-b9a3-0e1a7e9ba659.png" width="400">
+<img src="https://user-images.githubusercontent.com/68109112/205070945-f84c1102-9121-437c-908e-3332dd3a620a.png" width="400">
 
-...more info will follow soon...
+<More info soon...>
+
