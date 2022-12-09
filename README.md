@@ -53,17 +53,17 @@ The dialog has several sections, which are discussed below. All settings in this
 - _Nuclei channel_ : The image channel on which nuclei segmentation will be performed. This segmentation always happens in 2D; for 3D images on a maximum intensity projection. (default: 1)
 - _Foci channel A_ : the first foci channel (default: 2)
 - _Foci channel B_ : the second foci channel (default: 3)
-- _Also detect foci in Channel B and perform colocalization?_ -> If checked, foci in both channels *A* and *B* will be analyzed, followed by a simple colocalization analysis. (default: checked)
+- _Also detect foci in Channel B and perform colocalization?_ : If checked, foci in both channels *A* and *B* will be analyzed, followed by a simple colocalization analysis. (default: checked)
 - _Remove image borders (pixels)_ : Possibility to remove edges from the image. This can in particular be useful when the image edges have very different intensities, causing incorrect automatic nuclei segmentation.  (default: 0)
 - _Image XY binning before analysis_ : Optional pixel binning in case the resolution is very high and the foci consist of many pixels. A value of 2 means: 2x2 pixels will be binned into 1 pixel. This reduces noise in the image and speeds up analysis. (default: 1)
 
 ### Nuclei segmentation settings
 - _Nuclei segmentation method_ :
   - *Stardist nuclei segmentation* (default) uses the pretrained convolutional neural network [StarDist](https://github.com/stardist/stardist#readme) to recognize cell nuclei in fluoresence microscopy images. In general this method works very well on a large variety of samples.
-  - *Cellpose cytoplasm segmentation* uses the deep learning network [Cellpose](https://github.com/MouseLand/cellpose#--cellpose--) (model: cyto) to recognize whole cells. Use this option if you want to measure foci in entire cells and/or you do not have a nuclear staining (but it can also work well for nuclei). Cellpose requires a few additional installations (see [Installation / Requirements](https://github.com/BioImaging-NKI/Foci-analyzer/edit/main/README.md#installation--requirements)
+  - *Cellpose cytoplasm segmentation* uses the deep learning network [Cellpose](https://github.com/MouseLand/cellpose#--cellpose--) (model: cyto) to recognize whole cells. Use this option if you want to measure foci in entire cells and/or you do not have a nuclear staining (but it can also work well for nuclei). Cellpose requires a few additional installations (see [Installation / Requirements](https://github.com/BioImaging-NKI/Foci-analyzer/edit/main/README.md#installation--requirements)).
   - _Classic nuclei segmentation_ allows the user to segment nuclei using manual/automatic thresholding is provided for legacy reasons. The method is almost always outperformed by the two other methods.
 - _Stardist nuclei binning factor [1-n]_ : Stardist is trained on medium resolution images, and generally performs well on images with pixel sizes around 0.5 µm. For images with much smaller pixel size StarDist tends to 'oversegment' nuclei. In this case, increase the StarDist binning factor. (N.B. This option only affects the nuclei segmentation; it is different from the previously mentioned 'XY binning' parameter, which also changes the pixel size of the foci channels.) (default: 1)
-- _Probability threshold_ [0.0-1.0] (StarDist/Cellpose)_ : Lower values will accept more nuclei; higher values will be more stringent.
+- _Probability threshold [0.0-1.0] (StarDist/Cellpose)_ : Lower values will accept more nuclei; higher values will be more stringent.
 - _Remove nuclei with diameter smaller than (units)_ : Objects smaller than circles having an area corresponding to this diameter will be removed. 'Units' depends on the image, and will almost always be 'µm', or otherwise 'pixels' in case the pxiel calibration values are missing. (default: 4)
 - _Remove nuclei with diameter larger than (units)_ : Likewise, but for large objects. (default: 50)
 - _Exclude nuclei on image edges_ : When checked, nuclei that touch the image edge will not be analyzed.
