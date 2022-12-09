@@ -71,6 +71,13 @@ The dialog has several sections, which are discussed below. All settings in this
   - *No thanks* means no manual nuclei editing
   - *Manually remove nuclei* : Remove nuclei by leftclicking them in the image with the mouse. Editings will be saved to a small text file in the output folder.
   - *load previously saved removals (from output folder)* : If you have edited the segmented nuclei on this image before, it will load the previous nuclei removals from the file in the specified output folder. (Hence, if you change the output folder parameter this option will not work.)
-  
+ 
+### Foci detection settings
+- _Enable foci parameters optimization mode?_ : Checking this will allow the user to adapt the foci detection settings on a preview analysis before quantifying. (default: checked)
+- _Foci size channel A (and B)_ : choices between *tiny*, *small*, *average*, *large*, *huge*, and *other*. This parameter controls several foci image filtering steps and steers the macro towards detecting smaller or larger foci. (default: average).
+- _Foci detection method_ :
+  - *Marker-controlled watershed* uses [marker-controlled watershed](https://imagej.net/plugins/marker-controlled-watershed) with local maxima as seeds to segment foci
+  - *AreaMaximum detection* tends to detect only the peaks of the foci. Can be tried when the other option doesn't provide satisfactory results.
+
 <More info soon...>
 
