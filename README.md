@@ -126,3 +126,10 @@ Since the minimum and maximum slider values are (-2.5, 2.5) the threshold can be
 - _Nuclei label size_ : The size of the nuclei label numbers overlay.
 
 - _Debug mode (show intermediate images)_ : Used for development and bug fixing: checking this option will trigger displaying many intermediate results during the processing. It will also slow down the analysis.
+
+## Tips and tricks
+When the option _Enable foci parameters optimization mode?_ is active, a preview image of the detected foci will be shown during process. A dialog appears where foci detection parameters can be adjusted:
+
+<img src="https://user-images.githubusercontent.com/33119248/206919566-f0255a45-50fc-4f93-8386-a04e1d97351b.png" width="400">
+
+After changing the settings, clicking `OK` will detect the foci on the same nuclei with the updated parameters and redisplay them in the preview image. Channel display settings and zoom are remembered in between optimization steps.
