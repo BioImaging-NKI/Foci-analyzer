@@ -133,3 +133,17 @@ When the option _Enable foci parameters optimization mode?_ is active, a preview
 <img src="https://user-images.githubusercontent.com/33119248/206919566-f0255a45-50fc-4f93-8386-a04e1d97351b.png" width="400">
 
 After changing the settings, clicking `OK` will detect the foci on the same nuclei with the updated parameters and redisplay them in the preview image. Channel display settings and zoom are remembered in between optimization steps.
+The preview image shows an ImageJ hyperstack that, besides the z-slices of the 3D image (if applicable), contains two *frames* representing the foci channels A and B (if applicable), and four *channels*:
+1. The nuclei staining channel (azure blue)
+2. The original foci data (green)
+3. The detected foci (magenta)
+4. The centroids of the detected foci (white)
+
+<img src="https://user-images.githubusercontent.com/33119248/206935988-95c346ee-c1ba-44b6-8c14-2e9b214300da.png" width="297">
+
+The image below shows a montage layout of such a hyperstack, with vertically the '*frames*' (foci channels A and B - here 2 and 3), and horizontally the '*channels*' (as described above):
+![image](https://user-images.githubusercontent.com/33119248/206936107-175705d8-61b0-45df-8872-e279052ae035.png)
+
+By changing the displayed channels, and adjusting brightness&contrast and zoom ('+' and '-' keys), the user can inspect the foci detections for both foci channels and adjust the detection parameters if desired.
+
+![image](https://user-images.githubusercontent.com/33119248/206936509-2ee7a3c2-5ddf-4466-beb1-5e74afd003cf.png)
