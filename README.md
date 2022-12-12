@@ -147,6 +147,6 @@ The image below shows a montage layout of such a hyperstack, with vertically the
 
   By changing the displayed channels (*Shift-Z*), and adjusting brightness&contrast (Shift-C*)and zoom ('+' and '-' keys), the user can inspect the foci detections for both foci channels, adjust the detection parameters if desired and rerun the foci detection step. In particular, unchecking channel 1 (nuclei), and then alternating the displaying of channel 3 (detected foci) is most helpful.
 
-![image](https://user-images.githubusercontent.com/33119248/206936509-2ee7a3c2-5ddf-4466-beb1-5e74afd003cf.png)
+![image](https://user-images.githubusercontent.com/33119248/206996059-d86441ce-795c-4c43-a9e7-c3181f0bdd71.png)
 ![foci_03_crop_RGB_optimization_crop](https://user-images.githubusercontent.com/33119248/206938037-fd79a4eb-3b14-42d5-8ddc-8aa39794a727.gif)
 ![channels_tool](https://user-images.githubusercontent.com/33119248/206938473-f8f575fc-26b9-4071-abbe-77a33e86e156.gif)
