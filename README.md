@@ -22,7 +22,7 @@ The table is saved as a `.tsv` file, which can be easily opened in other program
 4. Segmented nuclei and foci are visualized as overlays on the original images for easy inspection. If desired, foci detection settings (threshold bias, min/max size) can be adapted before processing all input images. A colocalization map is also created when two channels are measured.
 
 ## Installation / Requirements
-In order to run the macro, download the [latest release](https://github.com/BioImaging-NKI/Foci-analyzer/releases/download/v1.3/Foci_Analyzer_1_3.ijm) into a sensible folder, then drag&drop the `.ijm` file on the Fiji window. This will open the editor. Click 'Run' in the bottom left.
+In order to run the macro, download the [latest release](https://github.com/BioImaging-NKI/Foci-analyzer/releases/download/v1.3/Foci_Analyzer_1_3.ijm) into a sensible folder.
 
 ► [Add](https://imagej.net/update-sites/following) the following Fiji update sites:
 - 3D ImageJ Suite
@@ -39,8 +39,9 @@ In order to run the macro, download the [latest release](https://github.com/BioI
 - A working Cellpose 2.0 environment in Python
 - PTBIOP update site, with proper settings. See https://github.com/BIOP/ijl-utilities-wrappers/blob/master/README.md#cellpose
 
+To run the macro, drag&drop the `.ijm` file on the Fiji window. This will open the editor. Click 'Run' in the bottom left.
 
-## Short usage manual
+## Usage manual
 
 The macro starts with a large dialog containing all options and parameters (click to enlarge):
 
