@@ -22,9 +22,9 @@ The table is saved as a `.tsv` file, which can be easily opened in other program
 4. Segmented nuclei and foci are visualized as overlays on the original images for easy inspection. If desired, foci detection settings (threshold bias, min/max size) can be adapted before processing all input images. A colocalization map is also created when two channels are measured.
 
 ## Installation / Requirements
-In order to run the macro, download the [latest release](https://github.com/BioImaging-NKI/Foci-analyzer/releases/download/v1.3/Foci_Analyzer_1_3.ijm) into a sensible folder.
+Download the [latest release of `Foci_Analyzer.ijm`](https://github.com/BioImaging-NKI/Foci-analyzer/releases/download/v1.3/Foci_Analyzer_1_3.ijm) into a sensible folder.
 
-► [Activate](https://imagej.net/update-sites/following) the following Fiji update sites:
+► [Activate](https://imagej.net/update-sites/following) the following Fiji update sites (in the menu bar, via Help > Update...):
 - 3D ImageJ Suite
 - CLIJ
 - CLIJ2
@@ -35,11 +35,13 @@ In order to run the macro, download the [latest release](https://github.com/BioI
 - SCF MPI CBG
 - StarDist
 
-► If you want to also use Cellpose segmentation you also need:
-- A working Cellpose 2.0 environment in Python
-- PTBIOP update site, with proper settings. See https://github.com/BIOP/ijl-utilities-wrappers/blob/master/README.md#cellpose
+► To run the script, you have two options:
+1. Drag&drop the `.ijm` file onto the Fiji window. This will open the file in the editor. Click 'Run' in the bottom left.
+2. Copy the `.ijm` file to `<myPath>\Fiji.app\Plugins\Macros` and restart Fiji. It will now appear in the menu bar under Plugins > Macros.
 
-To run the macro, drag&drop the `.ijm` file on the Fiji window. This will open the editor. Click 'Run' in the bottom left.
+In case you also want to use Cellpose segmentation you additionally need:
+- A working Cellpose 2.0 environment in Python
+- Activated PTBIOP update site, with proper settings. See https://github.com/BIOP/ijl-utilities-wrappers/blob/master/README.md#cellpose
 
 ## Usage manual
 
