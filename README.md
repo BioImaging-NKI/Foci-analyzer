@@ -24,7 +24,7 @@ The table is saved as a `.tsv` file, which can be easily opened in other program
 ## Installation / Requirements
 In order to run the macro, download the [latest release](https://github.com/BioImaging-NKI/Foci-analyzer/releases/download/v1.3/Foci_Analyzer_1_3.ijm) into a sensible folder.
 
-► [Add](https://imagej.net/update-sites/following) the following Fiji update sites:
+► [Activate](https://imagej.net/update-sites/following) the following Fiji update sites:
 - 3D ImageJ Suite
 - CLIJ
 - CLIJ2
@@ -145,7 +145,7 @@ The preview image shows an ImageJ hyperstack that, besides the z-slices of the 3
 The image below shows a montage layout of such a hyperstack, with vertically the '*frames*' (foci channels A and B - here 2 and 3), and horizontally the '*channels*' (as described above):
 ![image](https://user-images.githubusercontent.com/33119248/206936107-175705d8-61b0-45df-8872-e279052ae035.png)
 
-  By changing the displayed channels (*Shift-Z*), and adjusting brightness&contrast (*Shift-C*)and zoom ('+' and '-' keys), the user can inspect the foci detections for both foci channels, adjust the detection parameters if desired and rerun the foci detection step. In particular, unchecking channel 1 (nuclei), and then alternating the displaying of channel 3 (detected foci) is most helpful.
+By changing the displayed channels (*Shift-Z*), adjusting brightness&contrast (*Shift-C*) of the channels and zooming in ('+' and '-' keys), the user can inspect the foci detections for both foci channels, adjust the detection parameters if desired and rerun the foci detection step. In particular, unchecking channel 1 (nuclei), and then alternating the displaying of channel 3 (detected foci) is most helpful.
 
 ![image](https://user-images.githubusercontent.com/33119248/206996059-d86441ce-795c-4c43-a9e7-c3181f0bdd71.png)
 ![foci_03_crop_RGB_optimization_crop](https://user-images.githubusercontent.com/33119248/206938037-fd79a4eb-3b14-42d5-8ddc-8aa39794a727.gif)
