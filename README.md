@@ -116,7 +116,7 @@ Since the minimum and maximum slider values are (-2.5, 2.5) the threshold can be
 
 - _Minimum foci size_ : Foci occupying an area/volume smaller than this value (in pixel/voxels) will be deleted. Note that for the marker-controlled watershed detection method the minimum foci size is `5 pixels` for 2D images and `7 voxels` for 3D images. Hence, setting sizes smaller than this will not change the number of detected foci.
 
-- _Minimum foci size_ : The upper limit for the foci size, in pixels/voxels.
+- _Maximum foci size_ : The upper limit for the foci size, in pixels/voxels.
 
 - _Minimum overlap of foci to colocalize_ : Foci in channel A and B will be counted as colocalizing *only if they overlap with at least this area/volume (in pixels/voxels).
 
