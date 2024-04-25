@@ -6,7 +6,7 @@ The macro doesn't work on timelapse images (yet). A (slightly tedious) workaroun
 Author: Bram van den Broek, The Netherlands Cancer Institute (b.vd.broek@nki.nl or bioimaging@nki.nl)
 
 ![image](https://user-images.githubusercontent.com/68109112/180581530-dd326026-cc74-4ce1-8d97-14518bfd4d73.png)
-
+ width="400"
 ## Workflow summary
 1. Nuclei are segmented (in a 2D projection) using the pre-trained deep learning network [StarDist](https://imagej.net/plugins/stardist). Alternatively, classic thresholding + watershedding can be used (though no parameters can be changed). As a third option, the deep learning network [Cellpose](https://github.com/MouseLand/cellpose) can be used to segment whole cells, thanks to the [Cellpose wrapper for Fiji](https://github.com/BIOP/ijl-utilities-wrappers) by BIOP.[^1]
 [^1]: Currently, Cellpose is run using the 2D 'cyto' model on a single channel, with the default options and automatic diameter detection. Look for `run("Cellpose Advanced")` in the code and change parameters as seen fit.
@@ -22,7 +22,7 @@ The table is saved as a `.tsv` file, which can be easily opened in other program
 4. Segmented nuclei and foci are visualized as overlays on the original images for easy inspection. If desired, foci detection settings (threshold bias, min/max size) can be adapted before processing all input images. A colocalization map is also created when two channels are measured.
 
 ## Installation / Requirements
-Download the [latest release of `Foci_Analyzer.ijm`](https://github.com/BioImaging-NKI/Foci-analyzer/releases/download/v1.3/Foci_Analyzer_1_3.ijm) into a sensible folder.
+Download the [latest release of `Foci_Analyzer.ijm`](https://github.com/BioImaging-NKI/Foci-analyzer/releases/download/v1.4/Foci_Analyzer_1_4.ijm) into a sensible folder.
 
 ► [Activate](https://imagej.net/update-sites/following) the following Fiji update sites (in the menu bar, via Help > Update...):
 - 3D ImageJ Suite
@@ -47,7 +47,7 @@ In case you also want to use Cellpose segmentation you additionally need:
 
 The macro starts with a large dialog containing all options and parameters (click to enlarge):
 
-<img src="https://user-images.githubusercontent.com/33119248/206914361-ccaabf14-3e88-4ab6-8742-89dfbfb95cbc.png" width="400">
+<img src="https://github.com/BioImaging-NKI/Foci-analyzer/assets/33119248/87b057e3-834e-4d32-bdf2-1093685607c4" width="600">
 
 The dialog has several sections, which are discussed below. All settings in this dialog will be remembered after you click `OK`.
 
@@ -67,9 +67,12 @@ The dialog has several sections, which are discussed below. All settings in this
 
 - _3D image handling_ : This parameter determines how foci in 3D images should be analyzed. For 2D input images this setting is ignored. There are four options:
   - *Analyze foci in 3D* (default) performs foci analysis using 3D filters and 3D marker-controlled watershed functions. Connected foci in consecutive slices are counted once.
-  - *Detect foci on the Maximum Intensity Projection* performs 2D foci analysis on the max projection.
+  - *Detect foci on a Extended Depth of Focus Projection* performs 2D foci analysis on an EDF projection.
+  - *Detect foci on the Maximum Intensity Projection* performs 2D foci analysis on the MIP projection.
   - *Use quasi-2D foci detection (detect foci separately in every Z-slice)* analyzes every z-slice in a 3D image as a separate 2D image. This setting is useful in cases where the z-spacing is very large and each focus is visible in only one z-slice. Hence, connected foci in consecutive slices will be counted multiple times.
   - *Process a single z-slice only (specify below which slice)* allows the user to analyze foci only in a particular z-slice.
+
+  Often analysis on 2D projections provides satisfactory results that are easier visualized/inspected compared to true 3D analysis, and much faster processing, with minimal sacrifices (e.g. foci intensities).
 
 - _[single z-slice foci detection only] Slice nr_ : the single z-slice used for the option above. For any other choice this parameter is ignored.
 
@@ -86,7 +89,9 @@ The dialog has several sections, which are discussed below. All settings in this
 
 - _Stardist nuclei binning factor [1-n]_ : Stardist is trained on medium resolution images, and generally performs well on images with pixel sizes around 0.5 µm. For images with much smaller pixel size StarDist tends to 'oversegment' nuclei. In this case, increase the StarDist binning factor. (N.B. This option only affects the nuclei segmentation; it is different from the previously mentioned 'XY binning' parameter, which also changes the pixel size of the foci channels.) (default: 1)
 
-- _Probability threshold [0.0-1.0] (StarDist/Cellpose)_ : Lower values will accept more nuclei; higher values will be more stringent.
+- _Probability threshold [0.0-1.0] (StarDist/Cellpose)_ : Lower values will accept more nuclei; higher values will be more stringent. For Cellpose this is actually the _flow_threshold_ parameter.
+
+- _Cellpose cell diameter (pixels), 0 for automatic_ : Estimated diameter of the cells, in pixels. Setting this parameter to 0 will trigger Cellpose to estimate it. Please check the Fiji console for the resulting estimate.
 
 - _Remove nuclei with diameter smaller than (units)_ : Objects smaller than circles having an area corresponding to this diameter will be removed. 'Units' depends on the image, and will almost always be 'µm', or otherwise 'pixels' in case the pxiel calibration values are missing. (default: 4)
 
@@ -117,6 +122,8 @@ Since the minimum and maximum slider values are (-2.5, 2.5) the threshold can be
 - _Minimum foci size_ : Foci occupying an area/volume smaller than this value (in pixel/voxels) will be deleted. Note that for the marker-controlled watershed detection method the minimum foci size is `5 pixels` for 2D images and `7 voxels` for 3D images. Hence, setting sizes smaller than this will not change the number of detected foci.
 
 - _Maximum foci size_ : The upper limit for the foci size, in pixels/voxels.
+
+- _Include foci outside nuclei/cells, with maximum distance (units); -1 for the full image_ : This controls how far (in units (=microns)) outside the cell/nucleus segmentation foci should be still be counted. (default: 0)
 
 - _Minimum overlap of foci to colocalize_ : Foci in channel A and B will be counted as colocalizing *only if they overlap with at least this area/volume (in pixels/voxels).
 
