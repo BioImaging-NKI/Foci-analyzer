@@ -80,9 +80,9 @@ The dialog has several sections, which are discussed below. All settings in this
 
 - _Image XY binning before analysis_ : Optional pixel binning in case the resolution is very high and the foci consist of many pixels. A value of 2 means: 2x2 pixels will be binned into 1 pixel. This reduces noise in the image and speeds up analysis. (default: 1)
 
-### Nuclei segmentation settings
+### Nuclei/cell segmentation settings
 
-- _Nuclei segmentation method_ :
+- _Nuclei/cell segmentation method_ :
   - *Stardist nuclei segmentation* (default) uses the pretrained convolutional neural network [StarDist](https://github.com/stardist/stardist#readme) to recognize cell nuclei in fluoresence microscopy images. In general this method works very well on a large variety of samples.
   - *Cellpose cytoplasm segmentation* uses the deep learning network [Cellpose](https://github.com/MouseLand/cellpose#--cellpose--) (model: cyto) to recognize whole cells. Use this option if you want to measure foci in entire cells and/or you do not have a nuclear staining (but it can also work well for nuclei). Cellpose requires a few additional installations (see [Installation / Requirements](https://github.com/BioImaging-NKI/Foci-analyzer/edit/main/README.md#installation--requirements)).
   - _Classic nuclei segmentation_ allows the user to segment nuclei using manual/automatic thresholding is provided for legacy reasons. The method is almost always outperformed by the two other methods.
