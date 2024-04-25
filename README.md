@@ -6,7 +6,7 @@ The macro doesn't work on timelapse images (yet). A (slightly tedious) workaroun
 Author: Bram van den Broek, The Netherlands Cancer Institute (b.vd.broek@nki.nl or bioimaging@nki.nl)
 
 ![image](https://user-images.githubusercontent.com/68109112/180581530-dd326026-cc74-4ce1-8d97-14518bfd4d73.png)
- width="400"
+
 ## Workflow summary
 1. Nuclei are segmented (in a 2D projection) using the pre-trained deep learning network [StarDist](https://imagej.net/plugins/stardist). Alternatively, classic thresholding + watershedding can be used (though no parameters can be changed). As a third option, the deep learning network [Cellpose](https://github.com/MouseLand/cellpose) can be used to segment whole cells, thanks to the [Cellpose wrapper for Fiji](https://github.com/BIOP/ijl-utilities-wrappers) by BIOP.[^1]
 [^1]: Currently, Cellpose is run using the 2D 'cyto' model on a single channel, with most options set to the defaults. Look for `run("Cellpose Advanced")` in the code and change parameters as seen fit.
