@@ -151,7 +151,7 @@
  * - Overlay and overlap images are now saves as .zip files to save storage space (typically 10 times), at the expense of slower processing.
  * - Possibility for automatic rescaling nuclei for StarDist (to a pixel size 0.5 µm), with non-integer rescaling factor.
  *   Upscaling (downscale factor < 1) is now also allowed. Interpolation is set to bilinear.
- * - Settings optimization: Channels Tool and B&C window are displayed in upper left corner of the screen. Added some tips in the optimilization dialog.
+ * - Settings optimization: Channels Tool and B&C window are displayed in upper left corner of the screen. Added some tips in the optimization dialog.
  */
 
 version = 1.5;
