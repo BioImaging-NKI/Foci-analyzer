@@ -48,10 +48,9 @@ The macro [`Merge_result_files_1.1.ijm`](https://github.com/BioImaging-NKI/Foci-
 ## Usage manual
 
 The macro starts with a large dialog containing all options and parameters (click to enlarge):
+The dialog has several sections that are discussed below. All settings in this dialog will be remembered after you click `OK`.
 
 <img src="https://github.com/user-attachments/assets/2274ced2-2420-4f92-a395-7b200d32e356" width="600">
-
-The dialog has several sections, which are discussed below. All settings in this dialog will be remembered after you click `OK`.
 
 ### File handling and image settings
 
