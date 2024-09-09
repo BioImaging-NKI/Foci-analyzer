@@ -49,7 +49,7 @@ The macro [`Merge_result_files_1.1.ijm`](https://github.com/BioImaging-NKI/Foci-
 
 The macro starts with a large dialog containing all options and parameters (click to enlarge):
 
-<img src="https://github.com/BioImaging-NKI/Foci-analyzer/assets/33119248/87b057e3-834e-4d32-bdf2-1093685607c4" width="600">
+<img src="https://github.com/user-attachments/assets/2274ced2-2420-4f92-a395-7b200d32e356" width="600">
 
 The dialog has several sections, which are discussed below. All settings in this dialog will be remembered after you click `OK`.
 
@@ -91,7 +91,7 @@ The dialog has several sections, which are discussed below. All settings in this
 
 - _Stardist nuclei rescaling factor [1-n], 0 for automatic rescaling_ : Stardist is trained on medium resolution images, and generally performs well on images with pixel sizes around 0.5 µm. For images with much smaller pixel size StarDist tends to 'oversegment' nuclei. Set to `0` for automatic rescaling the nuclei to the optimal pixel size of 0.5 µm, or put any other number for manual control of the rescaling. (N.B. This option only affects the nuclei segmentation; it is different from the previously mentioned 'XY binning' parameter, which also changes the pixel size of the foci channels.) (default: 0)
 
-- _Probability threshold [0.0-1.0] (StarDist/Cellpose)_ : Lower values will accept more nuclei; higher values will be more stringent. For Cellpose this is actually the _flow_threshold_ parameter.
+- _Probability threshold [0.0-1.0] (StarDist/Cellpose)_ : Lower values will accept more nuclei; higher values will be more stringent. For Cellpose this is actually the _flow_threshold_ parameter. (default: 0.5)
 
 - _Cellpose cell diameter (pixels), 0 for automatic_ : Estimated diameter of the cells, in pixels. Setting this parameter to 0 will trigger Cellpose to estimate it. Please check the Fiji console for the resulting estimate.
 
@@ -99,7 +99,7 @@ The dialog has several sections, which are discussed below. All settings in this
 
 - _Remove nuclei with diameter larger than (units)_ : Likewise, but for large objects. (default: 50)
 
-- _Exclude nuclei on image edges_ : When checked, nuclei that touch the image edge will not be analyzed.
+- _Exclude nuclei on image edges_ : When checked, nuclei that touch the image edge will not be analyzed. (default: checked).
 
 - _Manual nuclei removal_ : allows the user to erase ill-segmented nuclei before analysis. (default: No thanks) Options:
   - *No thanks* means no manual nuclei editing
@@ -110,22 +110,20 @@ The dialog has several sections, which are discussed below. All settings in this
 
 - _Enable foci parameters optimization mode?_ : Checking this will allow the user to adapt the foci detection settings on a preview analysis before quantifying. (default: checked)
 
-- _Foci size channel A (and B)_ : choices between *tiny*, *small*, *average*, *large*, *huge*, and *other*. This parameter controls several foci image filtering steps and steers the macro towards detecting smaller or larger foci. (default: average).
+- _Foci size channel A/B (after XY binning)_ : choices between *tiny*, *small*, *average*, *large*, *huge*, and *other*. This parameter controls several foci image filtering steps and steers the macro towards detecting smaller or larger foci. (default: average).
 
 - _Foci detection method_ :
   - *Marker-controlled watershed* uses [marker-controlled watershed](https://imagej.net/plugins/marker-controlled-watershed) with local maxima as seeds to segment foci
   - *AreaMaximum detection* tends to detect only the peaks of the foci. Can be tried when the other option doesn't provide satisfactory results.
 
-- _Foci intensity threshold bias channel A_ : The macro will automatically estimate the intensity threshold for foci detection (after difference-of-Gaussians background subtraction). This default threshold is set at 3 times the median standard deviation of the nuclear background signal in all nuclei in the image. The user can bias this threshold with the slider to lower values (accepting more low intensity foci) or higher values (gearing towards high intensity foci). The bias slider couples exponentially to the used threshold value: threshold = estimated_threshold * e<sup>bias</sup>. 
+- _Foci intensity threshold bias channel A/B_ : The macro will automatically estimate the intensity threshold for foci detection (after difference-of-Gaussians background subtraction). This default threshold is set at 3 times the median standard deviation of the nuclear background signal in all nuclei in the image. The user can bias this threshold with the slider to lower values (accepting more low intensity foci) or higher values (gearing towards high intensity foci). The bias slider couples exponentially to the used threshold value: threshold = estimated_threshold * e<sup>bias</sup>. 
 Since the minimum and maximum slider values are (-2.5, 2.5) the threshold can be set to anywhere between 0.2 and 36 times the standard deviation of the nuclear background signal. (default: 0)
 
-- _Foci intensity threshold bias channel B_ : same as above
+- _Minimum foci size (pixels/voxels)_ : Foci occupying an area/volume smaller than this value (in pixel/voxels) will be deleted. Note that for the marker-controlled watershed detection method the minimum foci size is `5 pixels` for 2D images and `7 voxels` for 3D images. Hence, setting sizes smaller than this will not change the number of detected foci.
 
-- _Minimum foci size_ : Foci occupying an area/volume smaller than this value (in pixel/voxels) will be deleted. Note that for the marker-controlled watershed detection method the minimum foci size is `5 pixels` for 2D images and `7 voxels` for 3D images. Hence, setting sizes smaller than this will not change the number of detected foci.
+- _Maximum foci size (pixels/voxels)_ : The upper limit for the foci size, in pixels/voxels.
 
-- _Maximum foci size_ : The upper limit for the foci size, in pixels/voxels.
-
-- _Include foci outside nuclei/cells, with maximum distance (units); -1 for the full image_ : This controls how far (in units (=microns)) outside the cell/nucleus segmentation foci should be still be counted. (default: 0)
+- _Max distance of foci outside nuclei/cells (units); -1 for full image_ : This controls how far (in units (=microns)) outside the cell/nucleus segmentation foci should be still be counted. (default: 0)
 
 - _Minimum overlap of foci to colocalize_ : Foci in channel A and B will be counted as colocalizing *only if they overlap with at least this area/volume (in pixels/voxels).
 
