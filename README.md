@@ -40,7 +40,7 @@ Download the [latest release of `Foci_Analyzer.ijm`](https://github.com/BioImagi
 2. Copy the `.ijm` file to `<myPath>\Fiji.app\Plugins\Macros` and restart Fiji. It will now appear in the menu bar under Plugins > Macros.
 
 In case you also want to use Cellpose segmentation you additionally need:
-- A working Cellpose 2.0 environment in Python
+- A working Cellpose 2.0 environment in Python (conda or venv)
 - Activated PTBIOP update site, with proper settings. See https://github.com/BIOP/ijl-utilities-wrappers/blob/master/README.md#cellpose
 
 The macro [`Merge_result_files_1.1.ijm`](https://github.com/BioImaging-NKI/Foci-analyzer/releases/download/v1.4/Merge_result_files_1.1.ijm) can be used to pool output `.tsv` files into a single file.
