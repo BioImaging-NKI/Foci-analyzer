@@ -158,3 +158,8 @@ By changing the displayed channels (*Shift-Z*), adjusting brightness&contrast (*
 ![image](https://user-images.githubusercontent.com/33119248/206996059-d86441ce-795c-4c43-a9e7-c3181f0bdd71.png)
 ![foci_03_crop_RGB_optimization_crop](https://user-images.githubusercontent.com/33119248/206938037-fd79a4eb-3b14-42d5-8ddc-8aa39794a727.gif)
 ![channels_tool](https://user-images.githubusercontent.com/33119248/206938473-f8f575fc-26b9-4071-abbe-77a33e86e156.gif)
+
+### Colocalization
+
+Documentation will follow soon, sorry!
+It will be completed with the coming release (soon!), that includes proper (2D/3D) Cellpose segmentation.
