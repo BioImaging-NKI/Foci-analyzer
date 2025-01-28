@@ -162,4 +162,4 @@ By changing the displayed channels (*Shift-Z*), adjusting brightness&contrast (*
 ### Colocalization
 
 Documentation will follow soon, sorry!
-It will be completed with the coming release (soon!), that includes proper (2D/3D) Cellpose segmentation.
+It will be completed with the coming release (soon!), that includes proper (2D/3D) Cellpose segmentation, and stats for all foci instead of only averages per nucleus.
