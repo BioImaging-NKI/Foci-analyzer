@@ -161,5 +161,13 @@ By changing the displayed channels (*Shift-Z*), adjusting brightness&contrast (*
 
 ### Colocalization
 
-Documentation will follow soon, sorry!
-It will be completed with the coming release (soon!), that includes proper (2D/3D) Cellpose segmentation, and stats for all foci instead of only averages per nucleus.
+The macro produces overlap maps for the foci in the two chosen channels that visualize the overlap of foci in the different channels. This map has 6 channels:
+
+1. detected foci mask channel A (green)
+2. detected foci mask channel B (red)
+3. overlap % foci count with channel A (azure; the brighter, the more foci overlap)
+4. overlap % foci volume with channel A (magenta)
+5. overlap % foci count with channel B (azure)
+6. overlap % foci volume with channel B (magenta)
+
+More documentation will follow with the coming release (soon!), that includes proper (2D/3D) Cellpose segmentation, and stats for all foci instead of only averages per nucleus.
