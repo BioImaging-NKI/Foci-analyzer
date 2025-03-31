@@ -24,7 +24,7 @@ The table is saved as a `.tsv` file, which can be easily opened in other program
 ## Installation / Requirements
 Download the [latest release of `Foci_Analyzer.ijm`](https://github.com/BioImaging-NKI/Foci-analyzer/releases/) (in Assets) into a sensible folder. 
 
-► [Activate](https://imagej.net/update-sites/following) the following Fiji update sites (in the menu bar, via Help > Update...):
+► [Activate](https://imagej.net/update-sites/following) the following Fiji update sites (in the menu bar, via Help -> Update...):
 - 3D ImageJ Suite
 - CLIJ
 - CLIJ2
@@ -34,6 +34,7 @@ Download the [latest release of `Foci_Analyzer.ijm`](https://github.com/BioImagi
 - IJPB-plugins
 - SCF MPI CBG
 - StarDist
+- (TensorFlow) Due to a recent Fiji update, StarDist [may require the TensorFlow Update Site](https://forum.image.sc/t/stardist-error-since-update/107729) to function properly.
 
 ► To run the script, you have two options:
 1. Drag&drop the `.ijm` file onto the Fiji window. This will open the file in the editor. Click 'Run' in the bottom left.
