@@ -34,6 +34,7 @@ The table is saved as a `.tsv` file, which can be easily opened in other program
 - IJPB-plugins
 - StarDist
 - (TensorFlow) Due to a recent Fiji update, StarDist [may require the TensorFlow Update Site](https://forum.image.sc/t/stardist-error-since-update/107729) to function properly.
+
 Run Foci Analyzer from the Fiji menu: Plugins -> Foci Analyzer -> Foci Analyzer.
 
 In case you also want to use Cellpose segmentation you additionally need:
