@@ -1,5 +1,5 @@
 
-# Foci Analyzer
+# Foci Analyzer <img src=https://github.com/user-attachments/assets/b25e5cca-2e2f-4bee-a651-d33bd14dd3a7 width="160" align="right">
 
 ImageJ macro for the analysis of foci (e.g. DNA damage) in nuclei (or cells). Works on 2D/3D fluorescence images, including multiseries files, as long as all series have the same dimensions.
 Timelapse images are split into separate timepoints and processed individually.
