@@ -150,6 +150,9 @@
  * - Fixed bug where the macro would crash when 3D Cellpose segmentation was chosen in combination with *not* excluding cells on edges.
  * - Release version for Elmi 2025
  * 
+ * Version 1.81:
+ * - Added foci centroid coordinates to the 'All foci statistics' table
+ * 
  * 
  * --> TO DO: open timelapse output files, concatenate, and restore overlays. Now via external scripts.
  * 
@@ -209,7 +212,7 @@
 #@ Boolean	debugMode				(label = "Debug mode (show intermediate images)", value=false)
 #@ String	file_and_image_message0	(value = "<html><header font-size=24>Need help? Visit <a href=https://imagej.net/plugins/foci-analyzer>Foci Analyzer on ImageJ.net</a></html>", visibility="MESSAGE")
 
-version = 1.8;
+version = 1.81;
 
 requires("1.54a");	//Minimum required ImageJ version
 
@@ -255,6 +258,7 @@ requires("1.54a");	//Minimum required ImageJ version
 // * - IJPB-plugins
 // * - PT-BIOP
 // * - StarDist
+
 
 missingPlugin = "";
 List.setCommands;
@@ -996,15 +1000,18 @@ function process_current_series(image, nameHasExtension) {
 			selectWindow("Results");
 			boundingBox_X = Table.getColumn("BOUNDING_BOX_X");
 			boundingBox_Y = Table.getColumn("BOUNDING_BOX_Y");
+			boundingBox_Z = Table.getColumn("BOUNDING_BOX_Z");
 			boundingBox_width = Table.getColumn("BOUNDING_BOX_WIDTH");
 			boundingBox_height = Table.getColumn("BOUNDING_BOX_HEIGHT");
+			boundingBox_depth = Table.getColumn("BOUNDING_BOX_DEPTH");
 			Array.getStatistics(boundingBox_width, minWidth, maxWidth);
 			Array.getStatistics(boundingBox_height, minHeight, maxHeight);
+			Array.getStatistics(boundingBox_depth, minDepth, maxDepth);
 			if(debugMode) print("\nMaximum nucleus bounding box: "+maxWidth+", "+maxHeight);		
 
 			//Measure the foci 
-			nrFoci = measureFoci(original, fociChannelA, nrNuclei, labelmap_nuclei_3D, labelmap_fociA, boundingBox_X, boundingBox_Y, maxWidth, maxHeight);
-			if(detectFociChannelB) nrFoci = measureFoci(original, fociChannelB, nrNuclei, labelmap_nuclei_3D, labelmap_fociB, boundingBox_X, boundingBox_Y, maxWidth, maxHeight);
+			nrFoci = measureFoci(original, fociChannelA, nrNuclei, labelmap_nuclei_3D, labelmap_fociA, boundingBox_X, boundingBox_Y, boundingBox_Z, maxWidth, maxHeight, maxDepth);
+			if(detectFociChannelB) nrFoci = measureFoci(original, fociChannelB, nrNuclei, labelmap_nuclei_3D, labelmap_fociB, boundingBox_X, boundingBox_Y, boundingBox_Z, maxWidth, maxHeight, maxDepth);
 
 			if(gslices > 1 && nrFoci>0) Table.renameColumn("Volume", "Volume (voxels)", allFociResultsTable);
 			else if (gslices == 1 && nrFoci>0) Table.renameColumn("Volume", "Area (pixels)", allFociResultsTable);
@@ -2121,7 +2128,7 @@ function setLabel(image, label) {
 }
 
 
-function measureFoci(original, channel, nrNuclei, labelmap_nuclei_3D, labelmap_foci, boundingBox_X, boundingBox_Y, boundingBox_width, boundingBox_height) {
+function measureFoci(original, channel, nrNuclei, labelmap_nuclei_3D, labelmap_foci, boundingBox_X, boundingBox_Y, boundingBox_Z, boundingBox_width, boundingBox_height, boundingBox_depth) {
 	Ext.CLIJ2_push(labelmap_foci);
 //	if(debugMode) showImagefromGPU(labelmap_foci);
 	selectWindow(original);
@@ -2152,14 +2159,19 @@ function measureFoci(original, channel, nrNuclei, labelmap_nuclei_3D, labelmap_f
 		labelmap_foci_nucleus_relabeled = "labelmap_foci_nucleus_relabeled";
 		foci_raw_cropped = "foci_nucleus";
 		// Crop labelmaps and raw images before measuring - much faster for large images
-		Ext.CLIJ2_crop3D(foci_raw, foci_raw_cropped, boundingBox_X[i], boundingBox_Y[i], 0, boundingBox_width, boundingBox_height, gslices);
+		Ext.CLIJ2_crop3D(foci_raw, foci_raw_cropped, boundingBox_X[i], boundingBox_Y[i], boundingBox_Z[i], boundingBox_width, boundingBox_height, boundingBox_depth);
 		if(debugMode) {
 //			showImagefromGPU(foci_raw_cropped);
 //			getDimensions(width, height, channels, slices, frames);
 //			print("dimensions of nucleus "+i+1+" image: "+width+ ", "+height);
 		}
-		Ext.CLIJ2_crop3D(labelmap_nuclei_3D_dilated, labelmap_nuclei_cropped, boundingBox_X[i], boundingBox_Y[i], 0, boundingBox_width, boundingBox_height, gslices);
-		Ext.CLIJ2_crop3D(labelmap_foci, labelmap_foci_cropped, boundingBox_X[i], boundingBox_Y[i], 0, boundingBox_width, boundingBox_height, gslices);
+		//Crop nucleus (XY only) before measurements, for speed reasons
+//		Ext.CLIJ2_crop3D(labelmap_nuclei_3D_dilated, labelmap_nuclei_cropped, boundingBox_X[i], boundingBox_Y[i], 0, boundingBox_width, boundingBox_height, gslices);
+//		Ext.CLIJ2_crop3D(labelmap_foci, labelmap_foci_cropped, boundingBox_X[i], boundingBox_Y[i], 0, boundingBox_width, boundingBox_height, gslices);
+
+		Ext.CLIJ2_crop3D(labelmap_nuclei_3D_dilated, labelmap_nuclei_cropped, boundingBox_X[i], boundingBox_Y[i], boundingBox_Z[i], boundingBox_width, boundingBox_height, boundingBox_depth);
+		Ext.CLIJ2_crop3D(labelmap_foci, labelmap_foci_cropped, boundingBox_X[i], boundingBox_Y[i], boundingBox_Z[i], boundingBox_width, boundingBox_height, boundingBox_depth);
+
 		Ext.CLIJ2_maskLabel(labelmap_foci_cropped, labelmap_nuclei_cropped, labelmap_foci_nucleus, i+1);
 
 		//This is roughly equally fast as maskLabel:
@@ -2174,7 +2186,30 @@ function measureFoci(original, channel, nrNuclei, labelmap_nuclei_3D, labelmap_f
 		Ext.CLIJ2_pull(labelmap_foci_nucleus_relabeled);
 		run("Intensity Measurements 2D/3D", "input="+foci_raw_cropped+" labels="+labelmap_foci_nucleus_relabeled+" mean stddev max min median skewness volume");
 		fociTable = "foci_nucleus-intensity-measurements";
-		headings = split(Table.headings(fociTable), "\t");	//Get column headers. Ok, it is the same for every nucleus, but it's fast anyway.
+		fociheadings = split(Table.headings(fociTable), "\t");	//Get column headers. Ok, it is the same for every nucleus, but it's fast anyway.
+
+		//Add intensity measurements, centroid coordinates and circularity/sphericity for all foci
+		if(gslices>1) {
+			run("Analyze Regions 3D", "sphericity centroid surface_area_method=[Crofton (13 dirs.)] euler_connectivity=6");
+			labelTable = "labelmap_foci_nucleus_relabeled-morpho";
+		} else {
+			run("Analyze Regions", "circularity centroid");
+			labelTable = "labelmap_foci_nucleus_relabeled-Morphometry";
+		}
+		labelheadings = split(Table.headings(labelTable), "\t");	//Get column headers. Ok, it is the same for every nucleus, but it's fast anyway.
+		centroidX_ = Table.getColumn("Centroid.X", labelTable);
+		centroidY_ = Table.getColumn("Centroid.Y", labelTable);
+		if(gslices>1) centroidZ_ = Table.getColumn("Centroid.Z", labelTable);
+		centroidX_ = addScalarToArray(centroidX_, boundingBox_X[i]);
+		centroidY_ = addScalarToArray(centroidY_, boundingBox_Y[i]);
+		if(gslices>1) addScalarToArray(centroidZ_, boundingBox_Z[i]);
+		centroidX_ = multiplyArraywithScalar(centroidX_, pixelWidth);
+		centroidY_ = multiplyArraywithScalar(centroidY_, pixelHeight);
+		if(gslices>1) centroidZ_ = multiplyArraywithScalar(centroidZ_, pixelDepth);
+		Table.setColumn("Centroid.X", centroidX_, labelTable);
+		Table.setColumn("Centroid.Y", centroidY_, labelTable);
+		if(gslices>1) Table.setColumn("Centroid.Z", centroidZ_, labelTable);
+		
 		close(foci_raw_cropped);
 		close(labelmap_foci_nucleus_relabeled);
 		//Count the number of foci
@@ -2187,9 +2222,13 @@ function measureFoci(original, channel, nrNuclei, labelmap_nuclei_3D, labelmap_f
 			Table.set("Cell ID", k, i+1, allFociResultsTable);
 			Table.set("channel", k, channel, allFociResultsTable);
 		}
-	    for (col=0; col<headings.length; col++) {
-			col_values = Table.getColumn(headings[col], fociTable);
-			for(k = totalNrFoci; k < totalNrFoci + nrFoci; k++) Table.set(headings[col], k, col_values[k - totalNrFoci], allFociResultsTable);
+	    for (col=0; col<fociheadings.length; col++) {
+			col_values = Table.getColumn(fociheadings[col], fociTable);
+			for(k = totalNrFoci; k < totalNrFoci + nrFoci; k++) Table.set(fociheadings[col], k, col_values[k - totalNrFoci], allFociResultsTable);
+	    }
+	    for (col=0; col<labelheadings.length; col++) {
+			col_values = Table.getColumn(labelheadings[col], labelTable);
+			for(k = totalNrFoci; k < totalNrFoci + nrFoci; k++) Table.set(labelheadings[col], k, col_values[k - totalNrFoci], allFociResultsTable);
 	    }
 
 		// calculate stats for median intensity and size								
@@ -2250,6 +2289,7 @@ function measureFoci(original, channel, nrNuclei, labelmap_nuclei_3D, labelmap_f
 	Table.update();
 	
 	close(fociTable);
+	close(labelTable);
 	return nrFoci;
 }
 
@@ -2283,7 +2323,7 @@ function measure_nuclear_intensities(original, nrNuclei, labelmap_nuclei_3D, gch
 }
 
 
-			//Draw nuclei and/or foci numbers as overlay
+//Draw nuclei and/or foci numbers as overlay
 function overlay_numbers_on_image(overlay_image) {
 	selectImage(overlay_image);
 	if(addNumbersOverlay) {
@@ -2336,7 +2376,8 @@ function overlay_numbers_on_image(overlay_image) {
 					Overlay.drawString(i+1, x - labelFontSize/2, y + labelFontSize/2);
 					Overlay.setPosition(0, k+1, 0);
 				}
-				y = getResult("CENTROID_Y", i) + labelFontSize/2 + 2;
+				//y = getResult("CENTROID_Y", i) + labelFontSize/2 + 2;
+				y = y + labelFontSize + 4;
 				nrf = Table.get("Foci count ch"+fociChannelA, i, resultTable);
 				setColor(color2);
 				for(k = z_start; k <= z_end ; k++) {
@@ -2611,6 +2652,16 @@ function prependToArray(value, array) {
 	temparray[0]=value;
 	array=temparray;
 	return array;
+}
+
+
+//Adds a scalar to all elements of an array
+function addScalarToArray(array, scalar) {
+	added_array=newArray(lengthOf(array));
+	for (a=0; a<lengthOf(array); a++) {
+		added_array[a]=array[a] + scalar;
+	}
+	return added_array;
 }
 
 
