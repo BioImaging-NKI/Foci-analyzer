@@ -150,69 +150,69 @@
  * - Fixed bug where the macro would crash when 3D Cellpose segmentation was chosen in combination with *not* excluding cells on edges.
  * - Release version for Elmi 2025
  * 
- * Version 1.81:
+ * Version 1.82:
  * - Added foci centroid coordinates to the 'All foci statistics' table
+ * - Added descriptions to the Scijava script parameters
  * 
  * 
  * --> TO DO: open timelapse output files, concatenate, and restore overlays. Now via external scripts.
  * 
  */
-
 #@ String	file_message 			(value="<html><p style='font-size:14px; color:#9933cc; font-weight:bold'>File settings</p></html>", visibility="MESSAGE")
-#@ File[]	files 					(label = "Input files", style="File")
-#@ File		outputFolder			(label = "Output folder", style = "directory")
+#@ File[]	files 					(label = "Input files", style="File", description="Here you can specify which files to analyze, by adding them to the list, or drag&drop from a file explorer window.")
+#@ File		outputFolder			(label = "Output folder", style = "directory", description="The folder where all the analyzed images and results will be written.")
 
 #@ String	image_message 			(value="<html><p style='font-size:14px; color:#3366cc; font-weight:bold'>Image settings</p></html>", visibility="MESSAGE")
-#@ Boolean	loadSettingsFromFile	(label = "Load settings from previously analyzed image?")
-#@ Integer 	nucleiChannel			(label = "Nuclei channel (-1 if not used)", value = 1)
-#@ Integer	cytoChannel 			(label = "Cytoplasm/membrane channel (-1 if not used)", value = -1)
-#@ Integer	fociChannelA 			(label = "Foci channel A", value = 2)
-#@ Integer	fociChannelB 			(label = "Foci channel B", value = 3)
-#@ Boolean	detectFociChannelB		(label = "Also detect foci in channel B and perform colocalization?", persistence=true, value=true, description="Check this box to calculate colocalization between two foci channels.")
+#@ Boolean	loadSettingsFromFile	(label = "Load settings from previously analyzed image?", description="When checked, a separate dialog will popup where an output .zip file can be selected (overlay or colocalization map).\nAll settings are loaded from the metadata in the saved image. The script parameter entries in this large dialog are ignored.")
+#@ Integer 	nucleiChannel			(label = "Nuclei channel (-1 if not used)", value = 1, description="The image channel that contains the nuclei. For StarDist nuclei segmentation is performed using this channel, which always happens in 2D (in the case of 3D images on a maximum intensity projection).\nFor Cellpose, there are two possibilities, depending on the value of Cytoplasm/membrane channel below.")
+#@ Integer	cytoChannel 			(label = "Cytoplasm/membrane channel (-1 if not used)", value = -1, description="The image channel that contains cytoplasm or membrane. If set to -1, segmentation is performed on the nucleus channel alone.\nIf not -1 and Cellpose is chosen as segmentation method, segmentation is performed on this channel. In this case the nuclei channel is the 'additional helper channel'.\nIf not set to -1 and StarDist is chosen, this channel is not used in the segmentation, but instead just displayed in the overlay image. (default: -1)")
+#@ Integer	fociChannelA 			(label = "Foci channel A", value = 2, description="The first foci channel (default: 2)")
+#@ Integer	fociChannelB 			(label = "Foci channel B", value = 3, description="The second foci channel (default: 3)")
+#@ Boolean	detectFociChannelB		(label = "Also detect foci in channel B and perform colocalization?", persistence=true, value=true, description="If checked, foci in both channels A and B will be analyzed, followed by a simple colocalization analysis. (default: checked)")
 
-#@ String	ThreeDHandling 			(label = "2D/3D foci detection", choices={"Detect foci in 3D (or 2D when not applicable)", "Detect foci on the Maximum Intensity Projection", "Detect foci on the Standard Deviation Projection", "Detect foci on the Summed Intensity Projection", "Use quasi-2D foci detection (detect foci separately in every Z-slice)", "Process a single z-slice only (specify below which slice)"}, style="listbox")
-#@ Integer	singleSlice				(label = "[single z-slice foci detection only] Slice nr", value=1, min=1)
-#@ Integer	cropBorder				(label = "Remove image borders (pixels)", value = 0, min=0)
-#@ Integer	XYBinning				(label = "Image XY binning before analysis [1-n]", value = 1, min=1, description="Image binning will greatly shorten the analysis time, but can be less accurate.")
+#@ String	ThreeDHandling 			(label = "2D/3D foci detection", choices={"Detect foci in 3D (or 2D when N/A)", "Detect foci on the Maximum Intensity Projection", "Detect foci on a Extended Depth of Focus Projection", "Detect foci on the Standard Deviation Projection", "Detect foci on the Summed Intensity Projection", "Use quasi-2D foci detection (detect foci separately in every Z-slice)", "Process a single z-slice only (specify below which slice)"}, style="listbox", description="2D/3D foci detection:\nThis parameter determines how foci in 3D images should be analyzed. For 2D input images this setting is ignored. The options are:\n\n- Detect foci in 3D (or 2D when N/A) (default) performs foci analysis using 3D filters and 3D marker-controlled watershed functions. Connected foci in consecutive slices are counted once.\n\n- Detect foci on the Maximum Intensity Projection performs 2D foci analysis on the MIP projection.\n\n- Detect foci on a Extended Depth of Focus Projection performs 2D foci analysis on an EDF projection.\n\n- Detect foci on the Standard Deviation Projection performs 2D foci analysis on the STDEV projection.\n\n- Detect foci on the Summed Intensity Projection performs 2D foci analysis on the SUM projection.\n\n- Use quasi-2D foci detection (detect foci separately in every Z-slice) analyzes every z-slice in a 3D image as a separate 2D image.\n  This setting is useful in cases where the z-spacing is very large and each focus is visible in only one z-slice.\n  Hence, connected foci in consecutive slices will be counted multiple times.\n\n- Process a single z-slice only (specify below which slice) allows the user to analyze foci only in a particular z-slice.")
+#@ Integer	singleSlice				(label = "[single z-slice foci detection only] Slice nr", value=1, min=1, description="The single z-slice used for the option above. For any other choice this parameter is ignored.")
+#@ Integer	cropBorder				(label = "Remove image borders (pixels)", value = 0, min=0, description="Possibility to remove edges from the image. This can in particular be useful when the image edges have very different intensities, causing incorrect automatic nuclei segmentation. (default: 0)")
+#@ Integer	XYBinning				(label = "Image XY binning before analysis [1-n]", value = 1, min=1, description="Optional pixel binning in case the resolution is very high and the foci consist of many pixels.\nA value of 2 means: 2x2 pixels will be binned into 1 pixel. This reduces noise in the image and speeds up analysis. (default: 1)")
 
 #@ String	nuclei_message 			(value = "<html><p style='font-size:14px; color:#33aa00; font-weight:bold'>Nuclei/cell detection settings</p></html>", visibility="MESSAGE")
-#@ String	nucleiSegmentationChoice(label = "Nuclei/cell segmentation method", choices={"StarDist nuclei segmentation 2D (or on 2D projection)", "Cellpose segmentation 2D (or on 2D projection)", "Cellpose segmentation 3D", "Classic segmentation", "Load ROIs from file", "Load label images"}, style="listBox")
-#@ Double	downsampleFactorStarDist(label = "Stardist nuclei rescaling factor [1-n], 0 for automatic, 1 for no rescaling", value = 0, min=0, description="A binning >1 for high-resolution input images can prevent 'oversegmentation', and will also somewhat speed up processing.")
-#@ Double 	probabilityThreshold	(label = "Probablility/flow threshold [0.0-1.0] (StarDist/Cellpose)", value = 0.5, min=0, max=1, style="format:0.0", description="lower values will accept more nuclei")
-#@ String 	CellposeModel			(label = "Cellpose model", choices={"cyto3","nuclei","tissuenet_cp3","cpsam","custom"}, style="listBox", value="cyto3")
-#@ Integer	CellposeDiameter		(label = "Cellpose cell diameter (pixels), 0 for automatic", value = 0, min=0, description="Estimation of the cell diameter")
+#@ String	nucleiSegmentationChoice	(label = "Nuclei/cell segmentation method", choices={"StarDist nuclei segmentation 2D (or on 2D projection)", "Cellpose segmentation 2D (or on 2D projection)", "Cellpose segmentation 3D", "Classic segmentation", "Load ROIs from file", "Load label images"}, style="listBox", description="Nuclei/cell segmentation method:\nStardist nuclei segmentation 2D (or on 2D projection) (default) uses the pretrained convolutional neural network StarDist to recognize cell nuclei in fluorescence microscopy images.\nIn general this method works very well on a large variety of samples.\n\n- Cellpose segmentation 2D (or on 2D projection) uses the deep learning network Cellpose to recognize whole cells or nuclei.\nUse this option if you want to measure foci in entire cells, or if you prefer Cellpose nuclei segmentation over StarDist.\nN.B. Cellpose requires additional installations (see Installation / Requirements).\n\n- Cellpose segmentation 3D: If this option is chosen a new dialog pops up with extra settings. These are the most important parameters for 3D segmentation.\nMore parameters can be added in the 'Additional Cellpose parameters' field. The Help button takes you to the Cellpose CLI with explanations of all parameters.\n\n- Classic nuclei segmentation allows the user to segment nuclei using manual/automatic thresholding is provided for legacy reasons.\nThe method is almost always outperformed by the two other methods.\n\n- Load ROIs from file: ImageJ ROI .zip files can be loaded instead of performing segmentation. This option is used in the (near future) QuPath-Fiji workflow.\nROI files should have the same name as the input images without extensions, followed by '_ROIs.zip'.\n\n- Load label images allows loading a labelmap, if the segmentation has been done by external programs, or to quickly re-run files with the same segmentation.\nLabel image files should be present in another folder and have the exact same name as the input images.")
+#@ Double	downsampleFactorStarDist	(label = "Stardist nuclei rescaling factor [1-n], 0 for automatic, 1 for no rescaling", value = 0, min=0, description="Stardist is trained on medium resolution images, and generally performs well on images with pixel sizes around 0.2-0.5 µm.\nSet to 0 for automatic rescaling the nuclei to an optimal pixel size of 0.25 µm, or put any other number for manual control of the rescaling.")
+#@ Double 	probabilityThreshold		(label = "Probability/flow threshold [0.0-1.0] (StarDist/Cellpose)", value = 0.5, min=0, max=1, style="format:0.0", description="Lower values will accept more nuclei/cells; higher values will be more stringent. For Cellpose this is actually the flow_threshold parameter.")
+#@ String 	CellposeModel			(label = "Cellpose model", choices={"cyto3","nuclei","tissuenet_cp3","cpsam","custom"}, style="listBox", value="cyto3", description="The model (built-in or custom) used for segmentation.")
+#@ Integer	CellposeDiameter		(label = "Cellpose cell diameter (pixels), 0 for automatic", value = 0, min=0, description="Estimated diameter of the cells, in pixels. Setting this parameter to 0 will trigger Cellpose to estimate it.")
 
-#@ Integer 	minNucleusSize_setting	(label = "Remove nulei/cells with diameter smaller than (µm)", value = 4)
-#@ Integer	maxNucleusSize_setting	(label = "Remove nulei/cells with diameter larger than (µm)", value = 40)
-#@ Boolean	excludeOnEdges			(label = "Exclude nulei/cells on image edges", value = true)
-#@ String	manualRemoveNuclei		(label = "Manually remove segmentated nuclei/cells", choices={"No thanks","Manually remove nuclei", "load previously saved removals (from output folder)"}, value = "No thanks", description="Allow nuclei/cell removal by clicking, or load previous removals (Masks should be in the output folder)")
+#@ Integer 	minNucleusSize_setting	(label = "Remove nuclei/cells with diameter smaller than (µm)", value = 4, description="Objects smaller than circles having an area corresponding to this diameter will be removed.")
+#@ Integer	maxNucleusSize_setting	(label = "Remove nuclei/cells with diameter larger than (µm)", value = 50, description="Likewise, but for large objects.")
+#@ Boolean	excludeOnEdges			(label = "Exclude nuclei/cells on image edges", value = true, description="When checked, nuclei that touch the image edge will not be analyzed. (default: checked).")
+#@ String	manualRemoveNuclei		(label = "Manually remove segmented nuclei/cells", choices={"No thanks","Manually remove nuclei", "Load previously saved removals (from output folder)"}, value = "No thanks", description="Manual nuclei removal: allows the user to erase ill-segmented nuclei before analysis. (default: No thanks)\nOptions:\n\n- No thanks means no manual nuclei editing\n\n- Manually remove nuclei : Remove nuclei by leftclicking them in the image with the mouse. Editings will be saved to a small text file in the output folder.\n\n- Load previously saved removals (from output folder) : If you have edited the segmented nuclei on this image before, it will load the previous nuclei removals\n  from the file in the specified output folder. (Hence, if you change the output folder parameter this option will not work.)")
 
 #@ String	foci_message1			(value="<html><p style='font-size:14px; color:#cc9933; font-weight:bold'>Foci detection settings</p></html>", visibility="MESSAGE")
-#@ Boolean	optimizationModeSetting	(label = "Preview foci detection (for parameter fine-tuning)?", value=true)
-#@ String	fociSizeA				(label = "Foci size channel A (after XY binning)", choices={"tiny","small","average","large","huge","other"}, style="listBox", value="average", description="Simplified foci detection parameter. This parameter determines the Difference of Gaussians filter size for foci detection.")
-#@ String	fociSizeB				(label = "Foci size channel B (after XY binning)", choices={"tiny","small","average","large","huge","other"}, style="listBox", value="average", description="Simplified foci detection parameter. This parameter determines the Difference of Gaussians filter size for foci detection.")
-#@ String	fociDetectionMethod		(label = "Foci detection method", choices={"Marker-controlled watershed (recommended)","AreaMaxima local maximum detection"}, style="listBox")
+#@ Boolean	optimizationModeSetting	(label = "Preview foci detection (for parameter fine-tuning)?", value=true, description="Checking this will allow the user to adapt the foci detection settings on a preview analysis before quantifying.")
+#@ String	fociSizeA				(label = "Foci size channel A (after XY binning)", choices={"tiny","small","average","large","huge","other"}, style="listBox", value="average", description="This parameter controls several foci image filtering steps and steers the macro towards detecting smaller or larger foci.")
+#@ String	fociSizeB				(label = "Foci size channel B (after XY binning)", choices={"tiny","small","average","large","huge","other"}, style="listBox", value="average", description="This parameter controls several foci image filtering steps and steers the macro towards detecting smaller or larger foci.")
+#@ String	fociDetectionMethod		(label = "Foci detection method", choices={"Marker-controlled watershed (recommended)","AreaMaxima local maximum detection"}, style="listBox", description="Select the method for foci detection.")
 
-#@ Double	thresholdFactorA		(label = "Foci intensity threshold bias channel A", value = 0.0, min=-2.5, max=2.5, style="scroll bar", stepSize=0.01)
-#@ Double	thresholdFactorB		(label = "Foci intensity threshold bias channel B", value = 0.0, min=-2.5, max=2.5, style="scroll bar", stepSize=0.01)
-#@ Integer	minFociSize				(label = "Minimum foci size (area) (pixels/voxels)", value = 3)
-#@ Integer	maxFociSize				(label = "Maximum foci size (area) (pixels/voxels)", value = 9999)
+#@ Double	thresholdFactorA		(label = "Foci intensity threshold bias channel A", value = 0.0, min=-2.5, max=2.5, style="scroll bar", stepSize=0.01, description="The macro will automatically estimate the intensity threshold for foci detection. This default threshold can be biased with the slider.")
+#@ Double	thresholdFactorB		(label = "Foci intensity threshold bias channel B", value = 0.0, min=-2.5, max=2.5, style="scroll bar", stepSize=0.01, description="The macro will automatically estimate the intensity threshold for foci detection. This default threshold can be biased with the slider.")
+#@ Integer	minFociSize				(label = "Minimum foci size (area) (pixels/voxels)", value = 3, description="Foci occupying an area/volume smaller than this value will be deleted.")
+#@ Integer	maxFociSize				(label = "Maximum foci size (area) (pixels/voxels)", value = 9999, description="The upper limit for the foci size, in pixels/voxels.")
 
-#@ Double	maxFociDistanceOutsideNuclei_setting	(label = "Max distance of foci outside nuclei/cells (µm); -1 for full image", value = 0, min=-1, style="format:0.0")
+#@ Double	maxFociDistanceOutsideNuclei_setting	(label = "Max distance of foci outside nuclei/cells (µm); -1 for full image", value = 0, min=-1, style="format:0.0", description="This controls how far outside the cell/nucleus segmentation foci should still be counted. (default: 0)")
 
-#@ Integer	minOverlapSize			(label = "Minimum overlap of foci to colocalize (pixels/voxels)", min = 1, value = 1, description="Foci in channel A and B will be counted as colocalizing only if they overlap with at least this area/volume")
+#@ Integer	minOverlapSize			(label = "Minimum overlap of foci to colocalize (pixels/voxels)", min = 1, value = 1, description="Foci in channel A and B will be counted as colocalizing only if they overlap with at least this area/volume.")
 
 #@ String	visualization_message	(value = "<html><p style='font-size:14px; color:#cc3333; font-weight:bold'>Visualization options</p></html>", visibility="MESSAGE")
-#@ String	overlayChoice			(label = "Nuclei/cell overlay choice", choices={"nucleus/cell ID","foci count","both","none"})
-#@ ColorRGB	fontColorCells			(label = "Nuclei/cell label color", value="orange")
-#@ ColorRGB	fontColorFoci			(label = "Foci count label color", value="red")
-#@ Integer	labelFontSize			(label = "Nuclei/cell label font size", value=12, min=4)
-#@ String	overlayBrightness		(label = "Nuclei/cell outline bightness", choices={"bright","dim"})
-#@ String	outlineColor			(label = "Nuclei/cell outline color", choices={"White","Red","Green","Blue","Cyan","Magenta","Yellow"}, value = "Cyan")
-#@ Boolean	debugMode				(label = "Debug mode (show intermediate images)", value=false)
+#@ String	overlayChoice			(label = "Nuclei/cell overlay choice", choices={"nucleus/cell ID","foci count","both","none"}, description="Select which numbers are added to the overlay.")
+#@ ColorRGB	fontColorCells			(label = "Nuclei/cell label color", value="orange", description="The color of the nucleus/cell ID text overlay.")
+#@ ColorRGB	fontColorFoci			(label = "Foci count label color", value="red", description="The color of the foci count text overlay.")
+#@ Integer	labelFontSize			(label = "Nuclei/cell label font size", value=12, min=4, description="The size of the nuclei/cell ID text overlay.")
+#@ String	overlayBrightness		(label = "Nuclei/cell outline brightness", choices={"bright","dim"}, description="The brightness of the nuclei outlines overlay.")
+#@ String	outlineColor			(label = "Nuclei/cell outline color", choices={"White","Red","Green","Blue","Cyan","Magenta","Yellow"}, value = "Cyan", description="The color of the nuclei outlines overlay.")
+#@ Boolean	debugMode				(label = "Debug mode (show intermediate images)", value=false, description="Used for development and bug fixing: checking this option will trigger displaying many intermediate results during the processing. It will also slow down the analysis.")
 #@ String	file_and_image_message0	(value = "<html><header font-size=24>Need help? Visit <a href=https://imagej.net/plugins/foci-analyzer>Foci Analyzer on ImageJ.net</a></html>", visibility="MESSAGE")
 
-version = 1.81;
+version = 1.82;
 
 requires("1.54a");	//Minimum required ImageJ version
 
@@ -783,7 +783,7 @@ function process_current_series(image, nameHasExtension) {
 				maxFociDistanceOutsideNuclei = round(maxFociDistanceOutsideNuclei_setting / pixelWidth);
 				if(maxFociDistanceOutsideNuclei_setting < 0) Ext.CLIJ2_dilateLabels(labelmap_nuclei_3D, labelmap_nuclei_3D_dilated, maxOf(gwidth, gheight));
 				else Ext.CLIJ2_dilateLabels(labelmap_nuclei_3D, labelmap_nuclei_3D_dilated, maxFociDistanceOutsideNuclei);
-				if(ThreeDHandling == "Detect foci in 3D (or 2D when not applicable)" && nucleiSegmentationChoice == "Cellpose segmentation 3D" && pixelDepth/pixelWidth > 1.33) print("[WARNING] Due to non-isotropic pixels the foci region will be expanded from the nuclei more in Z than in X and Y! (by a factor of "+d2s(pixelDepth/pixelWidth,1)+")");
+				if(ThreeDHandling == "Detect foci in 3D (or 2D when N/A)" && nucleiSegmentationChoice == "Cellpose segmentation 3D" && pixelDepth/pixelWidth > 1.33) print("[WARNING] Due to non-isotropic pixels the foci region will be expanded from the nuclei more in Z than in X and Y! (by a factor of "+d2s(pixelDepth/pixelWidth,1)+")");
 				//N.B. For non-isotropic 3D data this 3D dilation is not fair, but making the labelmap isotropic creates intermediate (non-integer) values. Oh well..
 			}
 			else Ext.CLIJ2_copy(labelmap_nuclei_3D, labelmap_nuclei_3D_dilated);
@@ -1387,11 +1387,11 @@ function segmentCellsCellpose (image, nucleiChannel, cytoChannel, probabilityThr
 	}
 	else exit("ERROR: Cellpose wrapper not found! Update Fiji and activate the PT-BIOP Update site.");
 	List.clear();
-	if(nucleiSegmentationChoice == "Cellpose segmentation 3D" && ThreeDHandling != "Detect foci in 3D (or 2D when not applicable)" && imageIs3D == true) {
+	if(nucleiSegmentationChoice == "Cellpose segmentation 3D" && ThreeDHandling != "Detect foci in 3D (or 2D when N/A)" && imageIs3D == true) {
 		print("[WARNING] 3D Cellpose segmentation is selected, but '3D image handling' is set to '"+ThreeDHandling+"'.\nProceeding with 2D Cellpose segmentation.");
 		nucleiSegmentationChoice = "Cellpose segmentation 2D (or on 2D projection)";
 	}
-	if(nucleiSegmentationChoice == "Cellpose segmentation 3D" && ThreeDHandling == "Detect foci in 3D (or 2D when not applicable)" && imageIs3D == false) {
+	if(nucleiSegmentationChoice == "Cellpose segmentation 3D" && ThreeDHandling == "Detect foci in 3D (or 2D when N/A)" && imageIs3D == false) {
 		print("[WARNING] 3D Cellpose segmentation is selected, but the image has only 1 slice.\nProceeding with 2D Cellpose segmentation.");
 		nucleiSegmentationChoice = "Cellpose segmentation 2D (or on 2D projection)";
 	}
@@ -1646,7 +1646,7 @@ function manually_remove_labels(labelmap, label_edges, nrNuclei, windowName, ima
    	run("Add Image...", "image="+label_edges+" x=0 y=0 opacity=100 zero");
 	setBatchMode("show");
 
-	if(manualRemoveNuclei == "load previously saved removals (from output folder)" && File.exists(outputFolder + File.separator + imageName + "__removalMask.png")) {
+	if(manualRemoveNuclei == "Load previously saved removals (from output folder)" && File.exists(outputFolder + File.separator + imageName + "__removalMask.png")) {
 		open(outputFolder + File.separator + imageName + "__removalMask.png");
 		if(is("Inverting LUT")) run("Invert LUT");
 		run("Points from Mask");
