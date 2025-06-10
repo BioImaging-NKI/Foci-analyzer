@@ -150,8 +150,8 @@
  * - Fixed bug where the macro would crash when 3D Cellpose segmentation was chosen in combination with *not* excluding cells on edges.
  * - Release version for Elmi 2025
  * 
- * Version 1.82:
- * - Added foci centroid coordinates to the 'All foci statistics' table
+ * Version 1.83:
+ * - Added foci centroid coordinates to the 'All foci statistics' table (in 1.82 - bugfix in 1.83)
  * - Added descriptions to the Scijava script parameters
  * 
  * 
@@ -212,7 +212,7 @@
 #@ Boolean	debugMode				(label = "Debug mode (show intermediate images)", value=false, description="Used for development and bug fixing: checking this option will trigger displaying many intermediate results during the processing. It will also slow down the analysis.")
 #@ String	file_and_image_message0	(value = "<html><header font-size=24>Need help? Visit <a href=https://imagej.net/plugins/foci-analyzer>Foci Analyzer on ImageJ.net</a></html>", visibility="MESSAGE")
 
-version = 1.82;
+version = 1.83;
 
 requires("1.54a");	//Minimum required ImageJ version
 
@@ -2197,19 +2197,20 @@ function measureFoci(original, channel, nrNuclei, labelmap_nuclei_3D, labelmap_f
 			labelTable = "labelmap_foci_nucleus_relabeled-Morphometry";
 		}
 		labelheadings = split(Table.headings(labelTable), "\t");	//Get column headers. Ok, it is the same for every nucleus, but it's fast anyway.
-		centroidX_ = Table.getColumn("Centroid.X", labelTable);
-		centroidY_ = Table.getColumn("Centroid.Y", labelTable);
-		if(gslices>1) centroidZ_ = Table.getColumn("Centroid.Z", labelTable);
-		centroidX_ = addScalarToArray(centroidX_, boundingBox_X[i]);
-		centroidY_ = addScalarToArray(centroidY_, boundingBox_Y[i]);
-		if(gslices>1) addScalarToArray(centroidZ_, boundingBox_Z[i]);
-		centroidX_ = multiplyArraywithScalar(centroidX_, pixelWidth);
-		centroidY_ = multiplyArraywithScalar(centroidY_, pixelHeight);
-		if(gslices>1) centroidZ_ = multiplyArraywithScalar(centroidZ_, pixelDepth);
-		Table.setColumn("Centroid.X", centroidX_, labelTable);
-		Table.setColumn("Centroid.Y", centroidY_, labelTable);
-		if(gslices>1) Table.setColumn("Centroid.Z", centroidZ_, labelTable);
-		
+		if(Table.size(labelTable) > 0) {
+			centroidX_ = Table.getColumn("Centroid.X", labelTable);
+			centroidY_ = Table.getColumn("Centroid.Y", labelTable);
+			if(gslices>1) centroidZ_ = Table.getColumn("Centroid.Z", labelTable);
+			centroidX_ = addScalarToArray(centroidX_, boundingBox_X[i]);
+			centroidY_ = addScalarToArray(centroidY_, boundingBox_Y[i]);
+			if(gslices>1) addScalarToArray(centroidZ_, boundingBox_Z[i]);
+			centroidX_ = multiplyArraywithScalar(centroidX_, pixelWidth);
+			centroidY_ = multiplyArraywithScalar(centroidY_, pixelHeight);
+			if(gslices>1) centroidZ_ = multiplyArraywithScalar(centroidZ_, pixelDepth);
+			Table.setColumn("Centroid.X", centroidX_, labelTable);
+			Table.setColumn("Centroid.Y", centroidY_, labelTable);
+			if(gslices>1) Table.setColumn("Centroid.Z", centroidZ_, labelTable);
+		}
 		close(foci_raw_cropped);
 		close(labelmap_foci_nucleus_relabeled);
 		//Count the number of foci
@@ -2231,7 +2232,7 @@ function measureFoci(original, channel, nrNuclei, labelmap_nuclei_3D, labelmap_f
 			for(k = totalNrFoci; k < totalNrFoci + nrFoci; k++) Table.set(labelheadings[col], k, col_values[k - totalNrFoci], allFociResultsTable);
 	    }
 
-		// calculate stats for median intensity and size								
+		// calculate stats per nucleus								
 		foci_count_[i] = nrFoci;
 		if(nrFoci>0) {
 			int_ = Table.getColumn("Mean", fociTable);
@@ -2253,6 +2254,14 @@ function measureFoci(original, channel, nrNuclei, labelmap_nuclei_3D, labelmap_f
 		}
 	}
 	Table.update(allFociResultsTable);
+	
+//	//Measure distance to edge of the cell/nucleus
+//	//Not active yet: Possibly do this in a loop, because Table.setColumn() overwrites the results of the previous channel.
+//	Ext.CLIJ2_distanceMap(labelmap_nuclei_3D, distancemap_nuclei_3D);
+//	Ext.CLIJ2_pull(distancemap_nuclei_3D);
+//	run("Intensity Measurements 2D/3D", "input="+distancemap_nuclei_3D+" labels="+labelmap_foci+" mean");
+//	foci_distance_to_cell_edge_ = Table.getColumn("Mean");
+//	Table.setColumn("Distance to cell edge", foci_distance_to_cell_edge_, allFociResultsTable);
 
 	Ext.CLIJ2_release(foci_raw_cropped);
 	Ext.CLIJ2_release(labelmap_nuclei_cropped);
