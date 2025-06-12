@@ -1,12 +1,13 @@
 
 # Foci Analyzer <img src=https://github.com/user-attachments/assets/b25e5cca-2e2f-4bee-a651-d33bd14dd3a7 width="160" align="right">
 
-ImageJ macro for the analysis of foci (e.g. DNA damage) in nuclei (or cells). Works on 2D/3D fluorescence images, including multiseries files, as long as all series have the same dimensions.
-Timelapse images are split into separate timepoints and processed individually.
+Foci Analyzer is a comprehensive Fiji macro to detect, analyze and visualize nuclear/cellular foci in 2D/3D fluorescence microscopy images of cells and tissue.
+Foci are efficiently and reliably detected in images from different imaging modalities (confocal, widefield), with a wide range of resolutions.
+The output data include detailed tables with foci statistics and overlays of segmented cells with foci on the original image. Colocalization analysis is performed on images with two foci channels, and shown in insightful overlap maps.
+
+![image](https://github.com/user-attachments/assets/749fc433-576b-49d2-8fe7-2b3b049ee4d9)
 
 Author: Bram van den Broek, The Netherlands Cancer Institute, Amsterdam. For questions please use the [image.sc forum](https://forum.image.sc/) with tag @bramvdbroek.
-
-![image](https://user-images.githubusercontent.com/68109112/180581530-dd326026-cc74-4ce1-8d97-14518bfd4d73.png)
 
 ## Workflow summary
 
