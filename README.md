@@ -43,7 +43,7 @@ Run Foci Analyzer from the Fiji menu: `Plugins -> Foci Analyzer -> Foci Analyzer
 
 In case you also want to use Cellpose segmentation you additionally need:
 - A working Cellpose (2.0 or higher) environment in Python (conda or venv)
-- Activated PTBIOP update site, with proper settings. See https://github.com/BIOP/ijl-utilities-wrappers/blob/master/README.md#cellpose
+- Activated PTBIOP update site, with proper settings. See [here](https://github.com/BIOP/ijl-utilities-wrappers/blob/master/README.md#cellpose) for more details.
 
 
 ## Usage manual
@@ -57,7 +57,7 @@ The dialog has several (color-coded) sections that are discussed below. All sett
 
 - _Input files_ : Here you can specify which files to analyze. Simply add them to the list using the buttons, or directly drag&drop from a file explorer window. Input images should be multichannel images. (RGB images will be converted to composite multichannel image with channels 1:Red, 2:Green; 3:Blue.) Each file should contain at least a channel with nuclei staining, and a channel with foci (though technically they can be the same). The file format can e.g. be `.tiff`, or any proprietary microscopy file format that Fiji (i.e. Bio-Formats) can open, including multiple images packed into a single file as series.
 
-- _Output folder_ : the folder where all the analyzed images and results will be written.
+- _Output folder_ : the folder where all the analyzed images and result output files will be written.
 
 ### Image settings
 
