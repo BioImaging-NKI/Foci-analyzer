@@ -39,6 +39,7 @@ The table is saved as a `.tsv` file, which can be easily opened in other program
 - IJPB-plugins
 - StarDist
 - (TensorFlow) Due to a recent Fiji update, StarDist [may require the TensorFlow Update Site](https://forum.image.sc/t/stardist-error-since-update/107729) to function properly.
+- (SCF MPI CBG) Only if you want to use the foci detection method 'AreaMaxima local maxima detection'
 
 Run Foci Analyzer from the Fiji menu: `Plugins -> Foci Analyzer -> Foci Analyzer`.
 `Combine result files` can be used to pool output `.tsv` files into a single file/table.
