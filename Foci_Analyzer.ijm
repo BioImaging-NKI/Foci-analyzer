@@ -172,7 +172,7 @@
 #@ String	Foci_Analyzer_message 	(value="<html><p style='font-size:18px; color:#000000; font-weight:bold'><img width=96 height=96 src='https://imagej.net/media/icons/Foci-Analyzer-icon.png'</img><a style='color:#000000' href=https://imagej.net/plugins/foci-analyzer>Foci Analyzer</a> (v1.87)</p></html>", visibility="MESSAGE")
 #@ String	file_message 			(value="<html><p style='font-size:14px; color:#9933cc; font-weight:bold'>File settings</p></html>", visibility="MESSAGE")
 #@ File[]	files 					(label = "Input files", style="File", description="Here you can specify which files to analyze, by adding them to the list, or drag&drop from a file explorer window.")
-#@ String	processOnlyExtension	(label = "Only process files with extension (leave empty for all files)", value="")
+#@ String	processOnlyExtension	(label = "Only process files with extension (leave empty for all files)", value="", description="If files with multiple formats are in the list, only files ending with this extension (e.g. tif, czi) will be processed.")
 #@ File		outputFolder			(label = "Output folder", style = "directory", required=false, description="The folder where all the analyzed images and results will be saved.")
 #@ Boolean	useInputAsOutput		(label = "Save the output files in the same folder as the input file(s)?", description="When checked, output images and result files will be saved in the same folder as the input file(s).")
 
