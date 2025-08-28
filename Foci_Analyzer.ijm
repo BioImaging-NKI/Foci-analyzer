@@ -1,5 +1,5 @@
 /* Macro to quantify foci in nuclei/cells. Works on 2D/3D images, including multiseries files, as long as all series have the same specs
- * More info on https://github.com/BioImaging-NKI/Foci-analyzer/
+ * More info on https://imagej.net/plugins/foci-analyzer
  * 
  * ► Requires the following Fiji update sites:
  * - 3D ImageJ Suite
@@ -17,7 +17,8 @@
  * - PTBIOP update site, with proper settings. See https://github.com/BIOP/ijl-utilities-wrappers/blob/master/README.md#cellpose
  * 
  * 
- * Author: Bram van den Broek, The Netherlands Cancer Institute, b.vd.broek@nki.nl
+ * Author: Bram van den Broek, The Netherlands Cancer Institute
+ * For questions please use the Image.sc forum (https://forum.image.sc/) with tag @bramvdbroek.
  * 
  * 
  * 
@@ -45,17 +46,17 @@
  * Version 0.99, June 2022:
  * - Updated the parameters saved in the metadata of the output images
  * 
- * Version 1.0, July 2022:
+ * Version 1.00, July 2022:
  * - Added possibility to manually remove segmented nuclei by clicking. Masks are saved and can be loaded for re-analysis.
  * 
- * Version 1.1, July 2022:
+ * Version 1.10, July 2022:
  * - Fixed a small bug: nuclear intensity in foci channel B is now measured also when detectFociChannelB is false.
  * - Changes in AreaMaximum detection (minimum foci size) 
  * - Now asks to create output folder if it doesn't exist.
  * - Classic segmentation works again
  * - Fixed a bug where the nucleus area was not correctly reported when Stardist nuclei binning factor > 1
  * 
- * Version 1.2, October 2022:
+ * Version 1.20, October 2022:
  * - Fixed critical bug where after threshold optimization of the second image Fiji would crash (because an image was released from the GPU)
  * - Improved log window readability
  * - Fixed a bug (in debug mode) where Fiji crashed after threshold optimization if the overlay image was not selected
@@ -77,7 +78,7 @@
  * - Fixed bug where foci spots were not displayed correctly when threshold was changed
  * - Improved visualization options
  * 
- * Version 1.3, December 2022
+ * Version 1.30, December 2022
  * - If 'Alt' is pressed before a file is loaded, the user can select a ROI to do a preview analysis on.
  * - downscaled ROIs are now smoothed using spline fitting
  * - Improved GUI: 3D image handling radiobuttons instead of separate checkboxes
@@ -124,7 +125,7 @@
  * - A table with all foci statistics is now also saved (thanks to Harry Osborne)
  * - Added possibility to load settings from a previously analyzed file
  * 
- * Version 1.6-1.7, January-March 2025
+ * Version 1.60-1.70, January-March 2025
  * - Cellpose envPath and envType parameters are automatically retrieved (new Cellpose wrapper)
  * - Added 3D segmentation with Cellpose 2.5D/3D, and 3D label visualization. Cellpose 3.1.0 is required (for --dP_smooth/flow3D_smooth parameter)
  * - Changed automatic StarDist downscaling to 0.25 um/pixel (was 0.4)
@@ -145,7 +146,7 @@
  * - Possibility to choose a color for foci count overlay
  * - Possibility to choose 'none' for nucleus ID / foci count overlay
  * 
- * Version 1.8:
+ * Version 1.80:
  * - Added checkbox to hide the 3D segmentation dialog window for subsequent images.
  * - Fixed bug where the macro would crash when 3D Cellpose segmentation was chosen in combination with *not* excluding cells on edges.
  * - Release version for Elmi 2025
@@ -154,13 +155,26 @@
  * - Added foci centroid coordinates to the 'All foci statistics' table (in 1.82 - bugfix in 1.83)
  * - Added descriptions to the Scijava script parameters
  * 
+ * Version 1.84:
+ * - Changed comments
  * 
- * --> TO DO: open timelapse output files, concatenate, and restore overlays. Now via external scripts.
+ * Version 1.85:
+ * - Fixed a bug that caused foci detection outside nuclei to be inaccurate (dilated labels were incorrectly cropped)
+ * 
+ * Version 1.86-1.87:
+ * - New option to set file extension of images to be processed
+ * - New option to save the output files in the same (sub)folder as the input files.
+ * - Only perform StarDist and CSBDeep plugin check when using StarDist is actually used
+ * - Small bugfixes regarding manual removal of nuclei, circumventing the issue that sometimes old multipoint selections stay in memory (v1.87)
  * 
  */
+ 
+#@ String	Foci_Analyzer_message 	(value="<html><p style='font-size:18px; color:#000000; font-weight:bold'><img width=96 height=96 src='https://imagej.net/media/icons/Foci-Analyzer-icon.png'</img><a style='color:#000000' href=https://imagej.net/plugins/foci-analyzer>Foci Analyzer</a> (v1.87)</p></html>", visibility="MESSAGE")
 #@ String	file_message 			(value="<html><p style='font-size:14px; color:#9933cc; font-weight:bold'>File settings</p></html>", visibility="MESSAGE")
 #@ File[]	files 					(label = "Input files", style="File", description="Here you can specify which files to analyze, by adding them to the list, or drag&drop from a file explorer window.")
-#@ File		outputFolder			(label = "Output folder", style = "directory", description="The folder where all the analyzed images and results will be written.")
+#@ String	processOnlyExtension	(label = "Only process files with extension (leave empty for all files)", value="")
+#@ File		outputFolder			(label = "Output folder", style = "directory", required=false, description="The folder where all the analyzed images and results will be saved.")
+#@ Boolean	useInputAsOutput		(label = "Save the output files in the same folder as the input file(s)?", description="When checked, output images and result files will be saved in the same folder as the input file(s).")
 
 #@ String	image_message 			(value="<html><p style='font-size:14px; color:#3366cc; font-weight:bold'>Image settings</p></html>", visibility="MESSAGE")
 #@ Boolean	loadSettingsFromFile	(label = "Load settings from previously analyzed image?", description="When checked, a separate dialog will popup where an output .zip file can be selected (overlay or colocalization map).\nAll settings are loaded from the metadata in the saved image. The script parameter entries in this large dialog are ignored.")
@@ -210,15 +224,15 @@
 #@ String	overlayBrightness		(label = "Nuclei/cell outline brightness", choices={"bright","dim"}, description="The brightness of the nuclei outlines overlay.")
 #@ String	outlineColor			(label = "Nuclei/cell outline color", choices={"White","Red","Green","Blue","Cyan","Magenta","Yellow"}, value = "Cyan", description="The color of the nuclei outlines overlay.")
 #@ Boolean	debugMode				(label = "Debug mode (show intermediate images)", value=false, description="Used for development and bug fixing: checking this option will trigger displaying many intermediate results during the processing. It will also slow down the analysis.")
-#@ String	file_and_image_message0	(value = "<html><header font-size=24>Need help? Visit <a href=https://imagej.net/plugins/foci-analyzer>Foci Analyzer on ImageJ.net</a></html>", visibility="MESSAGE")
+#@ String	file_and_image_message0	(value = "<html><p style='font-size:12px'>Need help? Visit the <a href=https://imagej.net/plugins/foci-analyzer>Foci Analyzer</a> website on ImageJ.net</p></html>", visibility="MESSAGE")
 
-version = 1.83;
+version = 1.87;
 
-requires("1.54a");	//Minimum required ImageJ version
+requires("1.54i");	//Minimum required ImageJ version
 
 /* KNOWN ISSUES
  *  
- * ! Maka a possibility to skip the 3D Cellpose parameters dialog
+ * ! Make a possibility to skip the 3D Cellpose parameters dialog
  * ! Foci outside nuclei: Make isotropic - dilate - make non-isotropic
  * ! 3D outlines also in colocalization image
  * ! Make filter before classic segmentation pixelsize-dependent
@@ -226,13 +240,15 @@ requires("1.54a");	//Minimum required ImageJ version
  * 
  * TO DO | IDEAS
  * 
+ * * Open timelapse output files, concatenate, and restore overlays. Now via the script 'concatenate timelapse with overlays'.
+ * 
  * * Include 3D Cellpose settings when loading settings from previously analyzed image
  * 
  * * Output:
  * (Centroids of all foci? (MorphoLibJ Analyze regions?))
  * (Distance from edge for all foci?)
  * 
- * * Include Voronoi-Otsu segmentation!
+ * * Include Voronoi-Otsu segmentation
  * 
  * * Use Roi.setMinStrokeWidth() for a better scaling of outlines?
  * 
@@ -274,7 +290,7 @@ if (missingPlugin != "") {
 	print("Error: Required plugin(s) not found:\n"+missingPlugin+"\n \nFoci Analyzer requires the following Fiji Update Sites to be activated:\n* 3D ImageJ Suite\n* CLIJ\n* CLIJ2\n* CLIJx-assistent\n* CLIJx-assistent-extensions\n* CSBDeep\n* IJPB-plugins\n* StarDist\n \nGo to Help -> Update... -> Manage Update Sites and check the relevant boxes.");
 	exit("Error: Required plugin(s) not found:\n"+missingPlugin+"\n \nFoci Analyzer requires the following Fiji Update Sites to be activated:\n* 3D ImageJ Suite\n* CLIJ\n* CLIJ2\n* CLIJx-assistent\n* CLIJx-assistent-extensions\n* CSBDeep\n* IJPB-plugins\n* StarDist\n \nGo to Help -> Update... -> Manage Update Sites and check the relevant boxes.\nThis info is also printed to the Log Window.");
 }
-
+List.clear();
 
 if(loadSettingsFromFile == true) {	//TO DO: Add 3D Cellpose settings
 	setBatchMode(true);
@@ -283,7 +299,7 @@ if(loadSettingsFromFile == true) {	//TO DO: Add 3D Cellpose settings
 	else exit("Please select an output .zip file from a previous analysis. Exiting macro.");
 	print("Loading settings from "+loadSettingsPath);
 	loadVersion = Property.getNumber("00. Version ");
-	if(loadVersion <= version) showMessage("Warning: The file you have selected has been analyzed with version "+loadVersion+", while you are currently running version "+version+".\nUnexpected things may happen.");
+	if(loadVersion < version) showMessage("Warning: The file you have selected has been analyzed with version "+loadVersion+", while you are currently running version "+version+".\nUnexpected things may happen.");
 	nucleiChannel = Property.getNumber("02. Nuclei channel ");
 	cytoChannel = Property.getNumber("03. Cytoplasm/membrane channel  (-1 if not used) ");
 	fociChannelA = Property.getNumber("04. Foci channel A ");
@@ -316,7 +332,7 @@ if(loadSettingsFromFile == true) {	//TO DO: Add 3D Cellpose settings
 	minOverlapSize = Property.getNumber("31. Minimum overlap of foci to colocalize (pixels/voxels) ");
 	overlayChoice = Property.get("32. Nuclei overlay choice ");
 	fontColorCells = Property.get("33. Nuclei label color ");
-	fontColorFoci = Property.get("34. Nuclei label color ");
+	fontColorFoci = Property.get("34. Foci count label color ");
 	labelFontSize = Property.getNumber("35. Nuclei label size ");
 	overlayBrightness = Property.get("36. Nuclei/cell outline bightness ");
 	outlineColor = Property.get("37. Nuclei outline color ");
@@ -373,6 +389,10 @@ var processTime = 0;
 //var threshold = 0;
 var thresholdA = 0;
 var thresholdB = 0;
+var ROIsFolder = "";
+var labelImageFolder = "";
+var setROIsFolder = false;
+var setLabelImageFolder = false;
 
 //Create the azure and orange LUTs for the nuclei and cells (TO DO: maybe do this in a more elegant way than globals)
 b_reds = newArray(256);
@@ -408,7 +428,11 @@ setBatchMode(true);
 
 run("Close All");
 nrOfImages = files.length;
-if(!File.exists(outputFolder)) {
+if(outputFolder == "0" && useInputAsOutput == false) {
+	print("[WARNING] The output folder is not set. Using the input folder as output folder.");
+	useInputAsOutput = true;
+}
+if(!File.exists(outputFolder) && useInputAsOutput == false) {
 	createOutputFolder = getBoolean("The output folder '"+outputFolder+"' does not exist. Create?", "Of course, go ahead!", "See if I care!");
 	if(createOutputFolder) File.makeDirectory(outputFolder);
 	else {
@@ -420,9 +444,9 @@ if(!File.exists(outputFolder)) {
 		else exit("That's more like it. Now, run the macro and try again.");
 	}
 }
-if (nucleiSegmentationChoice == "Load ROIs from file") {
-//	ROIsFolder = call("ij.Prefs.get", "ROIs.Folder", File.getParent(files[0]));
-	ROIsFolder = File.getParent(files[0]);
+
+if (nucleiSegmentationChoice == "Load ROIs from file" && useInputAsOutput == false && setROIsFolder == false) {
+	ROIsFolder = call("ij.Prefs.get", "ROIs.Folder", File.getParent(files[0]));
 	Dialog.createNonBlocking("Select a ROIs folder");
 	Dialog.addMessage("ROI files should have the same name as the input images without extensions, followed by '_ROIs.zip'.");
 	Dialog.addDirectory("Folder containing ROI .zip files", ROIsFolder);
@@ -430,8 +454,10 @@ if (nucleiSegmentationChoice == "Load ROIs from file") {
 	ROIsFolder = Dialog.getString();
 	call("ij.Prefs.set", "ROIs.Folder", ROIsFolder);
 	print("Getting segmentations from ROIs in "+ROIsFolder);
+	setROIsFolder = true;
 }
-if (nucleiSegmentationChoice == "Load label images") {
+
+if (nucleiSegmentationChoice == "Load label images" && useInputAsOutput == false && setLabelImageFolder == false) {
 	labelImageFolder = call("ij.Prefs.get", "label.Image.Folder", File.getParent(files[0]));
 	Dialog.createNonBlocking("Select a label image folder");
 	Dialog.addMessage("Label image files should have the exact same name as the input images.");
@@ -440,6 +466,7 @@ if (nucleiSegmentationChoice == "Load label images") {
 	labelImageFolder = Dialog.getString();
 	call("ij.Prefs.set", "label.Image.Folder", labelImageFolder);
 	print("Getting segmentations from label images in "+labelImageFolder);
+	setLabelImageFolder = true;
 }
 if (cellpose == true && CellposeModel == "custom") {
 
@@ -467,7 +494,8 @@ else CellposeModelPath = "path\\to\\own_cellpose_model";	//dummy name
 
 for (currentFileNr = 0; currentFileNr < nrOfImages; currentFileNr++) {
 	print("\nProcessing file "+currentFileNr+1+"/"+nrOfImages+": "+files[currentFileNr] + "\n");
-	processFile(currentFileNr, files[currentFileNr], outputFolder);
+	if(processOnlyExtension == "" || endsWith(files[currentFileNr], processOnlyExtension)) processFile(currentFileNr, files[currentFileNr], outputFolder);
+	else print("Skipping "+File.getName(files[currentFileNr])+" because it is not a "+processOnlyExtension+" file.");
 }
 close("Results");
 
@@ -508,6 +536,11 @@ function processFile(current_image_nr, file, outputFolder) {
 	Ext.setId(file);
 	Ext.getSeriesCount(nr_series);
 
+	if(useInputAsOutput) outputFolder = File.getDirectory(file);
+	if(useInputAsOutput) ROIsFolder = File.getDirectory(file);
+	if(useInputAsOutput) labelImageFolder = File.getDirectory(file);
+	
+	
 	run("CLIJ2 Macro Extensions", "cl_device="); //Necessary to do this here, because you can only activate one Macro Extension at the time
 	Ext.CLIJ2_clear();
 
@@ -734,9 +767,8 @@ function process_current_series(image, nameHasExtension) {
 		labelmap_nuclei = nuclei_info[0];
 		nuclei_outlines = nuclei_info[1];
 		nrNuclei = nuclei_info[2];
-		labelmap_nuclei = "Labelmap_nuclei_edited";
+//		labelmap_nuclei = "Labelmap_nuclei_edited";
 	}
-
 	if(nrNuclei > 0) {
 		//Write ID and area to foci results table
 		run("Clear Results");
@@ -773,7 +805,7 @@ function process_current_series(image, nameHasExtension) {
 			roiManager("Set Line Width", 1);
 			roiManager("add");
 		}
-		
+	
 		do {
 			if(processAllOtherImages == false) doneOptimizing = false;	//Reset this parameter from the previous round
 			
@@ -788,7 +820,7 @@ function process_current_series(image, nameHasExtension) {
 			}
 			else Ext.CLIJ2_copy(labelmap_nuclei_3D, labelmap_nuclei_3D_dilated);
 			if(debugMode) showImagefromGPU(labelmap_nuclei_3D_dilated);
-		
+	
 			//Create outlines from dilated nuclei labelmap
 			nuclei_dilated_outlines = "nuclei_dilated_outlines";
 			if(isOpen("nuclei_dilated_outlines")) close(nuclei_dilated_outlines);
@@ -815,7 +847,7 @@ function process_current_series(image, nameHasExtension) {
 				if(outlineColor == "White") outlineColor = "Grays";
 				run(outlineColor);
 			}
-			
+
 			//Check if fociChannelB actually exists and is different from Foci channel A
 			if(detectFociChannelB == true && fociChannelB > gchannels) exit("Error: The selected Foci channel B ("+fociChannelB+") is higher than the number of channels of the image ("+gchannels+")."); 
 			if(detectFociChannelB == true && fociChannelB == fociChannelA) {
@@ -833,7 +865,7 @@ function process_current_series(image, nameHasExtension) {
 			if(firstTimeProcessing == false) call("ij.gui.ImageWindow.setNextLocation", x_image, y_image);
 			overlayA = mergeOriginalAndDetection(original, nrNuclei, nuclei_outlines, mask_fociA, spots_fociA, fociChannelA, useROI, x_ROI, y_ROI);
 			overlay_image = overlayA;	//Will be overwritten if channel B is also used
-			
+		
 			if(firstTimeProcessing == false && detectFociChannelB == false) close("Processing...");
 			//Foci channel B
 			if(detectFociChannelB == true) {
@@ -996,7 +1028,10 @@ function process_current_series(image, nameHasExtension) {
 		if(useROI == false) {
 			
 			//Get nuclei positions
-			if(maxFociDistanceOutsideNuclei_setting != 0) Ext.CLIJ2_statisticsOfLabelledPixels(labelmap_nuclei_3D_dilated, labelmap_nuclei_3D_dilated);
+			if(maxFociDistanceOutsideNuclei_setting != 0) {
+				run("Clear Results");
+				Ext.CLIJ2_statisticsOfLabelledPixels(labelmap_nuclei_3D_dilated, labelmap_nuclei_3D_dilated);
+			}
 			selectWindow("Results");
 			boundingBox_X = Table.getColumn("BOUNDING_BOX_X");
 			boundingBox_Y = Table.getColumn("BOUNDING_BOX_Y");
@@ -1192,6 +1227,18 @@ function segmentNucleiClassic(image, channel, nucleiBlurRadiusXY, nucleiBlurRadi
 
 
 function segmentNucleiStarDist (image, channel, probabilityThreshold, pixelWidth, unit, resultTable) {
+	//Check whether the StarDist dependencies have been installed
+	List.setCommands;
+	if (List.get("Run your network")=="") missingPlugin += "CDBDeep, ";
+	if (List.get("Command From Macro")=="") missingPlugin += "StarDist, ";
+	if (missingPlugin != "") {
+		print("\\Clear");
+		missingPlugin = missingPlugin.substring(0, missingPlugin.length-2);
+		print("Error: Required plugin(s) not found:\n"+missingPlugin+"\n \nFoci Analyzer requires the following Fiji Update Sites to be activated:\n* 3D ImageJ Suite\n* CLIJ\n* CLIJ2\n* CLIJx-assistent\n* CLIJx-assistent-extensions\n* CSBDeep\n* IJPB-plugins\n* StarDist\n \nGo to Help -> Update... -> Manage Update Sites and check the relevant boxes.");
+		exit("Error: Required plugin(s) not found:\n"+missingPlugin+"\n \nFoci Analyzer requires the following Fiji Update Sites to be activated:\n* 3D ImageJ Suite\n* CLIJ\n* CLIJ2\n* CLIJx-assistent\n* CLIJx-assistent-extensions\n* CSBDeep\n* IJPB-plugins\n* StarDist\n \nGo to Help -> Update... -> Manage Update Sites and check the relevant boxes.\nThis info is also printed to the Log Window.");
+	}
+	List.clear();
+
 	selectWindow(image);
 	getDimensions(width, height, channels, slices, frames);
 	minNucleusSize = PI*Math.sqr((minNucleusSize_setting / pixelWidth / 2));	//Calculate the nucleus area as if it were a circle
@@ -1647,20 +1694,29 @@ function manually_remove_labels(labelmap, label_edges, nrNuclei, windowName, ima
 	setBatchMode("show");
 
 	if(manualRemoveNuclei == "Load previously saved removals (from output folder)" && File.exists(outputFolder + File.separator + imageName + "__removalMask.png")) {
+		print("Previously saved removals found.");
 		open(outputFolder + File.separator + imageName + "__removalMask.png");
 		if(is("Inverting LUT")) run("Invert LUT");
 		run("Points from Mask");
+	}
+	else if(manualRemoveNuclei == "Load previously saved removals (from output folder)" && !File.exists(outputFolder + File.separator + imageName + "__removalMask.png")) {
+		print("[WARNING] No previous removals found. No nuclei will be removed from the analysis.");
 	}
 	else if(manualRemoveNuclei == "Manually remove nuclei") {
 		setTool("multipoint");
 		run("Select None");
 		run("Point Tool...", "type=Dot color=White size=[Extra Large] show counter=0");
-		waitForUser("Select nuclei to remove, then press OK");
+		Overlay.selectable(false)
+		waitForUser("Select nuclei to be removed by marking them with a dot by clicking in the image.\n \n* Already placed dots can be shifted by dragging.\n* Alt-click removes a dot.\n* Dots placed outside segmentations have no effect.\n* Press [Shift-a] to start over.\n \nPress OK when finished.");
 		if(selectionType == 10) {	//Only create mask if there is a selection
 			run("Create Mask");
 			saveAs("png", outputFolder + File.separator + imageName+"__removalMask");
+			run("Points from Mask");
 		}
-		else if(File.exists(outputFolder + File.separator + imageName + "__removalMask.png")) File.delete(outputFolder + File.separator + imageName + "__removalMask.png");	//Remove Mask
+		else if(File.exists(outputFolder + File.separator + imageName + "__removalMask.png")) {
+			File.delete(outputFolder + File.separator + imageName + "__removalMask.png");	//Remove Mask
+			print("\\Update:");
+		}
 	}
 	selectWindow(windowName);
 	run("Select None");
@@ -1670,6 +1726,7 @@ function manually_remove_labels(labelmap, label_edges, nrNuclei, windowName, ima
 	Ext.CLIJ2_getMaximumOfAllPixels(labelmap, nrLabels);
 	Ext.CLIJ2_pull(labelmap);
 	selectWindow(labelmap);
+	setTool("rectangle");
 	run("Restore Selection");
 	run("Clear Results");
 	run("Set Measurements...", "mean redirect=None decimal=3");
@@ -1689,11 +1746,14 @@ function manually_remove_labels(labelmap, label_edges, nrNuclei, windowName, ima
 	Ext.CLIJ2_release(labelmap);
 	labelmap = "Labelmap_nuclei_edited";
 
+	nrNuclei_old = nrNuclei;
 	Ext.CLIJ2_getMaximumOfAllPixels(labelmap_edited, nrNuclei);
+	print(nrNuclei_old - nrNuclei+" were removed manually.");
 
 	label_edges_edited = "label_edges_edited";
 	Ext.CLIJ2_detectLabelEdges(labelmap_edited, label_edges_edited);
 	Ext.CLIJ2_pull(label_edges_edited);
+	run("Multiply...", "value=255");
 	run("Cyan");
 	resetMinAndMax;
 
@@ -1710,8 +1770,7 @@ function manually_remove_labels(labelmap, label_edges, nrNuclei, windowName, ima
 	close("label_edges");
 //	draw_label_numbers(labelmap_edited, labelFontSize, fontColor);
 	updateDisplay();
-	close("label_edges");
-	
+
 	return newArray(labelmap_edited, label_edges_edited, nrNuclei);
 }
 
@@ -1734,6 +1793,7 @@ function detect_foci(image, channel, fociSize, anisotropyFactor, firstTimeProces
 	// Small FLAW: the area outside the nuclei is set to zero, but is included in the threshold calculation. (Could be fixed by setting 0 to NaN, but how to do that on the GPU?)
 	// On the other hand: there is almost no difference, it seems.
 	selectWindow(image);
+	run("Select None");
 	foci = "foci_ch"+channel;
 	if(firstTimeProcessing == true) {
 		rename(foci);
@@ -1763,6 +1823,7 @@ function detect_foci(image, channel, fociSize, anisotropyFactor, firstTimeProces
 	rename(foci+"_outliers_removed");
 	foci_outliers_removed = foci+"_outliers_removed";
 	selectWindow(foci+"_outliers_removed");
+
 	run("Remove Outliers", "block_radius_x="+minOf(25*fociSizeXY, 50)+" block_radius_y="+minOf(25*fociSizeXY, 50)+" standard_deviations=2 stack");
 	if(debugMode) setBatchMode("show");
 	Ext.CLIJ2_push(foci_outliers_removed);

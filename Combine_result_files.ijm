@@ -22,7 +22,7 @@ showStatus("");
 j=0;
 table_list=newArray(file_list.length);
 for(i=0; i<file_list.length; i++){
-	if (endsWith(file_list[i],fileString)) {
+	if (endsWith(file_list[i],fileString) && !matches(file_list[i], "Results_all_files.tsv")) {
 		table_list[j] = file_list[i];
 		j++;
 	}
