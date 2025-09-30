@@ -1937,7 +1937,8 @@ function detect_foci(image, channel, fociSize, anisotropyFactor, firstTimeProces
 				image_for_thresholding = foci_filtered + " overlaid with original pixel data (33% opacity)";
 				rename(image_for_thresholding);
 				if(firstTimeProcessing == true) setThreshold(threshold, pow(2,bits));
-				else setThreshold(manualThreshold, pow(2,bits));
+				else if(AorB == "A") setThreshold(manualThresholdA, pow(2,bits));
+				else if(AorB == "B") setThreshold(manualThresholdB, pow(2,bits));
 				overlay_image_3D(image_for_thresholding, image, 1, 33);
 				overlay_image_3D(image_for_thresholding, nuclei_outlines, 1, 50);
 
