@@ -2553,8 +2553,7 @@ function overlay_numbers_on_image(overlay_image) {
 			}
 		}
 		else if(overlayChoice == "none") {
-			continue;
-		}			
+		}
 		updateDisplay();
 	}
 }
