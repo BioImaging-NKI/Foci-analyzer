@@ -43,7 +43,7 @@ Run Foci Analyzer from the Fiji menu: `Plugins -> Foci Analyzer -> Foci Analyzer
 `Combine result files` can be used to pool output `.tsv` files into a single file/table.
 
 In case you also want to use Cellpose segmentation you additionally need:
-- A working Cellpose (2.0 or higher) environment in Python (conda or venv)
+- A working Cellpose (2.0 or higher) environment in Python (conda or venv). For 3D segmentation make sure you have Cellpose 3.1.1 or Cellpose 4 installed.
 - Activated PTBIOP update site, with proper settings. See [here](https://github.com/BIOP/ijl-utilities-wrappers/blob/master/README.md#cellpose) for more details.
 
 
