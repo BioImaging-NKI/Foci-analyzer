@@ -9,7 +9,9 @@ import qupath.opencv.ml.pixel.PixelClassifierTools
 
 import java.awt.image.BufferedImage
 
+//user parameters
 def PIXEL_CLASSIFIER = "hypoxia"
+
 def imageData = QP.getCurrentImageData()
 def classifier = QP.getProject().getPixelClassifiers().get(PIXEL_CLASSIFIER)
 def classifierServer = PixelClassifierTools.createPixelClassificationServer(imageData, classifier)
