@@ -7,7 +7,7 @@ import qupath.opencv.ml.pixel.PixelClassifierTools
 
 //user parameters
 def MEASUREMENT_NAME = "Foci count ch3"  // for positive/negative classification
-def MIN_THRESHOLD = 2                   // for positive/negative classification
+def MIN_THRESHOLD = 2                    // for positive/negative classification
 def POSITIVE_COLOR = ColorTools.packRGB(255,0,0)
 def NEGATIVE_COLOR = ColorTools.packRGB(0,255,0)
 def CLEAR_MEASUREMENTS = true            // Clear all measurements
