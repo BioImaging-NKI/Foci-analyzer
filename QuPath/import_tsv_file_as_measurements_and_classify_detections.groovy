@@ -7,14 +7,14 @@ import qupath.opencv.ml.pixel.PixelClassifierTools
 
 //user parameters
 def MEASUREMENT_NAME = "Foci count ch3"  // for positive/negative classification
-def MIN_THRESHOLD = 2                    // for positive/negative classification
-def POSITIVE_COLOR = ColorTools.packRGB(255,0,0)
-def NEGATIVE_COLOR = ColorTools.packRGB(0,255,0)
+def MIN_THRESHOLD = 3                   // for positive/negative classification
+def POSITIVE_COLOR = ColorTools.packRGB(0,255,255)
+def NEGATIVE_COLOR = ColorTools.packRGB(0,0,255)
 def CLEAR_MEASUREMENTS = true            // Clear all measurements
 def TILE_IDENTIFIER = "exported_tiles"   // Annotations with this name will be ignored
 def RUN_ON = RunOn.ALL_ANNOTATIONS       // Other options: RunOn.SELECTED or RunOn.ALL_ANNOTATIONS or RunOn.WHOLE_IMAGE
-def SEARCH_HEADER = 'foci'               // checks the .tsv header if it contains this character sequence, and ignores case.
-                                         // these are added as measurements to the dectections.
+def SEARCH_HEADER = 'foci'               // Checks the .tsv header if it contains this character sequence, case-insensitive.
+                                         // These are added as measurements to the dectections.
 
 def mydets = QP.getDetectionObjects()
 
