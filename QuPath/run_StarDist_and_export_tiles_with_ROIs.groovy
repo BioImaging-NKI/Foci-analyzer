@@ -15,7 +15,7 @@ import qupath.lib.scripting.QP
 //user parameters
 def RUN_ON = RunOn.ALL_ANNOTATIONS          // Other options: RunOn.SELECTED or RunOn.ALL_ANNOTATIONS or RunOn.WHOLE_IMAGE
 def MODELPATH = 'D:\\Software\\StarDist_pretrained_models\\dsb2018_heavy_augment.pb'
-def CHANNEL = 'Channel 1'                   // channel name for StarDist segmentation
+def CHANNEL = 'DAPI'                   // channel name for StarDist segmentation
 def MIN_NUCLEUS_SIZE = 20.0                 // um^2
 def TILE_SIZE = 1600                        // in pixels
 def OVERLAP = 128                           // tile overlap in pixels
