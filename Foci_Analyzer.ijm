@@ -171,11 +171,25 @@
  * - Implemented a 'Manual threshold' method for foci detection
  * - Gaussian filter in classic segmentation is now pixelsize-dependent (0.5 µm, or 2 pixels if unit is not microns)
  * - Fixed bug in classic segmentation where the nucleus min and max sizes were incorrect for calibrated images
- * - Updated Cellpose --dPSmooth parameter to --flow3D_smooth
+ * - Updated Cellpose --dPSmooth parameter to --flow3D_smooth (Cellpose version 3.1.1) 
  * 
+ * Version 1.89:
+ * - Thanks to Andrew Lutsky, fixed bug where tables would not save when "none" was chosen as nuclei/cell overlay
+ * - Also check for TensorFlow Update site when StarDist segmentation is used
+ * - Use large centroid spots when foci size is set equal or larger than 'large (4 pixels)' (dilate centroids with sphere)
+ * 
+ * Version 1.90:
+ * - Thanks to Marcelo Zoccoler, Cell/nuclei volumes are reported (and not 2D area) when the segmentation is done in 3D
+ * - Thanks to Marcelo Zoccoler, fixed bug where only the first slice of the nuclei/cell outlines was displayed when 3D label images were loaded from file
+ * - Added version requirement for Cellpose 3D: 3.1.1, due to Cellpose --flow3D_smooth parameter name change. Macro exits if Cellpose fails for whatever reason.
+ * - Fixed some issues regarding loading 3D labels on a 2D (projected) image (-> skip image), and vice versa (-> extend labels)
+ * 
+ * Version 1.91:
+ * - Better handling of timelapse images (reading ROI files, plotting)
+ *  
  */
 
-#@ String	Foci_Analyzer_message 	(value="<html><p style='font-size:18px; color:#000000; font-weight:bold'><img width=96 height=96 src='https://imagej.net/media/icons/Foci-Analyzer-icon.png'</img><a style='color:#000000' href=https://imagej.net/plugins/foci-analyzer>Foci Analyzer</a> (v1.88)</p></html>", visibility="MESSAGE")
+#@ String	Foci_Analyzer_message 	(value="<html><p style='font-size:18px; color:#000000; font-weight:bold'><img width=96 height=96 src='https://imagej.net/media/icons/Foci-Analyzer-icon.png'</img><a style='color:#000000' href=https://imagej.net/plugins/foci-analyzer>Foci Analyzer</a> (v1.91)</p></html>", visibility="MESSAGE")
 #@ String	file_message 			(value="<html><p style='font-size:14px; color:#9933cc; font-weight:bold'>File settings</p></html>", visibility="MESSAGE")
 #@ File[]	files 					(label = "Input files", style="File", description="Here you can specify which files to analyze, by adding them to the list, or drag&drop from a file explorer window.")
 #@ String	processOnlyExtension	(label = "Only process files with extension (leave empty for all files)", value="", description="If files with multiple formats are in the list, only files ending with this extension (e.g. tif, czi) will be processed.")
@@ -196,7 +210,7 @@
 #@ Integer	XYBinning				(label = "Image XY binning before analysis [1-n]", value = 1, min=1, description="Optional pixel binning in case the resolution is very high and the foci consist of many pixels.\nA value of 2 means: 2x2 pixels will be binned into 1 pixel. This reduces noise in the image and speeds up analysis. (default: 1)")
 
 #@ String	nuclei_message 			(value = "<html><p style='font-size:14px; color:#33aa00; font-weight:bold'>Nuclei/cell detection settings</p></html>", visibility="MESSAGE")
-#@ String	nucleiSegmentationChoice	(label = "Nuclei/cell segmentation method", choices={"StarDist nuclei segmentation 2D (or on 2D projection)", "Cellpose segmentation 2D (or on 2D projection)", "Cellpose segmentation 3D", "Classic segmentation", "Load ROIs from file", "Load label images"}, style="listBox", description="Nuclei/cell segmentation method:\nStardist nuclei segmentation 2D (or on 2D projection) (default) uses the pretrained convolutional neural network StarDist to recognize cell nuclei in fluorescence microscopy images.\nIn general this method works very well on a large variety of samples.\n\n- Cellpose segmentation 2D (or on 2D projection) uses the deep learning network Cellpose to recognize whole cells or nuclei.\nUse this option if you want to measure foci in entire cells, or if you prefer Cellpose nuclei segmentation over StarDist.\nN.B. Cellpose requires additional installations (see Installation / Requirements).\n\n- Cellpose segmentation 3D: If this option is chosen a new dialog pops up with extra settings. These are the most important parameters for 3D segmentation.\nMore parameters can be added in the 'Additional Cellpose parameters' field. The Help button takes you to the Cellpose CLI with explanations of all parameters.\n\n- Classic nuclei segmentation allows the user to segment nuclei using manual/automatic thresholding is provided for legacy reasons.\nThe method is almost always outperformed by the two other methods.\n\n- Load ROIs from file: ImageJ ROI .zip files can be loaded instead of performing segmentation. This option is used in the (near future) QuPath-Fiji workflow.\nROI files should have the same name as the input images without extensions, followed by '_ROIs.zip'.\n\n- Load label images allows loading a labelmap, if the segmentation has been done by external programs, or to quickly re-run files with the same segmentation.\nLabel image files should be present in another folder and have the exact same name as the input images.")
+#@ String	nucleiSegmentationChoice	(label = "Nuclei/cell segmentation method", choices={"StarDist nuclei segmentation 2D (or make 2D projection)", "Cellpose segmentation 2D (or make 2D projection)", "Cellpose segmentation 3D", "Classic segmentation 2D", "Load ROIs from file", "Load label images"}, style="listBox", description="Nuclei/cell segmentation method:\nStardist nuclei segmentation 2D (or make 2D projection) (default) uses the pretrained convolutional neural network StarDist to recognize cell nuclei in fluorescence microscopy images.\nIn general this method works very well on a large variety of samples.\n\n- Cellpose segmentation 2D (or make 2D projection) uses the deep learning network Cellpose to recognize whole cells or nuclei.\nUse this option if you want to measure foci in entire cells, or if you prefer Cellpose nuclei segmentation over StarDist.\nN.B. Cellpose requires additional installations (see Installation / Requirements).\n\n- Cellpose segmentation 3D: If this option is chosen a new dialog pops up with extra settings. These are the most important parameters for 3D segmentation.\nMore parameters can be added in the 'Additional Cellpose parameters' field. The Help button takes you to the Cellpose CLI with explanations of all parameters.\n\n- Classic nuclei segmentation allows the user to segment nuclei using manual/automatic thresholding is provided for legacy reasons.\nThe method is almost always outperformed by the two other methods.\n\n- Load ROIs from file: ImageJ ROI .zip files can be loaded instead of performing segmentation. This option is used in the (near future) QuPath-Fiji workflow.\nROI files should have the same name as the input images without extensions, followed by '_ROIs.zip'.\n\n- Load label images allows loading a labelmap, if the segmentation has been done by external programs, or to quickly re-run files with the same segmentation.\nLabel image files should be present in another folder and have the exact same name as the input images.")
 #@ Double	downsampleFactorStarDist	(label = "Stardist nuclei rescaling factor [1-n], 0 for automatic, 1 for no rescaling", value = 0, min=0, description="Stardist is trained on medium resolution images, and generally performs well on images with pixel sizes around 0.2-0.5 µm.\nSet to 0 for automatic rescaling the nuclei to an optimal pixel size of 0.25 µm, or put any other number for manual control of the rescaling.")
 #@ Double 	probabilityThreshold		(label = "Probability/flow threshold [0.0-1.0] (StarDist/Cellpose)", value = 0.5, min=0, max=1, style="format:0.0", description="Lower values will accept more nuclei/cells; higher values will be more stringent. For Cellpose this is actually the flow_threshold parameter.")
 #@ String 	CellposeModel			(label = "Cellpose model", choices={"cyto3","nuclei","tissuenet_cp3","cpsam","custom"}, style="listBox", value="cyto3", description="The model (built-in or custom) used for segmentation.")
@@ -232,7 +246,7 @@
 #@ Boolean	debugMode				(label = "Debug mode (show intermediate images)", value=false, description="Used for development and bug fixing: checking this option will trigger displaying many intermediate results during the processing. It will also slow down the analysis.")
 #@ String	file_and_image_message0	(value = "<html><p style='font-size:12px'>Need help? Visit the <a href=https://imagej.net/plugins/foci-analyzer>Foci Analyzer</a> website on ImageJ.net</p></html>", visibility="MESSAGE")
 
-version = 1.88;
+version = 1.91;
 
 requires("1.54i");	//Minimum required ImageJ version
 
@@ -279,6 +293,7 @@ requires("1.54i");	//Minimum required ImageJ version
 // * - IJPB-plugins
 // * - PT-BIOP
 // * - StarDist
+// * - TensorFlow
 
 
 missingPlugin = "";
@@ -355,7 +370,7 @@ nucleiMedian3DradiusZ = 2;
 //maxNucleusSize = 40;
 excludeOnEdges = excludeOnEdges;
 StarDistDownsampleInterpolation = "Bilinear";	//None, Bilinear or Bicubic
-if(nucleiSegmentationChoice == "Cellpose segmentation 2D (or on 2D projection)" || nucleiSegmentationChoice=="Cellpose segmentation 3D") cellpose = true;
+if(nucleiSegmentationChoice == "Cellpose segmentation 2D (or make 2D projection)" || nucleiSegmentationChoice=="Cellpose segmentation 3D") cellpose = true;
 else cellpose=false;
 
 //foci detection
@@ -373,11 +388,11 @@ var flipSlicesAndChannels = false;
 
 thickOutlines = true;		//Width of nuclei outlines, 1 or 2 pixels
 thickOutlinesThresholdSize = 1200;	//Above this image size nuclei outlines are always thick (2 pixels)
-useLargeSpots = false;		//Make spots in overlay larger
 LABELOPACITY = 100;			//opacity of outlines
 addNumbersOverlay = true;
 saveOverlayImage = true;
 
+var useLargeSpots = false;		//Make spots in overlay larger
 var hideCellpose3DDialog = false;
 var optimizationMode = optimizationModeSetting;
 var processchoice;
@@ -455,7 +470,7 @@ if(!File.exists(outputFolder) && useInputAsOutput == false) {
 if (nucleiSegmentationChoice == "Load ROIs from file" && useInputAsOutput == false && setROIsFolder == false) {
 	ROIsFolder = call("ij.Prefs.get", "ROIs.Folder", File.getParent(files[0]));
 	Dialog.createNonBlocking("Select a ROIs folder");
-	Dialog.addMessage("ROI files should have the same name as the input images without extensions, followed by '_ROIs.zip'.");
+	Dialog.addMessage("ROI files should have the same name as the input images without extensions, followed by '_ROIs.zip'.\nTimelapse ROIs should be in separate files named <image name>__t=xxx_ROIs.zip");
 	Dialog.addDirectory("Folder containing ROI .zip files", ROIsFolder);
 	Dialog.show();
 	ROIsFolder = Dialog.getString();
@@ -554,7 +569,7 @@ function processFile(current_image_nr, file, outputFolder) {
 	filename = File.getName(file);
 	fileExtension = substring(filename, lastIndexOf(filename, "."), lengthOf(filename));
 
-	if(endsWith(fileExtension, "tif") || endsWith(fileExtension, "jpg") || endsWith(fileExtension, "png")) {	//Use standard opener
+	if(endsWith(fileExtension, "tif") || endsWith(fileExtension, "tiff") || endsWith(fileExtension, "jpg") || endsWith(fileExtension, "jpeg") || (endsWith(fileExtension, "zip") && !endsWith(fileExtension, "ROIs.zip")) || endsWith(fileExtension, "png")) {	//Use standard opener
 		open(file);
 		if(XYBinning > 1) run("Bin...", "x="+XYBinning+" y="+XYBinning+" z=1 bin=Average");
 		if(reAnalyzeFullImage == false && optimizationModeSetting == true && processAllOtherImages == false) optimizationMode = true;
@@ -590,7 +605,7 @@ function process_current_series(image, nameHasExtension) {
 
 	if(nameHasExtension) imageName = File.getNameWithoutExtension(image);
 	else imageName = image;
-	
+
 	//Initialize image and table
 	getDimensions(gwidth, gheight, gchannels, gslices, gframes); // global variables
 	getVoxelSize(pixelWidth, pixelHeight, pixelDepth, unit);
@@ -600,16 +615,21 @@ function process_current_series(image, nameHasExtension) {
 	}
 	if(gslices>1) imageIs3D = true;
 	else imageIs3D = false;
-	
+
 	//timelapse handling - save individual frames and call processFile recursively [smiley with sunglasses]
 	if(gframes > 1){
 		original = getTitle;
+		print("Saving "+gframes+" time frames to disk...");
 		for(t=1; t<=gframes; t++) {
 			showStatus("Splitting time frames... "+t+"/"+gframes);
 			showProgress(t, gframes);
-			run("Duplicate...", "duplicate frames="+t);
+			if(gchannels>1) run("Duplicate...", "duplicate frames="+t);
+			else run("Duplicate...", "duplicate range="+t+"-"+t);
 			saveAs("tiff", outputFolder + File.separator + imageName + "__t="+IJ.pad(t, 3));
 			close();
+		}
+		if (nucleiSegmentationChoice == "Load ROIs from file") {
+			print("Timelapse ROIs are expected to be in separate files named <image name>__t=xxx_ROIs.zip");
 		}
 		if (nucleiSegmentationChoice == "Load label images") {
 			open(labelImageFolder + File.separator + File.getNameWithoutExtension(image) + ".tif");
@@ -644,17 +664,17 @@ function process_current_series(image, nameHasExtension) {
 			setBatchMode("show");
 			Dialog.createNonBlocking("Single channel detected");
 			Dialog.addMessage("Warning: ["+imageName+"] has only 1 Channel, but "+gslices+" Slices.");
-			Dialog.addRadioButtonGroup("Do you want to flip Channels and Slices?", newArray("Yes, and do this for all subsequent images", "Yes, only for this image", "No (exit macro)"), 3, 1, "Yes, and do this for all subsequent images");
+			Dialog.addRadioButtonGroup("Do you want to flip Channels and Slices?", newArray("Yes, and do this for all subsequent images", "Yes, only for this image", "No, use this channel for both cell segmentation and foci detection"), 3, 1, "Yes, and do this for all subsequent images");
 			Dialog.show();
 			answer = Dialog.getRadioButton();
 			if(answer == "Yes, and do this for all subsequent images") flipSlicesAndChannels = true;
 			if(answer == "Yes, only for this image") run("Re-order Hyperstack ...", "channels=[Slices (z)] slices=[Channels (c)] frames=[Frames (t)]");
-			else if(answer == "No (exit macro)") exit();
 		}
 		if(flipSlicesAndChannels == true) run("Re-order Hyperstack ...", "channels=[Slices (z)] slices=[Channels (c)] frames=[Frames (t)]");
 		setBatchMode("hide");
 	}
-	Stack.setDisplayMode("grayscale");
+	if(gchannels>1) Stack.setDisplayMode("grayscale");
+	else run("Grays");
 	getDimensions(gwidth, gheight, gchannels, gslices, gframes);
 	Stack.setChannel(nucleiChannel);
 
@@ -757,11 +777,11 @@ function process_current_series(image, nameHasExtension) {
 	if(useROI == false) process_image = original;
 
 	//Segment and label nuclei
-	if (nucleiSegmentationChoice == "StarDist nuclei segmentation 2D (or on 2D projection)") nuclei_info = segmentNucleiStarDist(process_image, nucleiChannel, probabilityThreshold, pixelWidth, unit, resultTable);
-	else if (nucleiSegmentationChoice == "Classic segmentation") nuclei_info = segmentNucleiClassic(process_image, nucleiChannel, nucleiBlurRadiusXY, nucleiBlurRadiusZ, nucleiMedian3DradiusXY, nucleiMedian3DradiusZ);
+	if (nucleiSegmentationChoice == "StarDist nuclei segmentation 2D (or make 2D projection)") nuclei_info = segmentNucleiStarDist(process_image, nucleiChannel, probabilityThreshold, pixelWidth, unit, resultTable);
+	else if (nucleiSegmentationChoice == "Classic segmentation 2D") nuclei_info = segmentNucleiClassic(process_image, nucleiChannel, nucleiBlurRadiusXY, nucleiBlurRadiusZ, nucleiMedian3DradiusXY, nucleiMedian3DradiusZ);
 	else if (cellpose == true) 									 nuclei_info = segmentCellsCellpose(process_image, nucleiChannel, cytoChannel, probabilityThreshold, pixelWidth, pixelDepth, unit, resultTable);
-	else if (nucleiSegmentationChoice == "Load ROIs from file")  nuclei_info = loadROIs(original, nucleiChannel, ROIsFolder);
-	else if (nucleiSegmentationChoice == "Load label images") 	 nuclei_info = loadROIs(original, nucleiChannel, labelImageFolder);
+	else if (nucleiSegmentationChoice == "Load ROIs from file")  nuclei_info = loadROIs(imageName, nucleiChannel, ROIsFolder);
+	else if (nucleiSegmentationChoice == "Load label images") 	 nuclei_info = loadROIs(imageName, nucleiChannel, labelImageFolder);
 
 	if(nuclei_info[0] == "FileNotFound") continue;
 	labelmap_nuclei = nuclei_info[0];
@@ -781,7 +801,10 @@ function process_current_series(image, nameHasExtension) {
 		Ext.CLIJ2_statisticsOfLabelledPixels(labelmap_nuclei, labelmap_nuclei);
 		nucleus_id_ = Table.getColumn("IDENTIFIER", "Results");
 		nucleus_area_ = Table.getColumn("PIXEL_COUNT", "Results");
-		nucleus_area_ = multiplyArraywithScalar(nucleus_area_, Math.sqr(pixelWidth));
+		Ext.CLIJ2_getDimensions(labelmap_nuclei, labelmap_nuclei_width, labelmap_nuclei_height, labelmap_nuclei_depth);
+		if (labelmap_nuclei_depth == 1) nucleus_area_ = multiplyArraywithScalar(nucleus_area_, Math.sqr(pixelWidth));
+		else nucleus_area_ = multiplyArraywithScalar(nucleus_area_, Math.sqr(pixelWidth) * pixelDepth);
+		
 		Table.setColumn("Cell ID", nucleus_id_, resultTable);
 		if (nucleiSegmentationChoice == "Load ROIs from file") {
 			for (i = 0; i < nrNuclei; i++) {
@@ -790,18 +813,18 @@ function process_current_series(image, nameHasExtension) {
 			}
 			roiManager("deselect");
 		}
-		Table.setColumn("Cell area 2D ("+unit+"^2)", nucleus_area_, resultTable);
+		if (labelmap_nuclei_depth == 1) Table.setColumn("Cell area 2D ("+unit+"^2)", nucleus_area_, resultTable);
+		else Table.setColumn("Cell volume ("+unit+"^3)", nucleus_area_, resultTable);
 
 		//Create a 3D version of the 2D nuclei labelmap, if required
-		Ext.CLIJ2_getDimensions(labelmap_nuclei, labelmap_width, labelmap_height, labelmap_depth);
-		if(gslices>1 && labelmap_depth==1) Ext.CLIJ2_imageToStack(labelmap_nuclei, labelmap_nuclei_3D, gslices);
+		if(gslices>1 && labelmap_nuclei_depth==1) Ext.CLIJ2_imageToStack(labelmap_nuclei, labelmap_nuclei_3D, gslices);
 		else labelmap_nuclei_3D = labelmap_nuclei;
 
 		//Foci filtering and detection - in a loop to enable parameter optimization 
 		firstTimeProcessing = true;
 		zoom = 1;
 
-		//Add selected ROI to the ROI Manager and add as overlay - must do this after StarDist
+		//Add selected ROI to the ROI Manager and add as overlay - must do this after nuclei segmentation
 		if(useROI) {
 			selectWindow(original);
 			roiManager("reset");
@@ -811,7 +834,7 @@ function process_current_series(image, nameHasExtension) {
 			roiManager("Set Line Width", 1);
 			roiManager("add");
 		}
-	
+
 		do {
 			if(processAllOtherImages == false) doneOptimizing = false;	//Reset this parameter from the previous round
 			
@@ -821,12 +844,12 @@ function process_current_series(image, nameHasExtension) {
 				maxFociDistanceOutsideNuclei = round(maxFociDistanceOutsideNuclei_setting / pixelWidth);
 				if(maxFociDistanceOutsideNuclei_setting < 0) Ext.CLIJ2_dilateLabels(labelmap_nuclei_3D, labelmap_nuclei_3D_dilated, maxOf(gwidth, gheight));
 				else Ext.CLIJ2_dilateLabels(labelmap_nuclei_3D, labelmap_nuclei_3D_dilated, maxFociDistanceOutsideNuclei);
-				if(ThreeDHandling == "Detect foci in 3D (or 2D when N/A)" && nucleiSegmentationChoice == "Cellpose segmentation 3D" && pixelDepth/pixelWidth > 1.33) print("[WARNING] Due to non-isotropic pixels the foci region will be expanded from the nuclei more in Z than in X and Y! (by a factor of "+d2s(pixelDepth/pixelWidth,1)+")");
+				if(ThreeDHandling == "Detect foci in 3D (or 2D when N/A)" && nucleiSegmentationChoice == "Cellpose segmentation 3D" && pixelDepth/pixelWidth > 1.33) print("[WARNING] Due to non-isotropic pixels the foci detection region will be expanded from the nuclei edge in Z more than in X and Y! (by a factor of "+d2s(pixelDepth/pixelWidth,1)+")");
 				//N.B. For non-isotropic 3D data this 3D dilation is not fair, but making the labelmap isotropic creates intermediate (non-integer) values. Oh well..
 			}
 			else Ext.CLIJ2_copy(labelmap_nuclei_3D, labelmap_nuclei_3D_dilated);
 			if(debugMode) showImagefromGPU(labelmap_nuclei_3D_dilated);
-	
+
 			//Create outlines from dilated nuclei labelmap
 			nuclei_dilated_outlines = "nuclei_dilated_outlines";
 			if(isOpen("nuclei_dilated_outlines")) close(nuclei_dilated_outlines);
@@ -1230,9 +1253,11 @@ function segmentNucleiClassic(image, channel, nucleiBlurRadiusXY, nucleiBlurRadi
 
 function segmentNucleiStarDist (image, channel, probabilityThreshold, pixelWidth, unit, resultTable) {
 	//Check whether the StarDist dependencies have been installed
+	missingPlugin = "";
 	List.setCommands;
 	if (List.get("Run your network")=="") missingPlugin += "CDBDeep, ";
 	if (List.get("Command From Macro")=="") missingPlugin += "StarDist, ";
+	if (List.get("TensorFlow...")=="") missingPlugin += "TensorFlow, ";
 	if (missingPlugin != "") {
 		print("\\Clear");
 		missingPlugin = missingPlugin.substring(0, missingPlugin.length-2);
@@ -1365,12 +1390,11 @@ function segmentNucleiStarDist (image, channel, probabilityThreshold, pixelWidth
 function loadROIs(image, channel, folder) {
 //	File.setDefaultDir(outputFolder);
 	run("Duplicate...", "title=nuclei duplicate channels=" +channel);	//Get nucleus channel
-
 	roiManager("reset");
 	if(nucleiSegmentationChoice == "Load ROIs from file") {
 		if(File.exists(folder + File.separator + File.getNameWithoutExtension(image) + "_ROIs.zip")) roiManager("open", folder + File.separator + File.getNameWithoutExtension(image) + "_ROIs.zip");
 		else {
-			print("WARNING: ROI file not found!  "+folder + File.separator + File.getNameWithoutExtension(image) + "_ROIs.zip\nSkipping this image");
+			print("WARNING: ROI file not found!  "+folder + File.separator + File.getNameWithoutExtension(image) + "_ROIs.zip\nSkipping this image.");
 			return newArray("FileNotFound");
 		}
 		run("ROI Manager to LabelMap(2D)");
@@ -1378,29 +1402,43 @@ function loadROIs(image, channel, folder) {
 	else if(nucleiSegmentationChoice == "Load label images") {
 		if(File.exists(folder + File.separator + File.getNameWithoutExtension(image) + ".tif")) open(folder + File.separator + File.getNameWithoutExtension(image) + ".tif");	//Label images must have the same name as the original image
 		else {
-			print("WARNING: Labelmap file not found!  "+folder + File.separator + File.getNameWithoutExtension(image) + ".tif\nSkipping this image");
+			print("WARNING: Labelmap file not found!  "+folder + File.separator + File.getNameWithoutExtension(image) + ".tif\nSkipping this image.");
 			return newArray("FileNotFound");			
 		}
+	}
+	if(gslices == 1 && nSlices > 1) {
+		print("WARNING: Foci detection is set to 2D mode, but the loaded labels are 3D. Skipping this image.");
+		return newArray("FileNotFound");	//It is found, but not useable
+	}
+	if(gslices > 1 && nSlices == 1) {
+		print("WARNING: Foci detection is set to 3D, but the loaded labels/ROIs are 2D. They will be extended in the z-direction.");
 	}
 	labelmap_nuclei_final = "Labelmap_nuclei";
 	rename(labelmap_nuclei_final);
 	
 	Ext.CLIJ2_push(labelmap_nuclei_final);
-//	close(labelmap_nuclei);
 	Ext.CLIJ2_getMaximumOfAllPixels(labelmap_nuclei_final, nrNuclei);	//Count the number of nuclei
 
 	//Create nuclei outlines from nuclei labelmap
-	Ext.CLIJ2_detectLabelEdges(labelmap_nuclei_final, labelmap_edges);
-	if(thickOutlines == false) {
-		Ext.CLIJ2_mask(labelmap_nuclei_final, labelmap_edges, labelmap_outlines);
-		Ext.CLIJ2_release(labelmap_edges);
+	Ext.CLIJ2_getDimensions(labelmap_nuclei_final, labelmap_nuclei_width, labelmap_nuclei_height, labelmap_nuclei_depth);
+	if (labelmap_nuclei_depth == 1) {
+		Ext.CLIJ2_detectLabelEdges(labelmap_nuclei_final, labelmap_edges);
+		if(thickOutlines == false) {
+			Ext.CLIJ2_mask(labelmap_nuclei_final, labelmap_edges, labelmap_outlines);
+			Ext.CLIJ2_release(labelmap_edges);
+		}
+		else labelmap_outlines = labelmap_edges;
+		Ext.CLIJ2_pullBinary(labelmap_outlines);
+		Ext.CLIJ2_release(labelmap_outlines);
 	}
-	else labelmap_outlines = labelmap_edges;
-	Ext.CLIJ2_pullBinary(labelmap_outlines);
-	Ext.CLIJ2_release(labelmap_outlines);
+	else if (labelmap_nuclei_depth > 1) {
+		labelmap_outlines = create_3D_outlines_from_labelmap(labelmap_nuclei_final);
+		selectImage(labelmap_outlines);
+	}
 	rename("nuclei_outlines");
+	if(bitDepth() != 8) run("8-bit");
+	run("Multiply...", "value=255 stack");
 	run(outlineColor);
-	
 	nuclei_outlines = "nuclei_outlines";
 	labelmap_nuclei_final = "Labelmap_nuclei";
 
@@ -1438,16 +1476,16 @@ function segmentCellsCellpose (image, nucleiChannel, cytoChannel, probabilityThr
 	List.clear();
 	if(nucleiSegmentationChoice == "Cellpose segmentation 3D" && ThreeDHandling != "Detect foci in 3D (or 2D when N/A)" && imageIs3D == true) {
 		print("[WARNING] 3D Cellpose segmentation is selected, but '3D image handling' is set to '"+ThreeDHandling+"'.\nProceeding with 2D Cellpose segmentation.");
-		nucleiSegmentationChoice = "Cellpose segmentation 2D (or on 2D projection)";
+		nucleiSegmentationChoice = "Cellpose segmentation 2D (or make 2D projection)";
 	}
 	if(nucleiSegmentationChoice == "Cellpose segmentation 3D" && ThreeDHandling == "Detect foci in 3D (or 2D when N/A)" && imageIs3D == false) {
 		print("[WARNING] 3D Cellpose segmentation is selected, but the image has only 1 slice.\nProceeding with 2D Cellpose segmentation.");
-		nucleiSegmentationChoice = "Cellpose segmentation 2D (or on 2D projection)";
+		nucleiSegmentationChoice = "Cellpose segmentation 2D (or make 2D projection)";
 	}
 
 	selectWindow(image);
 	getDimensions(width, height, channels, slices, frames);
-	if(nucleiSegmentationChoice == "Cellpose segmentation 2D (or on 2D projection)") {
+	if(nucleiSegmentationChoice == "Cellpose segmentation 2D (or make 2D projection)") {
 		minNucleusSize = PI*Math.sqr((minNucleusSize_setting / pixelWidth / 2));	//Calculate the nucleus area as if it were a circle
 		maxNucleusSize = PI*Math.sqr((maxNucleusSize_setting / pixelWidth / 2));	
 	}
@@ -1465,7 +1503,7 @@ function segmentCellsCellpose (image, nucleiChannel, cytoChannel, probabilityThr
 	Cellpose_minCellIntensity = 0;		//To do: maybe make this a parameter for 2D Cellpose as well
 
 	if(slices>1) {
-		if(nucleiSegmentationChoice == "Cellpose segmentation 2D (or on 2D projection)") {
+		if(nucleiSegmentationChoice == "Cellpose segmentation 2D (or make 2D projection)") {
 			run("Z Project...", "projection=[Max Intensity]");
 			rename("forCellpose_Zprojected");
 			cellpose_input_image = getTitle();
@@ -1499,7 +1537,7 @@ function segmentCellsCellpose (image, nucleiChannel, cytoChannel, probabilityThr
 				Dialog.addNumber("--cellprob_threshold", Cellpose_cellprob_threshold, 1, 6, "[(-6)-6], default: 0.0");
 				Dialog.addNumber("--anisotropy", d2s(pixelDepth/pixelWidth,2), 2, 6, "obtained from image dimensions");	//Seems to only work well for 2.5D (?)
 				Dialog.addNumber("--stitch_threshold", Cellpose_stitch_threshold, 2, 6, "[0-1], 2D + stitching across planes; only for '2.5D'");
-				Dialog.addNumber("--flow3D_smooth (3D only)", Cellpose_dP_smooth, 1, 6, "stddev of Gaussian filter for smoothing flows");
+				Dialog.addNumber("--flow3D_smooth (3D only - requires Cellpose 3.1.1)", Cellpose_dP_smooth, 1, 6, "stddev of Gaussian filter for smoothing flows");
 				Dialog.addNumber("--min_size", Cellpose_min_size, 0, 6, "pixels, default: 15");
 				Dialog.addString("Additional Cellpose parameters", Cellpose_additional_parameters, 60);
 	//			Dialog.setInsets(0, 258, 0);	//probably depends on display scaling and/or font size...
@@ -1534,9 +1572,9 @@ function segmentCellsCellpose (image, nucleiChannel, cytoChannel, probabilityThr
 			call("ij.Prefs.set", "Cellpose.use.GPU", Cellpose_use_GPU);
 			call("ij.Prefs.set", "Cellpose.3Dseg.type", Cellpose_3Dseg_type);
 			call("ij.Prefs.set", "Cellpose.diameter", CellposeDiameter);
-			setScriptParameterValue(CellposeDiameter, CellposeDiameter);
+			setScriptParameterValue("CellposeDiameter", CellposeDiameter);
 			call("ij.Prefs.set", "Cellpose.cellprob.threshold", Cellpose_cellprob_threshold);
-			setScriptParameterValue(Cellpose_cellprob_threshold, Cellpose_cellprob_threshold);
+			setScriptParameterValue("Cellpose_cellprob_threshold", Cellpose_cellprob_threshold);
 			call("ij.Prefs.set", "Cellpose.anisotropy", Cellpose_anisotropy);
 			call("ij.Prefs.set", "Cellpose.stitch.threshold", Cellpose_stitch_threshold);
 			call("ij.Prefs.set", "Cellpose.dP.smooth", Cellpose_dP_smooth);
@@ -1563,11 +1601,11 @@ function segmentCellsCellpose (image, nucleiChannel, cytoChannel, probabilityThr
 
 	setBatchMode("exit and display"); //Cellpose doesn't work in batch mode
 	selectWindow(cellpose_input_image);
-	showStatus("Performing Cellpose segmentation... (check the Console for live info)");
+	showStatus("Performing Cellpose segmentation... (check the Fiji Console for live info)");
 
 	//Cellpose segmentation
-	//NOTE: for 3D the parameter --dP_smooth has been replaced by --flow3D_smooth (from Cellpose 3.1.something)
-	if(nucleiSegmentationChoice == "Cellpose segmentation 2D (or on 2D projection)") {
+	//NOTE: for 3D the parameter --dP_smooth has been replaced by --flow3D_smooth (from Cellpose 3.1.1)
+	if(nucleiSegmentationChoice == "Cellpose segmentation 2D (or make 2D projection)") {
 		if(cytoChannel  >  0) run("Cellpose ...", "env_path="+envPath+" env_type="+envType+" model=["+CellposeModel+"] model_path=["+CellposeModelPath+"] diameter="+CellposeDiameter+" ch1="+cytoChannel+" ch2="+nucleiChannel+" additional_flags=[--use_gpu, --flow_threshold, "+probabilityThreshold+", --cellprob_threshold, 0.0]");
 		else run("Cellpose ...", "env_path="+envPath+" env_type="+envType+" model=["+CellposeModel+"] model_path=["+CellposeModelPath+"] diameter="+CellposeDiameter+" ch1="+cytoChannel+" ch2=0 additional_flags=[--use_gpu, --flow_threshold, "+probabilityThreshold+", --cellprob_threshold, 0.0]");
 	}
@@ -1577,6 +1615,10 @@ function segmentCellsCellpose (image, nucleiChannel, cytoChannel, probabilityThr
 	}
 	else if(oldCellposeWrapper == true) run("Cellpose Advanced", "diameter="+CellposeDiameter+" cellproba_threshold=0 flow_threshold="+probabilityThreshold+" anisotropy=1.0 diam_threshold=12.0 model="+CellposeModel+" nuclei_channel=0 cyto_channel=1 dimensionmode=2D stitch_threshold=-1.0 omni=false cluster=false additional_flags=");
 
+	if(getTitle() != cellpose_input_image+"-cellpose") {
+		print("[ERROR] Cellpose failed! Please check the Fiji console for error messages. Possible solution (for 3D segmentation): make sure Cellpose is upgraded to version 3.1.1") 
+		exit("[ERROR] Cellpose failed! Please check the Fiji console for error messages. Possible solution (for 3D segmentation): make sure Cellpose is upgraded to version 3.1.1");
+	}
 	labelmap_nuclei = getTitle();
 	setBatchMode("hide");
 
@@ -1584,7 +1626,7 @@ function segmentCellsCellpose (image, nucleiChannel, cytoChannel, probabilityThr
 //	setBatchMode("hide");
 
 	//Close unused images
-	if(slices>1 && nucleiSegmentationChoice == "Cellpose segmentation 2D (or on 2D projection)") close("forCellpose_Zprojected");
+	if(slices>1 && nucleiSegmentationChoice == "Cellpose segmentation 2D (or make 2D projection)") close("forCellpose_Zprojected");
 
 	Ext.CLIJ2_push(labelmap_nuclei);
 	//Exclude nuclei on edges (only XY!) and count nr of nuclei
@@ -1606,7 +1648,7 @@ function segmentCellsCellpose (image, nucleiChannel, cytoChannel, probabilityThr
 		Ext.CLIJ2_release(flaglist_labels_on_edges);
 		Ext.CLIJ2_release(labelmap_nuclei);
 	}
-	else if(excludeOnEdges && nucleiSegmentationChoice == "Cellpose segmentation 2D (or on 2D projection)") {
+	else if(excludeOnEdges && nucleiSegmentationChoice == "Cellpose segmentation 2D (or make 2D projection)") {
 		Ext.CLIJ2_push(labelmap_nuclei);
 		Ext.CLIJ2_excludeLabelsOnEdges(labelmap_nuclei, labelmap_nuclei_edges_excluded);
 		Ext.CLIJ2_release(labelmap_nuclei);
@@ -1649,7 +1691,7 @@ function segmentCellsCellpose (image, nucleiChannel, cytoChannel, probabilityThr
 		if(debugMode) { showImagefromGPU(labelmap_nuclei_filtered_gapsclosed); run("glasbey on dark"); }
 	}
 	//Create nuclei outlines from nuclei labelmap
-	if (nucleiSegmentationChoice == "Cellpose segmentation 2D (or on 2D projection)") {
+	if (nucleiSegmentationChoice == "Cellpose segmentation 2D (or make 2D projection)") {
 		Ext.CLIJ2_detectLabelEdges(labelmap_nuclei_final, labelmap_edges);
 		if(thickOutlines == false) {
 			Ext.CLIJ2_mask(labelmap_nuclei_final, labelmap_edges, labelmap_outlines);
@@ -1658,25 +1700,34 @@ function segmentCellsCellpose (image, nucleiChannel, cytoChannel, probabilityThr
 		else labelmap_outlines = labelmap_edges;
 		Ext.CLIJ2_pullBinary(labelmap_outlines);
 		Ext.CLIJ2_release(labelmap_outlines);
-		rename("nuclei_outlines");
-		run(outlineColor);
 	}
-	else if(nucleiSegmentationChoice == "Cellpose segmentation 3D") {	//Create a 3D image with label edges, without the ugly 'filled planes' that Ext.CLIJ2_detectLabelEdges() outputs.
-		Ext.CLIJ2_maximumSliceBySliceSphere(labelmap_nuclei_final, labelmap_maximum, 1, 1);
-		Ext.CLIJ2_minimumSliceBySliceSphere(labelmap_nuclei_final, labelmap_minimum, 1, 1);
-		Ext.CLIJ2_subtractImages(labelmap_maximum, labelmap_minimum, label_edges);
-		Ext.CLIJ2_release(labelmap_maximum);
-		Ext.CLIJ2_release(labelmap_minimum);
-		Ext.CLIJ2_threshold(label_edges, labelmap_outlines, 1);
-		Ext.CLIJ2_pull(labelmap_outlines);
-		Ext.CLIJ2_release(label_edges);
-		Ext.CLIJ2_release(labelmap_outlines);
-		rename("nuclei_outlines");
-		run(outlineColor);
+	else if(nucleiSegmentationChoice == "Cellpose segmentation 3D") {
+		labelmap_outlines = create_3D_outlines_from_labelmap(labelmap_nuclei_final);
+		selectImage(labelmap_outlines);
 	}
+	rename("nuclei_outlines");
+	run("8-bit");
+	run("Multiply...", "value=255 stack");
+	run(outlineColor);
+	run("Enhance Contrast", "saturated=0.35");
 	nuclei_outlines = "nuclei_outlines";
 
 	return newArray(labelmap_nuclei_final, nuclei_outlines, nrNuclei);
+}
+
+
+//Create a 3D image with label edges, without the ugly 'filled planes' that Ext.CLIJ2_detectLabelEdges() outputs.
+function create_3D_outlines_from_labelmap(labelmap_nuclei_final) {
+	Ext.CLIJ2_maximumSliceBySliceSphere(labelmap_nuclei_final, labelmap_maximum, 1, 1);
+	Ext.CLIJ2_minimumSliceBySliceSphere(labelmap_nuclei_final, labelmap_minimum, 1, 1);
+	Ext.CLIJ2_subtractImages(labelmap_maximum, labelmap_minimum, label_edges);
+	Ext.CLIJ2_release(labelmap_maximum);
+	Ext.CLIJ2_release(labelmap_minimum);
+	Ext.CLIJ2_threshold(label_edges, labelmap_outlines, 1);
+	Ext.CLIJ2_pull(labelmap_outlines);
+	Ext.CLIJ2_release(label_edges);
+	Ext.CLIJ2_release(labelmap_outlines);
+	return labelmap_outlines;
 }
 
 
@@ -2034,7 +2085,13 @@ function detect_foci(image, channel, fociSize, anisotropyFactor, firstTimeProces
 	Ext.CLIJ2_mask(labeledSpots_masked, labelmap_foci_final, labeledSpots_masked_filtered);
 	Ext.CLIJ2_release(labeledSpots_masked);
 	if(isOpen("foci_spots_ch"+channel)) close("foci_spots_ch"+channel);
-	if(useLargeSpots == true) Ext.CLIJ2_dilateBox(labeledSpots_masked_filtered, labeledSpots_masked_filtered_dilated);
+	useLargeSpots = false;
+	//if(gwidth > 1500) useLargeSpots = true;
+	//if(unit == "µm" || unit == "um" || unit == "microns" || unit == "micron") {
+	//	if(pixelWidth < 0.1) useLargeSpots = true;
+	//}
+	if(fociSizeXY >= 2) useLargeSpots = true;
+	if(useLargeSpots == true) Ext.CLIJ2_dilateSphere(labeledSpots_masked_filtered, labeledSpots_masked_filtered_dilated);
 	else labeledSpots_masked_filtered_dilated = labeledSpots_masked_filtered;
 	Ext.CLIJ2_pullBinary(labeledSpots_masked_filtered_dilated);
 	rename("foci_spots_ch"+channel);
@@ -2195,12 +2252,13 @@ function mergeOriginalAndDetection(original, nrNuclei, nuclei_outlines, foci_mas
 
 	//Add nuclei outlines as overlay to the original image
 	selectWindow(nuclei_outlines);
-	if(overlayBrightness == "dim") setMinAndMax(0, 512);	//Silly way to set nuclei outline overlay to dim, but it works
-	if(overlayBrightness == "bright") resetMinAndMax;		//Silly way to set nuclei outline overlay to dim, but it works
+	outline_slices = nSlices;
+	if(overlayBrightness == "dim") setMinAndMax(0, 2*getValue("Max"));	//Silly way to set nuclei outline overlay to dim, but it works
+	if(overlayBrightness == "bright") resetMinAndMax;					//Silly way to set nuclei outline overlay to dim, but it works
 	if(debugMode) setBatchMode("show");
 	selectWindow("Foci_overlay_ch"+channel);
 	for (i = 1; i <= gslices; i++) {
-		if(gslices>1 && nucleiSegmentationChoice == "Cellpose segmentation 3D") {
+		if(gslices>1 && outline_slices>1) {
 			selectImage(nuclei_outlines);
 			Stack.setSlice(i);
 			if(maxFociDistanceOutsideNuclei_setting != 0) {
@@ -2553,7 +2611,7 @@ function overlay_numbers_on_image(overlay_image) {
 			}
 		}
 		else if(overlayChoice == "none") {
-		}
+		}		
 		updateDisplay();
 	}
 }
