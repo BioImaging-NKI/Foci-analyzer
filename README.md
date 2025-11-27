@@ -43,7 +43,7 @@ Run Foci Analyzer from the Fiji menu: `Plugins -> Foci Analyzer -> Foci Analyzer
 `Combine result files` can be used to pool output `.tsv` files into a single file/table.
 
 In case you also want to use Cellpose segmentation you additionally need:
-- A working Cellpose (2.0 or higher) environment in Python (conda or venv). For 3D segmentation make sure you have Cellpose 3.1.1 or Cellpose 4 installed.
+- A working Cellpose (2.0 or higher) environment in Python (conda or venv)
 - Activated PTBIOP update site, with proper settings. See [here](https://github.com/BIOP/ijl-utilities-wrappers/blob/master/README.md#cellpose) for more details.
 
 
@@ -113,7 +113,7 @@ This option only affects the nuclei segmentation; it is different from the previ
 
 - _Cellpose cell diameter (pixels), 0 for automatic_ : Estimated diameter of the cells, in pixels. Setting this parameter to 0 will trigger Cellpose to estimate it. Please check the Fiji console for the resulting estimate.
 
-- _Cellpose model_ : The [model](https://cellpose.readthedocs.io/en/v3.1.1.1/models.html#models) (built-in or custom) used for segmentation. Tested up to Cellpose 3.1 (cpsam may just work though).
+- _Cellpose model_ : The [model](https://cellpose.readthedocs.io/en/v3.1.1.1/models.html#models) (built-in or custom) used for segmentation. Tested up to Cellpose 3.1.1.1 (Cellpose 4 is now operated with a different command - support will follow soon).
 
 - _Remove nuclei with diameter smaller than (units)_ : Objects smaller than circles having an area corresponding to this diameter will be removed. 'Units' depends on the image, and will almost always be 'µm', or otherwise 'pixels' in case the pxiel calibration values are missing. (default: 4)
 
@@ -241,4 +241,4 @@ The macro produces overlap maps for the foci in the two chosen channels that vis
 For each image (or frame) a new result file is generated. When multiple images (or frames) are processed. Result `.tsv` files in a folder can be appended by running `Combine result files` in the Foci-Analyzer Fiji submenu. The resulting table is saved as `Results_all_files.tsv` in the same folder as the input `.tsv` files. (By the way, this script also runs on other text-based files, e.g. `.csv`, `.txt`.)
 
 ## Foci quantification on large images using QuPath & Fiji
-Foci Analyzer can be combined with QuPath, enabling foci analysis on very large images. For this, we have developed some [`groovy` scripts](https://github.com/BioImaging-NKI/Foci-analyzer/tree/main/QuPath). Image tiles from annotated regions together with cell segmentations are exported from QuPath and analyzed in Fiji. Foci results can be imported into QuPath, allowing cells to be classified on their foci characteristics.
+Foci Analyzer can be combined with QuPath, enabling foci analysis on very large images. For this, we have developed some `groovy` scripts [(on Github)](https://github.com/BioImaging-NKI/Foci-analyzer/tree/main/QuPath). Image tiles from annotated regions together with cell segmentations are exported from QuPath and analyzed in Fiji. Foci results can be imported into QuPath, allowing cells to be classified on their foci characteristics.
