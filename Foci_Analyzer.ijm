@@ -193,34 +193,47 @@
  * - 'All Foci Results per cell' and 'All Foci Statistics' tables are generated and saved at the end of a run with multiple files.
  * - Threshold (on filtered image) is saved as column in the Foci Results per cell table.
  * - Thanks to Ksenia Kudryashova, fixed a bug where Cellpose would fail if 'use gpu' was not checked.
- * - Foci pixels are displayed in slightly transparent magenta (display range to 384), so foci centroids are still visible.
+ * - Foci pixels are displayed in slightly transparant magenta (display range to 384), so foci centroids are still visible.
  * 
+ * Version 1.93:
+ * - Tiny optimizations: updating detected foci LUT and script parameter messages
+ * 
+ * Version 1.94:
+ * - Better logging
+ * 
+ * Version 1.95:
+ * - After analyzing a timelapse image, 'combine result files', 'concatenate timelapse with overlays' and 'plot foci timetraces' are automatically run 
+ * - Option to save the label images after segmentation 
+ * - Added the option for classic segmentation to manually set the threshold
+ * 
+ * Version 1.96:
+ * - Thanks to Stephen Royle, added a "No to all images" option in the dialog for flipping channels and slices 
  *  
  */
 
-#@ String	foci_Analyzer_message 	(value="<html><p style='font-size:18px; color:#000000; font-weight:bold'><img width=96 height=96 src='https://imagej.net/media/icons/Foci-Analyzer-icon.png'</img><a style='color:#000000' href=https://imagej.net/plugins/foci-analyzer>Foci Analyzer</a> (v1.92)</p></html>", visibility="MESSAGE", persist=false)
-#@ String	foci_Analyzer_message2 	(value="<html><p style='font-size:12px; color:#000000; font-weight:bold'>Please note: in v1.92 the (3D) filtering has changed, possibly leading to different results compared to earlier versions!</p></html>", visibility="MESSAGE", persist=false)
-#@ String	file_message 			(value="<html><p style='font-size:14px; color:#9933cc; font-weight:bold'>File settings</p></html>", visibility="MESSAGE", persist=false)
+#@ String	foci_Analyzer_message 	(value="<html><p style='font-size:18px; color:#000000; font-weight:bold'><img width=96 height=96 src='https://imagej.net/media/icons/Foci-Analyzer-icon.png'</img><a style='color:#000000' href=https://imagej.net/plugins/foci-analyzer>Foci Analyzer</a> (v1.96)</p></html>", visibility="MESSAGE", required=false, persist=false)
+//#@ String	foci_Analyzer_message2 	(value="<html><p style='font-size:12px; color:#000000; font-weight:bold'>Please note: Since v1.92 the improved (3D) filtering may lead to slightly different results compared to earlier versions!</p></html>", visibility="MESSAGE", required=false, persist=false)
+#@ String	file_message 			(value="<html><p style='font-size:14px; color:#9933cc; font-weight:bold'>File settings</p></html>", visibility="MESSAGE", required=false, persist=false)
 #@ File[]	files 					(label = "Input files", style="File", description="Here you can specify which files to analyze, by adding them to the list, or drag&drop from a file explorer window.")
 #@ String	processOnlyExtension	(label = "Only process files with extension (leave empty for all files)", value="", description="If files with multiple formats are in the list, only files ending with this extension (e.g. tif, czi) will be processed.")
 #@ File		outputFolder			(label = "Output folder", style = "directory", required=false, description="The folder where all the analyzed images and results will be saved.")
 #@ Boolean	useInputAsOutput		(label = "Save the output files in the same folder as the input file(s)?", description="When checked, output images and result files will be saved in the same folder as the input file(s).")
 
-#@ String	image_message 			(value="<html><p style='font-size:14px; color:#3366cc; font-weight:bold'>Image settings</p></html>", visibility="MESSAGE", persist=false)
+#@ String	image_message 			(value="<html><p style='font-size:14px; color:#3366cc; font-weight:bold'>Image settings</p></html>", visibility="MESSAGE", required=false, persist=false)
 #@ Boolean	loadSettingsFromFile	(label = "Load settings from previously analyzed image?", description="When checked, a separate dialog will popup where an output .zip file can be selected (overlay or colocalization map).\nAll settings are loaded from the metadata in the saved image. The script parameter entries in this large dialog are ignored.")
 #@ Integer 	nucleiChannel			(label = "Nuclei channel (-1 if not used)", value = 1, description="The image channel that contains the nuclei. For StarDist nuclei segmentation is performed using this channel, which always happens in 2D (in the case of 3D images on a maximum intensity projection).\nFor Cellpose, there are two possibilities, depending on the value of Cytoplasm/membrane channel below.")
 #@ Integer	cytoChannel 			(label = "Cytoplasm/membrane channel (-1 if not used)", value = -1, description="The image channel that contains cytoplasm or membrane. If set to -1, segmentation is performed on the nucleus channel alone.\nIf not -1 and Cellpose is chosen as segmentation method, segmentation is performed on this channel. In this case the nuclei channel is the 'additional helper channel'.\nIf not set to -1 and StarDist is chosen, this channel is not used in the segmentation, but instead just displayed in the overlay image. (default: -1)")
 #@ Integer	fociChannelA 			(label = "Foci channel A", value = 2, description="The first foci channel (default: 2)")
 #@ Integer	fociChannelB 			(label = "Foci channel B", value = 3, description="The second foci channel (default: 3)")
-#@ Boolean	detectFociChannelB		(label = "Also detect foci in channel B and perform colocalization?", persistence=true, value=true, description="If checked, foci in both channels A and B will be analyzed, followed by a simple colocalization analysis. (default: checked)")
+#@ Boolean	detectFociChannelB		(label = "Also detect foci in channel B and perform colocalization?", persist=true, value=true, description="If checked, foci in both channels A and B will be analyzed, followed by a simple colocalization analysis. (default: checked)")
 
 #@ String	ThreeDHandling 			(label = "2D/3D foci detection", choices={"Detect foci in 3D (or 2D when N/A)", "Detect foci on the Maximum Intensity Projection", "Detect foci on a Extended Depth of Focus Projection", "Detect foci on the Standard Deviation Projection", "Detect foci on the Summed Intensity Projection", "Use quasi-2D foci detection (detect foci separately in every Z-slice)", "Process a single z-slice only (specify below which slice)"}, style="listbox", description="2D/3D foci detection:\nThis parameter determines how foci in 3D images should be analyzed. For 2D input images this setting is ignored. The options are:\n\n- Detect foci in 3D (or 2D when N/A) (default) performs foci analysis using 3D filters and 3D marker-controlled watershed functions. Connected foci in consecutive slices are counted once.\n\n- Detect foci on the Maximum Intensity Projection performs 2D foci analysis on the MIP projection.\n\n- Detect foci on a Extended Depth of Focus Projection performs 2D foci analysis on an EDF projection.\n\n- Detect foci on the Standard Deviation Projection performs 2D foci analysis on the STDEV projection.\n\n- Detect foci on the Summed Intensity Projection performs 2D foci analysis on the SUM projection.\n\n- Use quasi-2D foci detection (detect foci separately in every Z-slice) analyzes every z-slice in a 3D image as a separate 2D image.\n  This setting is useful in cases where the z-spacing is very large and each focus is visible in only one z-slice.\n  Hence, connected foci in consecutive slices will be counted multiple times.\n\n- Process a single z-slice only (specify below which slice) allows the user to analyze foci only in a particular z-slice.")
 #@ Integer	singleSlice				(label = "[single z-slice foci detection only] Slice nr", value=1, min=1, description="The single z-slice used for the option above. For any other choice this parameter is ignored.")
 #@ Integer	cropBorder				(label = "Remove image borders (pixels)", value = 0, min=0, description="Possibility to remove edges from the image. This can in particular be useful when the image edges have very different intensities, causing incorrect automatic nuclei segmentation. (default: 0)")
 #@ Integer	XYBinning				(label = "Image XY binning before analysis [1-n]", value = 1, min=1, description="Optional pixel binning in case the resolution is very high and the foci consist of many pixels.\nA value of 2 means: 2x2 pixels will be binned into 1 pixel. This reduces noise in the image and speeds up analysis. (default: 1)")
 
-#@ String	nuclei_message 			(value = "<html><p style='font-size:14px; color:#33aa00; font-weight:bold'>Nuclei/cell detection settings</p></html>", visibility="MESSAGE", persist=false)
-#@ String	nucleiSegmentationChoice	(label = "Nuclei/cell segmentation method", choices={"StarDist nuclei segmentation 2D (or make 2D projection)", "Cellpose segmentation 2D (or make 2D projection)", "Cellpose segmentation 3D", "Classic segmentation 2D", "Load ROIs from file", "Load label images"}, style="listBox", description="Nuclei/cell segmentation method:\nStardist nuclei segmentation 2D (or make 2D projection) (default) uses the pretrained convolutional neural network StarDist to recognize cell nuclei in fluorescence microscopy images.\nIn general this method works very well on a large variety of samples.\n\n- Cellpose segmentation 2D (or make 2D projection) uses the deep learning network Cellpose to recognize whole cells or nuclei.\nUse this option if you want to measure foci in entire cells, or if you prefer Cellpose nuclei segmentation over StarDist.\nN.B. Cellpose requires additional installations (see Installation / Requirements).\n\n- Cellpose segmentation 3D: If this option is chosen a new dialog pops up with extra settings. These are the most important parameters for 3D segmentation.\nMore parameters can be added in the 'Additional Cellpose parameters' field. The Help button takes you to the Cellpose CLI with explanations of all parameters.\n\n- Classic nuclei segmentation allows the user to segment nuclei using manual/automatic thresholding is provided for legacy reasons.\nThe method is almost always outperformed by the two other methods.\n\n- Load ROIs from file: ImageJ ROI .zip files can be loaded instead of performing segmentation. This option is used in the (near future) QuPath-Fiji workflow.\nROI files should have the same name as the input images without extensions, followed by '_ROIs.zip'.\n\n- Load label images allows loading a labelmap, if the segmentation has been done by external programs, or to quickly re-run files with the same segmentation.\nLabel image files should be present in another folder and have the exact same name as the input images.")
+#@ String	nuclei_message 			(value = "<html><p style='font-size:14px; color:#33aa00; font-weight:bold'>Nuclei/cell detection settings</p></html>", visibility="MESSAGE", required=false, persist=false)
+#@ String	nucleiSegmentationChoice	(label = "Nuclei/cell segmentation method", choices={"StarDist nuclei segmentation 2D (or make 2D projection)", "Cellpose segmentation 2D (or make 2D projection)", "Cellpose segmentation 3D", "Classic segmentation 2D (automatic threshold)", "Classic segmentation 2D (manual threshold)","Load ROIs from file", "Load label images"}, style="listBox", description="Nuclei/cell segmentation method:\nStardist nuclei segmentation 2D (or make 2D projection) (default) uses the pretrained convolutional neural network StarDist to recognize cell nuclei in fluorescence microscopy images.\nIn general this method works very well on a large variety of samples.\n\n- Cellpose segmentation 2D (or make 2D projection) uses the deep learning network Cellpose to recognize whole cells or nuclei.\nUse this option if you want to measure foci in entire cells, or if you prefer Cellpose nuclei segmentation over StarDist.\nN.B. Cellpose requires additional installations (see Installation / Requirements).\n\n- Cellpose segmentation 3D: If this option is chosen a new dialog pops up with extra settings. These are the most important parameters for 3D segmentation.\nMore parameters can be added in the 'Additional Cellpose parameters' field. The Help button takes you to the Cellpose CLI with explanations of all parameters.\n\n- Classic nuclei segmentation allows the user to segment nuclei using manual/automatic thresholding is provided for legacy reasons.\nThe method is almost always outperformed by the two other methods.\n\n- Load ROIs from file: ImageJ ROI .zip files can be loaded instead of performing segmentation. This option is used in the (near future) QuPath-Fiji workflow.\nROI files should have the same name as the input images without extensions, followed by '_ROIs.zip'.\n\n- Load label images allows loading a labelmap, if the segmentation has been done by external programs, or to quickly re-run files with the same segmentation.\nLabel image files should be present in another folder and have the exact same name as the input images.")
 #@ Double	downsampleFactorStarDist	(label = "Stardist nuclei rescaling factor [1-n], 0 for automatic, 1 for no rescaling", value = 0, min=0, description="Stardist is trained on medium resolution images, and generally performs well on images with pixel sizes around 0.2-0.5 µm.\nSet to 0 for automatic rescaling the nuclei to an optimal pixel size of 0.25 µm, or put any other number for manual control of the rescaling.")
 #@ Double 	probabilityThreshold		(label = "Probability/flow threshold [0.0-1.0] (StarDist/Cellpose)", value = 0.5, min=0, max=1, style="format:0.0", description="Lower values will accept more nuclei/cells; higher values will be more stringent. For Cellpose this is actually the flow_threshold parameter.")
 #@ String 	CellposeModel			(label = "Cellpose model", choices={"cyto3","nuclei","tissuenet_cp3","cpsam","custom"}, style="listBox", value="cyto3", description="The model (built-in or custom) used for segmentation.")
@@ -231,7 +244,7 @@
 #@ Boolean	excludeOnEdges			(label = "Exclude nuclei/cells on image edges", value = true, description="When checked, nuclei that touch the image edge will not be analyzed. (default: checked).")
 #@ String	manualRemoveNuclei		(label = "Manually remove segmented nuclei/cells", choices={"No thanks","Manually remove nuclei", "Load previously saved removals (from output folder)"}, value = "No thanks", description="Manual nuclei removal: allows the user to erase ill-segmented nuclei before analysis. (default: No thanks)\nOptions:\n\n- No thanks means no manual nuclei editing\n\n- Manually remove nuclei : Remove nuclei by leftclicking them in the image with the mouse. Editings will be saved to a small text file in the output folder.\n\n- Load previously saved removals (from output folder) : If you have edited the segmented nuclei on this image before, it will load the previous nuclei removals\n  from the file in the specified output folder. (Hence, if you change the output folder parameter this option will not work.)")
 
-#@ String	foci_message1			(value="<html><p style='font-size:14px; color:#cc9933; font-weight:bold'>Foci detection settings</p></html>", visibility="MESSAGE", persist=false)
+#@ String	foci_message1			(value="<html><p style='font-size:14px; color:#cc9933; font-weight:bold'>Foci detection settings</p></html>", visibility="MESSAGE", required=false, persist=false)
 #@ Boolean	optimizationModeSetting	(label = "Preview foci detection (for parameter fine-tuning)?", value=true, description="Checking this will allow the user to adapt the foci detection settings on a preview analysis before quantifying.")
 #@ String	fociSizeA				(label = "Foci size channel A (after XY binning)", choices={"tiny (0.5 pixels)","small (1 pixel)","average (2 pixels)","large (4 pixels)","huge (8 pixels)","other (define later)"}, style="listBox", value="average", description="This parameter controls several foci image filtering steps and steers the macro towards detecting smaller or larger foci.")
 #@ String	fociSizeB				(label = "Foci size channel B (after XY binning)", choices={"tiny (0.5 pixels)","small (1 pixel)","average (2 pixels)","large (4 pixels)","huge (8 pixels)","other (define later)"}, style="listBox", value="average", description="This parameter controls several foci image filtering steps and steers the macro towards detecting smaller or larger foci.")
@@ -246,17 +259,17 @@
 
 #@ Integer	minOverlapSize			(label = "Minimum overlap of foci to colocalize (pixels/voxels)", min = 1, value = 1, description="Foci in channel A and B will be counted as colocalizing only if they overlap with at least this area/volume.")
 
-#@ String	visualization_message	(value = "<html><p style='font-size:14px; color:#cc3333; font-weight:bold'>Visualization options</p></html>", visibility="MESSAGE", persist=false)
-#@ String	overlayChoice			(label = "Nuclei/cell overlay choice", choices={"nucleus/cell ID","foci count","both","none"}, description="Select which numbers are added to the overlay.")
-#@ ColorRGB	fontColorCells			(label = "Nuclei/cell label color", value="orange", description="The color of the nucleus/cell ID text overlay.")
+#@ String	visualization_message	(value = "<html><p style='font-size:14px; color:#cc3333; font-weight:bold'>Visualization options</p></html>", visibility="MESSAGE", required=false, persist=false)
+#@ String	overlayChoice			(label = "Nuclei/cell overlay choice", choices={"cell ID and foci count","cell ID","foci count","none"}, description="Select which numbers are added to the overlay.")
+#@ ColorRGB	fontColorCells			(label = "Nuclei/cell label color", value="orange", description="The color of the cell ID text overlay.")
 #@ ColorRGB	fontColorFoci			(label = "Foci count label color", value="red", description="The color of the foci count text overlay.")
-#@ Integer	labelFontSize			(label = "Nuclei/cell label font size", value=12, min=4, description="The size of the nuclei/cell ID text overlay.")
+#@ Integer	labelFontSize			(label = "Nuclei/cell label font size", value=12, min=4, description="The size of the cell ID text overlay.")
 #@ String	overlayBrightness		(label = "Nuclei/cell outline brightness", choices={"bright","dim"}, description="The brightness of the nuclei outlines overlay.")
 #@ String	outlineColor			(label = "Nuclei/cell outline color", choices={"White","Red","Green","Blue","Cyan","Magenta","Yellow"}, value = "Cyan", description="The color of the nuclei outlines overlay.")
 #@ Boolean	debugMode				(label = "Debug mode (show intermediate images)", value=false, description="Used for development and bug fixing: checking this option will trigger displaying many intermediate results during the processing. It will also slow down the analysis.")
-#@ String	file_and_image_message0	(value = "<html><p style='font-size:12px'>Need help? Visit the <a href=https://imagej.net/plugins/foci-analyzer>Foci Analyzer</a> website on ImageJ.net</p></html>", visibility="MESSAGE", persist=false)
+#@ String	file_and_image_message0	(value = "<html><p style='font-size:12px'>Need help? Visit the <a href=https://imagej.net/plugins/foci-analyzer>Foci Analyzer</a> website on ImageJ.net</p></html>", visibility="MESSAGE", required=false, persist=false)
 
-version = 1.92;
+version = 1.96;
 
 requires("1.54i");	//Minimum required ImageJ version
 
@@ -395,7 +408,8 @@ maxTileSize = 2048;			// Maximum StarDist tile size
 thresholdMultiplier = 3;	//Default threshold multiplier - foci should be this number of times more intense than the standard deviation of the background (average of all nuclei) 
 minFociSize = minFociSize;
 maxFociSize = maxFociSize;
-var flipSlicesAndChannels = false;
+var flipSlicesAndChannels= false;
+var bypassFlipSlicesAndChannelsDialog = false;
 //H_max_peak_flooding = 100;	//Percentage of the peak
 
 thickOutlines = true;		//Width of nuclei outlines, 1 or 2 pixels
@@ -403,6 +417,7 @@ thickOutlinesThresholdSize = 1200;	//Above this image size nuclei outlines are a
 LABELOPACITY = 100;			//opacity of outlines
 addNumbersOverlay = true;
 saveOverlayImage = true;
+saveLabelImage = true;
 
 var useLargeSpots = false;		//Make spots in overlay larger
 var hideCellpose3DDialog = false;
@@ -418,6 +433,7 @@ var displayMode = "composite";	//Default display settings at optimization phase
 var activeChannels = "11111";
 var maxDisplaySetting;
 var processTime = 0;
+var doTimelapse = false;
 //var threshold = 0;
 var thresholdA = 0;
 var thresholdB = 0;
@@ -427,6 +443,7 @@ var ROIsFolder = "";
 var labelImageFolder = "";
 var setROIsFolder = false;
 var setLabelImageFolder = false;
+
 
 //Create the azure and orange LUTs for the nuclei and cells (TO DO: maybe do this in a more elegant way than globals)
 b_reds = newArray(256);
@@ -455,6 +472,7 @@ run("Clear Results");
 run("CLIJ2 Macro Extensions", "cl_device=");
 Ext.CLIJ2_clear();
 
+print("    === Foci Analyzer v"+version+" ===");
 
 // Start of workflow
 //------------------------------
@@ -527,7 +545,6 @@ else CellposeModelPath = "path\\to\\own_cellpose_model";	//dummy name
 
 
 for (currentFileNr = 0; currentFileNr < nrOfImages; currentFileNr++) {
-	print("\nProcessing file "+currentFileNr+1+"/"+nrOfImages+": "+files[currentFileNr] + "\n");
 	if(processOnlyExtension == "" || endsWith(files[currentFileNr], processOnlyExtension)) processFile(currentFileNr, files[currentFileNr], outputFolder);
 	else print("Skipping "+File.getName(files[currentFileNr])+" because it is not a "+processOnlyExtension+" file.");
 }
@@ -537,7 +554,7 @@ logWindowContents = getInfo("log");
 File.saveString(logWindowContents, outputFolder + File.separator + "Log.txt");
 
 //Create table for all files by loading from disk and concatenating
-if(nrOfImages > 1) {
+if(nrOfImages > 1 || doTimelapse == true) {
 	close(resultTable);
 	close(allFociResultsTable);
 	run("Combine result files", "filestring=__Foci_results.tsv dir=["+outputFolder+"], outputfilename=All_Foci_Results_per_cell");
@@ -548,6 +565,14 @@ if(nrOfImages > 1) {
 	Table.setLocationAndSize(100, 600, 1000, 500);
 }
 
+//Create additional tables and  plots in case of a timelapse
+if (doTimelapse == true) {
+	run("Concatenate timelapse with overlays", "dir=["+outputFolder+"] fileextension=zip");
+	Table.rename("All Foci Results per cell", "Results");
+	run("Plot foci timetraces", "  focichannel="+fociChannelA+" smoothtracesstep=0");
+	if (detectFociChannelB == true) run("Plot foci timetraces", "  focichannel="+fociChannelB+" smoothtracesstep=0");
+}
+	
 print("\n-------------------------------------------------------------------------");
 print("Finished processing "+nrOfImages+" files in "+processTime*60+" seconds ("+d2s(processTime,1)+" minutes).");
 print("Average speed: "+d2s((nrOfImages)/processTime,1)+" images per minute.");
@@ -611,8 +636,7 @@ function processFile(current_image_nr, file, outputFolder) {
 			run("Bio-Formats Importer", "open=["+file+"] autoscale color_mode=Default view=Hyperstack stack_order=XYCZT series_"+s+1);
 			seriesName = getTitle();
 			seriesName = replace(seriesName,"\\/","-");	//replace slashes by dashes in the seriesName
-	//		print(seriesName);
-	//		outputPath = output + File.separator + substring(seriesName)
+			print("Series "+s+1+": "+seriesName);
 
 			if(XYBinning > 1) run("Bin...", "x="+XYBinning+" y="+XYBinning+" z=1 bin=Average");
 			process_current_series(seriesName, false);
@@ -629,8 +653,8 @@ function process_current_series(image, nameHasExtension) {
 
 	if(nameHasExtension) imageName = File.getNameWithoutExtension(image);
 	else imageName = image;
-
-	//Initialize image and table
+	
+	//Initialize image and table	
 	getDimensions(gwidth, gheight, gchannels, gslices, gframes); // global variables
 	getVoxelSize(pixelWidth, pixelHeight, pixelDepth, unit);
 	if(bitDepth() == 24) {
@@ -642,6 +666,7 @@ function process_current_series(image, nameHasExtension) {
 
 	//timelapse handling - save individual frames and call processFile recursively [smiley with sunglasses]
 	if(gframes > 1){
+		doTimelapse = true;
 		original = getTitle;
 		print("Saving "+gframes+" time frames to disk...");
 		for(t=1; t<=gframes; t++) {
@@ -680,19 +705,37 @@ function process_current_series(image, nameHasExtension) {
 		return;
 	}
 
+	print("\nProcessing "+image);
+
+	//Print date and time
+	getDateAndTime(year, month, dayOfWeek, dayOfMonth, hour, minute, second, msec);
+	MonthNames = newArray("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec");
+ 	DayNames = newArray("Sun", "Mon","Tue","Wed","Thu","Fri","Sat");
+ 	timeString = DayNames[dayOfWeek]+" ";
+	if (dayOfMonth<10) {timeString = timeString+"0";}
+	timeString = timeString+dayOfMonth+" "+MonthNames[month]+" "+year+", ";
+	if (hour<10) {timeString = timeString+"0";}
+	timeString = timeString+hour+":";
+	if (minute<10) {timeString = timeString+"0";}
+	timeString = timeString+minute+":";
+	if (second<10) {timeString = timeString+"0";}
+	timeString = timeString+second;
+	print(timeString + "\n");
+	
 	original = getTitle();
-	print("Image path: "+image+"\n");
 
 	if(gchannels == 1 && gslices > 1) {
-		if(flipSlicesAndChannels == false) {
+		if(bypassFlipSlicesAndChannelsDialog == false) {
 			setBatchMode("show");
 			Dialog.createNonBlocking("Single channel detected");
 			Dialog.addMessage("Warning: ["+imageName+"] has only 1 Channel, but "+gslices+" Slices.");
-			Dialog.addRadioButtonGroup("Do you want to flip Channels and Slices?", newArray("Yes, and do this for all subsequent images", "Yes, only for this image", "No, use this channel for both cell segmentation and foci detection"), 3, 1, "Yes, and do this for all subsequent images");
+			Dialog.addRadioButtonGroup("Do you want to flip Channels and Slices?", newArray("Yes, for all subsequent images", "Yes, only for this image", "No, use this channel for both cell segmentation and foci detection, for all subsequent images", "No, use this channel for both cell segmentation and foci detection, only for this image"), 4, 1, "Yes, for all subsequent images");
 			Dialog.show();
 			answer = Dialog.getRadioButton();
-			if(answer == "Yes, and do this for all subsequent images") flipSlicesAndChannels = true;
-			if(answer == "Yes, only for this image") run("Re-order Hyperstack ...", "channels=[Slices (z)] slices=[Channels (c)] frames=[Frames (t)]");
+			if     (answer == "Yes, for all subsequent images") { flipSlicesAndChannels = true; bypassFlipSlicesAndChannelsDialog = true; }
+			else if(answer == "Yes, only for this image")       { flipSlicesAndChannels = true; bypassFlipSlicesAndChannelsDialog = false; }
+			else if(answer == "No, use this channel for both cell segmentation and foci detection, for all subsequent images") bypassFlipSlicesAndChannelsDialog = true;
+			else if(answer == "No, use this channel for both cell segmentation and foci detection, only for this image")       bypassFlipSlicesAndChannelsDialog = false;
 		}
 		if(flipSlicesAndChannels == true) run("Re-order Hyperstack ...", "channels=[Slices (z)] slices=[Channels (c)] frames=[Frames (t)]");
 		setBatchMode("hide");
@@ -713,9 +756,8 @@ function process_current_series(image, nameHasExtension) {
 	
 	if(gslices > 1) anisotropyFactor = pixelDepth / pixelWidth;
 	else anisotropyFactor = 0;
+
 	bits = bitDepth();
-	
-//TO DO: FIND A BETTER WAY FOR THIS:
 	if(bits == 8) run("16-bit");	//Convert to 16-bit, because 8-bit restricts the foci labelmap to 255 foci
 
 	Stack.setSlice(gslices/2);
@@ -800,7 +842,7 @@ function process_current_series(image, nameHasExtension) {
 
 	//Segment and label nuclei
 	if (nucleiSegmentationChoice == "StarDist nuclei segmentation 2D (or make 2D projection)") nuclei_info = segmentNucleiStarDist(process_image, nucleiChannel, probabilityThreshold, pixelWidth, unit, resultTable);
-	else if (nucleiSegmentationChoice == "Classic segmentation 2D") nuclei_info = segmentNucleiClassic(process_image, nucleiChannel, nucleiBlurRadiusXY, nucleiBlurRadiusZ, nucleiMedian3DradiusXY, nucleiMedian3DradiusZ);
+	else if (nucleiSegmentationChoice == "Classic segmentation 2D (automatic threshold)" || nucleiSegmentationChoice == "Classic segmentation 2D (manual threshold)") nuclei_info = segmentNucleiClassic(process_image, nucleiChannel, nucleiBlurRadiusXY, nucleiBlurRadiusZ, nucleiMedian3DradiusXY, nucleiMedian3DradiusZ);
 	else if (cellpose == true) 									 nuclei_info = segmentCellsCellpose(process_image, nucleiChannel, cytoChannel, probabilityThreshold, pixelWidth, pixelDepth, unit, resultTable);
 	else if (nucleiSegmentationChoice == "Load ROIs from file")  nuclei_info = loadROIs(imageName, nucleiChannel, ROIsFolder);
 	else if (nucleiSegmentationChoice == "Load label images") 	 nuclei_info = loadROIs(imageName, nucleiChannel, labelImageFolder);
@@ -956,8 +998,10 @@ function process_current_series(image, nameHasExtension) {
 			Stack.setActiveChannels(activeChannels);
 			if(firstTimeProcessing == false) Stack.setPosition(currentChannel, currentSlice, currentFrame);
 			else if(gslices > 1) Stack.setSlice(gslices/2);
+			Stack.setChannel(3);	//Update LUT
+			Stack.setChannel(2);
 			setBatchMode("show");
-
+			
 			if(firstTimeProcessing == false) run("Set... ", "zoom="+zoom*100+" x="+displayX + displayWidth/2+" y="+displayY + displayHeight/2);
 			run("Channels Tool...");
 			selectWindow("Channels");
@@ -1170,6 +1214,20 @@ function process_current_series(image, nameHasExtension) {
 			selectWindow(allFociResultsTable);
 			Table.save(outputFolder + File.separator + imageName + "__All_Foci_statistics.tsv");
 
+			//labelmap
+			Ext.CLIJ2_pull(labelmap_nuclei_3D);
+			selectImage(labelmap_nuclei_3D);
+			if(nucleiSegmentationChoice != "Cellpose segmentation 3D" && imageIs3D == true) {
+				run("Make Subset...", "slices=1");
+			}
+			run("16-bit");
+			max = getValue("Max");
+			if(max<255) setMinAndMax(0, 255);
+			else resetMinAndMax;
+			run("Glasbey_on_dark");
+			if(saveLabelImage == true) saveAs("zip", outputFolder + File.separator + imageName + "__labelmap");
+			
+			//Overlay image
 			if(saveOverlayImage == true) {
 				if(detectFociChannelB == true) {
 					selectImage(foci_overlap_map);
@@ -1236,6 +1294,18 @@ function segmentNucleiClassic(image, channel, nucleiBlurRadiusXY, nucleiBlurRadi
 	Ext.CLIJ2_gaussianBlur3D(nuclei, nuclei_filtered1, nucleiBlurRadiusXY, nucleiBlurRadiusXY, nucleiBlurRadiusZ);
 	Ext.CLIJ2_maximumZProjection(nuclei_filtered1, nuclei_filtered_MAX);
 	Ext.CLIJ2_automaticThreshold(nuclei_filtered_MAX, thresholded, "Otsu");
+	if(nucleiSegmentationChoice == "Classic segmentation 2D (manual threshold)"){
+		Ext.CLIJ2_pull(nuclei_filtered_MAX);
+		rename("Filtered cells for segmentation");
+		setBatchMode("show");
+		run("Threshold...");
+		setAutoThreshold("Otsu dark");
+		waitForUser("Optimize threshold and press OK when done");
+		getThreshold(lower, upper);
+		close();
+		Ext.CLIJ2_automaticThreshold(nuclei_filtered_MAX, thresholded, "Otsu");
+		Ext.CLIJ2_threshold(nuclei_filtered_MAX, thresholded, lower);
+	}
 	Ext.CLIJ2_pullBinary(thresholded);
 	run("Watershed");	//Not on GPU because results are not so good.
 	if(debugMode) { setBatchMode("show"); roiManager("Show None"); }
@@ -1383,6 +1453,7 @@ function segmentNucleiStarDist (image, channel, probabilityThreshold, pixelWidth
 //	else labelmap_nuclei_final = labelmap_nuclei_gapsClosed;
 	Ext.CLIJ2_release(labelmap_nuclei_filtered);
 	Ext.CLIJ2_getMaximumOfAllPixels(labelmap_nuclei_final, nrNuclei);	//Count the number of nuclei
+	print(nrNuclei+" nuclei detected.");
 	print(nrNucleiBeforeSizeFiltering - nrNuclei + " nuclei were removed due to size restrictions (" + minNucleusSize_setting + " - " + maxNucleusSize_setting + " " + unit + " | "+d2s(minNucleusSize,0)+" - "+d2s(maxNucleusSize,0)+" pixels).");
 
 	//Create nuclei outlines from nuclei labelmap
@@ -1633,9 +1704,9 @@ function segmentCellsCellpose (image, nucleiChannel, cytoChannel, probabilityThr
 	}
 	else if(oldCellposeWrapper == true) run("Cellpose Advanced", "diameter="+CellposeDiameter+" cellproba_threshold=0 flow_threshold="+probabilityThreshold+" anisotropy=1.0 diam_threshold=12.0 model="+CellposeModel+" nuclei_channel=0 cyto_channel=1 dimensionmode=2D stitch_threshold=-1.0 omni=false cluster=false additional_flags=");
 
-	if(getTitle() != cellpose_input_image+"-cellpose") {
-		print("[ERROR] Cellpose failed! Please check the Fiji console for error messages. Possible solution (for 3D segmentation): make sure Cellpose is upgraded to version 3.1.1");
-		exit("[ERROR] Cellpose failed! Please check the Fiji console for error messages. Possible solution (for 3D segmentation): make sure Cellpose is upgraded to version 3.1.1");
+	if(!endsWith(getTitle(), "-cellpose")) {
+		print("[ERROR] Cellpose failed! Please check the Fiji console for error messages. Possible solution (for 3D segmentation): make sure Cellpose3 is upgraded to version 3.1.1.2");
+//		exit("[ERROR] Cellpose failed! Please check the Fiji console for error messages. Possible solution (for 3D segmentation): make sure Cellpose3 is upgraded to version 3.1.1.2");
 	}
 	labelmap_nuclei = getTitle();
 	setBatchMode("hide");
@@ -2281,6 +2352,7 @@ function mergeOriginalAndDetection(original, nrNuclei, nuclei_outlines, foci_mas
 		setLut(o_reds, o_greens, o_blues);
 	}
 
+
 	//Add nuclei outlines as overlay to the original image
 	selectWindow(nuclei_outlines);
 	outline_slices = nSlices;
@@ -2584,7 +2656,7 @@ function overlay_numbers_on_image(overlay_image) {
 		color2 = color_to_hex(fontColorFoci);
 		setColor(color1);
 		
-		if(overlayChoice == "nucleus/cell ID") {
+		if(overlayChoice == "cell ID") {
 			for (i = 0; i < nrNuclei; i++) {
 				x = getResult("CENTROID_X", i);
 				y = getResult("CENTROID_Y", i);
@@ -2617,7 +2689,7 @@ function overlay_numbers_on_image(overlay_image) {
 				}
 			}
 		}
-		else if(overlayChoice == "both") {
+		else if(overlayChoice == "cell ID and foci count") {
 			for (i = 0; i < nrNuclei; i++) {
 				x = getResult("CENTROID_X", i);
 				y = getResult("CENTROID_Y", i) - labelFontSize/2 - 2;
@@ -2809,7 +2881,7 @@ function computeOverlap(mask_fociA, mask_fociB, nrNuclei, labelmap_nuclei_3D, bo
 		run("Clear Results");
 		Ext.CLIJ2_statisticsOfLabelledPixels(labelmap_nuclei, labelmap_nuclei);
 		setFont("SansSerif", labelFontSize, "bold antialiased");
-		if(overlayChoice == "nucleus/cell ID") {
+		if(overlayChoice == "cell ID") {
 			color = color_to_hex(fontColorCells);
 			setColor(color);
 			for (i = 0; i < nrNuclei; i++) {
