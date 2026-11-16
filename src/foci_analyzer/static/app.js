@@ -344,7 +344,14 @@ async function run(images) {
 $("run").onclick = () => run(null);
 $("run-one").onclick = () => { if (V.id) run([V.id]); else status("Choose an image first", true); };
 
+$("quit").onclick = async () => {
+  if (S.batch.running && !window.confirm("An analysis is running. Stop Foci Analyzer anyway?")) return;
+  try { await api("/api/quit", {}); } catch { /* it is stopping */ }
+  document.body.replaceChildren(el("p", { style: "margin:60px auto;font-size:16px", textContent: "Foci Analyzer has stopped. You can close this tab." }));
+};
+
 // ---------------------------------------------------------------- start
+window.FA = { viewer, V, S };  // for looking at the state from the browser console
 initResults({
   openCell: async (id, frame, x, y, width) => {  // from a clicked point on the Results page
     showPage("analyze");

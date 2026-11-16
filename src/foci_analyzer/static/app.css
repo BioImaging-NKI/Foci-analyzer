@@ -36,7 +36,7 @@ header { display: flex; align-items: center; gap: 18px; padding: 8px 16px; backg
 nav button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 4px; margin-right: 10px; }
 nav button.on { border-bottom-color: var(--accent); font-weight: 600; }
 #status { margin-left: auto; color: var(--muted); } #status.error { color: var(--danger); }
-#theme { font-size: 12.5px; padding: 3px 9px; }
+#theme, #quit { font-size: 12.5px; padding: 3px 9px; }
 
 .page { flex: 1; min-height: 0; overflow: auto; padding: 16px; }
 .page[hidden] { display: none; }

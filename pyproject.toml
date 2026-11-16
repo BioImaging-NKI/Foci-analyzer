@@ -21,6 +21,9 @@ dependencies = [
 [project.scripts]
 foci-analyzer = "foci_analyzer.cli:main"
 
+[project.gui-scripts]
+foci-analyzer-window = "foci_analyzer.cli:main"  # the same, without a console window (the desktop shortcut)
+
 # Extras for the deep-learning back-ends are added when their milestone starts (plan.md, section 9),
 # after checking the versions that install together.
 

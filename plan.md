@@ -246,32 +246,81 @@ slice / projection switch and smooth wheel zoom. The WebGL viewer replaces it.
 | # | Content | State |
 |---|---|---|
 | 0 | Scaffold: package, settings schema, TIFF reader, experiment scan, server, GUI shell, simple viewer, tests | done |
-| 1 | WebGL tile viewer with label and marker layers | plan approved? |
-| 2 | Foci by seeded watershed (§5.3) with live preview (§5.6); threshold segmentation and labels from file | plan approved? |
-| 3 | Deep-learning segmentation back-ends and comparison on your data | |
-| 4 | Spotiflow | |
-| 5 | Measurements, colocalization, batch run, storage | |
-| 6 | Results page | |
-| 7 | Time-lapse and tracking | |
-| 8 | Manual (MkDocs), example data, desktop shortcut | |
+| 1 | WebGL tile viewer with label and marker layers | done |
+| 2 | Foci by seeded watershed (§5.3) with live preview (§5.6); threshold segmentation and labels from file | done |
+| 3 | Deep-learning segmentation back-ends | done: Cellpose, InstanSeg (tested); StarDist written, not tested (no TensorFlow installed) |
+| 4 | Spotiflow | done |
+| 5 | Measurements, colocalization, batch run, storage | done |
+| 6 | Results page | done (first version) |
+| 7 | Time-lapse and tracking | done: overlap linking and Trackastra, tested on a made-up time-lapse only |
+| 8 | Manual (MkDocs), example data, desktop shortcut | installer and shortcut done; manual not started |
 
-Validation: for milestones 2–5, compare against the Fiji outputs you will provide (counts per cell, not
-pixel-identical masks) and against a few hand-annotated crops.
+### As built: where it differs from the plan above
+
+- **Storage**: `cells.csv`, `foci.csv`, `settings.toml`, `run.json` in the results folder (no Parquet: one
+  dependency less, and the tables open in Excel). Label images are not saved; a click on a result opens the
+  image and repeats the (cached) analysis.
+- **Images in memory**: every opened image is read completely (largest test image: 7533 × 7506 × 4 channels,
+  450 MB). The viewer does request tiles per pyramid level, so the browser stays light. Reading regions
+  straight from pyramidal CZI files is not built.
+- **Live preview**: the threshold slider filters the candidates in the browser at once (markers and count);
+  the outlines follow when the server has redone the extents (0.1 s in 2D, about 0.7 s for 1024² × 8 in 3D).
+  "Current view only" for large images is not built; a whole 22-megapixel 2D image takes 1.3 s per step.
+- **Networks**: they run in a worker process with its own Python (`models-env` next to the app environment,
+  or any Python given in the settings), so an existing Cellpose environment can be used. Images sampled
+  finer than 0.25 µm per pixel are made smaller for the networks.
+- **Spotiflow on stacks** with a 2D model: spots come from the max projection, their slice from the
+  brightest value. A 3D model (name with a 3D model) is used directly.
+- **Filters**: DoG (default), LoG and à trous wavelet; all 3D for 3D detection, sigma in µm per axis with an
+  axial elongation factor (default 2).
+- **Default threshold** 8 × noise (robust SD inside the cells). On `TestData/3-channel` 10 × gives about the
+  Fiji count in 3D; projections need about 5 ×. It stays a visual choice, hence the slider.
+- **Batch**: images are analyzed in parallel processes when no network is used (8 test images in 20 s);
+  with networks one after another, because they share the graphics card.
+- **Extra**: Quit button and "start twice opens the running window", needed without a console window.
+
+### Measured on this computer (Quadro RTX 3000)
+
+| Step | 1024² × 8, 2 foci channels | 5679 × 3852, 1 channel |
+|---|---|---|
+| Cellpose (cyto3/nuclei, automatic diameter) | 5.6 s | about 45 s |
+| InstanSeg | 4.1 s | about 10 s |
+| Filter + candidates + extents (CPU) | 4 s | 5 s |
+| One slider step | 0.7 s | 1.3 s |
+| Model loading, first use per session | 25–30 s per network | |
+
+InstanSeg found the nuclei of the cultured cells in `3-channel` (28, Cellpose 24 of which edge nuclei are
+removed) and is clearly faster on large images; Cellpose was more robust on the image without a real
+nuclear stain (`Hi-res 3D`). Default: Cellpose.
+
+### Open, in order of use to you
+
+1. **Speed**: GPU filters (PyTorch in the worker) and "analyze the current view only" for large images;
+   Cellpose with a given diameter skips its size model.
+2. **Results page**: per-track graphs for time-lapse, export of the graph data, more flags.
+3. **Manual** with `/anthropic-skills:update-manual` (methods are already in the context help).
+4. **StarDist** test (needs TensorFlow in the models environment) and Cellpose 4 (`cpsam`) through an
+   existing environment: written, not tested.
+5. **Foci tracking over time** (registration of the nucleus, then linking foci): foci have ids and
+   positions per frame and a `track` column of their cell, nothing more yet.
+6. Validation against the Fiji outputs per data set (only `3-channel` was compared, by total counts).
 
 ---
 
 ## 10. Way of working
 
-- Tokens matter more than building speed: one session, one milestone at a time, no `/orchestrate`, sub-agents
-  only when they clearly save reading.
-- A `CHANGELOG.md` from milestone 2 on; every entry says whether results change.
+- Tokens matter more than building speed: one session, no `/orchestrate`, sub-agents only when they clearly
+  save reading.
+- `CHANGELOG.md`: every entry says whether results change.
 - Result files are saved atomically (write to a temporary file, then rename).
+- Commits per milestone, pushed to the private repository `bvandenbroek/Foci-Analyzer-Python` (to be moved
+  to BioImaging-NKI).
 
-## 11. Open decisions
+## 11. Decisions
 
-- **D1** Models in this environment, in your existing environments, or both (proposal: both).
-- **D2** Default segmentation back-end (proposal: decide on data in milestone 3).
-- **D3** Default foci extent: at the threshold or at half-maximum (proposal: half-maximum).
-- **D4** Git: the folder is not a repository yet. Proposal: `git init`, commit locally per milestone, and put
-  it on GitHub when you say so.
-- **D5** Name of the package and command: now `foci_analyzer` / `foci-analyzer`.
+- **D1** Networks in a separate environment by default; the installer asks, and any existing environment
+  can be given in the settings. Done.
+- **D2** Default segmentation: Cellpose (see the measurements above); InstanSeg for speed.
+- **D3** Foci extent at half maximum. Done.
+- **D4** Git repository with a commit per milestone. Done.
+- **D5** Package and command: `foci_analyzer` / `foci-analyzer`.

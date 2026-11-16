@@ -100,7 +100,7 @@ def _friendly(error: str, op: str) -> str:
 def worker(python: str = "") -> Worker:
     python = python.strip().strip('"') or default_python()
     if not python:
-        raise ValueError("the neural networks are not installed: run 'install_models.bat', or give the Python of "
+        raise ValueError("the neural networks are not installed: run 'install.bat' again and choose the networks, or give the Python of "
                          "an environment that has them under Nuclei / cells > Advanced > Python of the models")
     if not Path(python).is_file():
         raise ValueError(f"Python of the models not found: {python}")
@@ -108,6 +108,14 @@ def worker(python: str = "") -> Worker:
         if python not in _workers:
             _workers[python] = Worker(python)
         return _workers[python]
+
+
+def stop_all() -> None:
+    """End the model processes (when the program stops)."""
+    with _lock:
+        for w in _workers.values():
+            w.stop()
+        _workers.clear()
 
 
 def available() -> dict:

@@ -2,42 +2,58 @@
 
 Python successor of the Fiji macro Foci Analyzer (v1.96, `C:\Fiji\plugins\Foci-Analyzer\Foci_Analyzer.ijm`,
 same as GitHub BioImaging-NKI/Foci-analyzer). Browser window for a single local user. It does not have to
-reproduce the Fiji results. Design, milestones and open decisions: `plan.md` (keep it current).
+reproduce the Fiji results. Design, state per milestone and open items: `plan.md` (keep it current, §9).
 
 ## Environment
 - The project folder is in surfdrive (synced). The uv environment is OUTSIDE it: always
   `export UV_PROJECT_ENVIRONMENT=C:/PythonProjects/Foci-Analyzer/.venv` before `uv` commands, or call
   `C:/PythonProjects/Foci-Analyzer/.venv/Scripts/python.exe` directly. The file `.venv` in the project folder
   is a placeholder that stops uv from making an environment in surfdrive: never delete it.
+- Networks: `C:/PythonProjects/Foci-Analyzer/models-env` (torch 2.6 cu124, cellpose 3.1, spotiflow,
+  instanseg-torch, trackastra; no StarDist). Found automatically because it is next to `.venv`.
 - Tests: `python -m pytest -q -p no:warnings`; lint: `python -m ruff check src tests`.
 - The user's window state is in `~/.foci_analyzer`. Test with a separate one:
-  `.claude/launch.json` → `foci-analyzer-test` (port 8771, `--home C:/PythonProjects/Foci-Analyzer/test-home`,
-  conditions point at `TestData/`).
-- No Node, no conda. GPU: Quadro RTX 3000, 6 GB. Existing environments that may be reused for models:
-  `C:/PythonProjects/Cellpose3`, `Cellpose4`, `Spotiflow`.
-- Not a git repository yet (plan.md, D4). Commit and push only when the user says so.
+  `.claude/launch.json` → `foci-analyzer-test` (port 8771, `--home C:/PythonProjects/Foci-Analyzer/test-home`).
+  Python changes need a restart of that server; files in `static/` are read on every request.
+  In the test window `window.FA = { viewer, V, S }` gives the state.
+- No Node, no conda. GPU: Quadro RTX 3000, 6 GB. The user's own environments: `C:/PythonProjects/Cellpose3`,
+  `Cellpose4`, `Spotiflow`.
+- Git: private repository `bvandenbroek/Foci-Analyzer-Python` (to move to BioImaging-NKI); commit and push
+  per milestone is agreed. `TestData/` and `LiFT/` stay out of it.
+- The project path contains `&`: in cmd it must be quoted; write multi-line Python to a file in the
+  scratchpad instead of a heredoc, and edit project files with the Edit/Write tools, not `sed` with `\n`.
 
-## How it works now (milestone 0, scaffold)
+## Modules (`src/foci_analyzer/`)
 - `config.py`: settings as dataclasses made with `opt()`; `schema()` drives the form, `from_dict()` validates.
-  A new setting is added there only. At most 5 visible settings per section; the rest `advanced=True`.
-- `io.py`: TIFF → array `T, C, Z, Y, X` + `ImageInfo` (µm, or `px` when not calibrated).
-- `experiment.py`: conditions (name, folders, pattern) → image list.
-- `imagestore.py`: opened images, planes (slice or max projection) at pyramid levels, in memory.
-- `stages.py`: `StageCache`, the basis for the cached analysis chain (plan.md §5). No analysis stages yet.
+  A new setting is added there only (label, context help, `advanced`, `slider`, `when`). At most 5 visible
+  settings per section.
+- `io.py`: TIFF, CZI (scenes), LIF (series) → array `T, C, Z, Y, X` + `ImageInfo`. `experiment.py`:
+  conditions (folders or files) → image list; a file with several series gives several images (`id`).
+- `analysis.py`: the image analysis as plain functions; all arrays `Z, Y, X` (Z = 1 for 2D).
+- `pipeline.py`: one frame as cached stages: prepare → segment → per foci channel filter → candidates →
+  extents → cells → tables. `stages.py`: the cache, with time per stage.
+- `models.py` + `model_worker.py`: networks in a worker process with its own Python. The worker must not
+  import `foci_analyzer`.
+- `batch.py`: all images (parallel processes without networks), tables to the results folder.
+  `tracking.py`: overlap linking, or Trackastra. `stats.py`: tests with Holm correction.
 - `server.py`: standard-library server on 127.0.0.1; `/api/*` needs the token written into the page and a
   local Host header; only images of the experiment can be read.
-- `static/app.{html,css,js}`: pages Experiment | Analyze | Results; plain JavaScript modules, no build step.
-  The viewer is a simple 2D-canvas stand-in for the WebGL tile viewer of plan.md §6.
+- `static/`: `app.js` (pages, form, preview, batch), `viewer.js` (WebGL2 tile viewer), `results.js`
+  (Plotly graphs, tests), `util.js`; plain JavaScript modules, no build step. Plotly comes from the
+  `plotly` Python package.
+- `install.bat`: installation for users without Python (uv, app environment, optional networks, shortcut).
 
 ## Working agreements
-- Present a detailed plan before implementing difficult parts; milestones 1 and 2 wait for approval.
-- Keep the number of visible settings low; sections with a collapsed Advanced part.
+- Present a detailed plan before implementing difficult parts.
+- Keep the number of visible settings low; sections with a collapsed Advanced part; context help everywhere.
 - Tokens matter more than building speed: no `/orchestrate`, few sub-agents, read only what is needed.
+- Analysis speed matters: parallel where possible, GPU where it helps.
+- The manual is made with `/anthropic-skills:update-manual` (not started; not online yet).
 - Inspiration (same author, both readable with `gh`; Microirradiation is private):
-  Jalink-lab/FAST-HIPPOS-Python (standard-library server, plain JavaScript, tile pyramid viewer, TOML settings)
-  and Jalink-lab/Microirradiation-recruitment-analysis (Setup | Review | Results, conditions, Plotly graphs,
-  statistics per cell or on experiment means with Holm correction, quality flags that never exclude).
+  Jalink-lab/FAST-HIPPOS-Python and Jalink-lab/Microirradiation-recruitment-analysis.
 - gh CLI: `"C:/Program Files/GitHub CLI/gh.exe"` (not on PATH in Git Bash).
 - Organization default: metric units.
-- Test data: `TestData/` (1024², 8-bit, 3 channels × 8 slices, 0.240 µm XY, 0.755 µm Z; and a 1-channel
-  version). More data and Fiji outputs will come from the user.
+- Test data: `TestData/` (channels as far as known): `3-channel` and `1-channel`
+  (nuclei 1, foci 2 and 3), `Hi-res 3D` (no nuclear stain; nuclei from channel 2), `Deconvolved with
+  cytoplasm` (float32, no Z spacing), `Multi-series` (LIF, 5 series), `Organoid` (CZI stack),
+  `Spheroid pyramidal` (large 2D CZI). Fiji outputs are in sub-folders; they are good, not ground truth.

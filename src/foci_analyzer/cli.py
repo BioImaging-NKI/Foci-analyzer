@@ -4,10 +4,19 @@ from __future__ import annotations
 
 import argparse
 import os
+import urllib.request
 import webbrowser
 
-from . import __version__
+from . import __version__, models
 from .server import make_server
+
+
+def _already_running(url: str) -> bool:
+    try:
+        with urllib.request.urlopen(url, timeout=2) as r:
+            return b"<title>Foci Analyzer</title>" in r.read(600)
+    except OSError:
+        return False
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -21,12 +30,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.home:
         os.environ["FOCI_ANALYZER_HOME"] = args.home
 
+    url = f"http://127.0.0.1:{args.port}/"
     try:
         server, _ = make_server(args.port)
     except OSError as e:
+        if _already_running(url):  # started twice: show the window that is there
+            if not args.no_browser:
+                webbrowser.open(url)
+            return 0
         print(f"Port {args.port} cannot be used ({e}). Try another one with --port.")
         return 1
-    url = f"http://127.0.0.1:{args.port}/"
     print(f"Foci Analyzer {__version__} at {url}  (Ctrl+C to stop)")
     if not args.no_browser:
         webbrowser.open(url)
@@ -36,4 +49,5 @@ def main(argv: list[str] | None = None) -> int:
         pass
     finally:
         server.server_close()
+        models.stop_all()
     return 0

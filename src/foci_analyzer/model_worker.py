@@ -146,6 +146,7 @@ def trackastra(arrays, p):
         _models["trackastra"] = Trackastra.from_pretrained(p.get("model") or "general_2d", device=_device())
     imgs, masks = arrays["imgs"], arrays["masks"]
     graph = _models["trackastra"].track(imgs, masks, mode=p.get("mode", "greedy"))
+    graph = graph[0] if isinstance(graph, tuple) else graph  # newer versions also return the masks
     table, tracked = graph_to_ctc(graph, masks, outdir=None)
     parent = {int(r.label): int(r.parent) for r in table.itertuples()}
     rows = []
@@ -179,7 +180,7 @@ def main():
             try:
                 import torch
                 torch.cuda.empty_cache()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001, S110
                 pass
         _reply.write(json.dumps(answer) + "\n")
         _reply.flush()

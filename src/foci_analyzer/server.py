@@ -414,6 +414,11 @@ def make_handler(app: App):
                 "/api/stats": lambda: app.compare(body),
                 "/api/results/open": app.open_results_folder,
             }
+            if path == "/api/quit":
+                def quit_():
+                    self._json({"stopped": True})
+                    threading.Thread(target=self.server.shutdown, daemon=True).start()
+                return self._api(quit_)
             if path in posts:
                 return self._api(lambda: self._json(posts[path]()))
             self._send(404, b"not found", "text/plain")
