@@ -26,7 +26,7 @@ def synthetic(seed=0, slices=5, shift=0.0):
     def foci(dx):
         out = np.zeros_like(nuclei)
         for sz, sy, sx in spots:
-            out += 600 * np.exp(-(((y - sy) ** 2 + (x - sx - dx) ** 2) / (2 * 1.2**2) + (z - sz) ** 2 / (2 * 0.8**2)))
+            out += 600 * np.exp(-(((y - sy) ** 2 + (x - sx - dx) ** 2) / (2 * 1.2**2) + (z - (sz if slices > 1 else 0)) ** 2 / (2 * 0.8**2)))
         return out
 
     data = np.stack([nuclei, 60 * (nuclei > 0) + foci(0), 60 * (nuclei > 0) + foci(shift)])

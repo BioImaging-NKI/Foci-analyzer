@@ -148,7 +148,7 @@ def spot_filter(img: np.ndarray, sigma: tuple[float, float, float], method: str)
                 out -= s * s * ndi.gaussian_filter(img, sigma, order=order)
         return out
     if method == "wavelet":
-        j = max(1, int(round(np.log2(max(2 * sigma[1], 1.0)))))
+        j = max(1, round(float(np.log2(max(2 * sigma[1], 1.0)))))
         planes = _atrous(img, j + 1, in_z=sigma[0] >= 0.5)
         return np.sqrt(np.clip(planes[j - 1], 0, None) * np.clip(planes[j], 0, None))
     raise ValueError(f"unknown filter '{method}'")
