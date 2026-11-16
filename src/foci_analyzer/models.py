@@ -24,18 +24,42 @@ from scipy import ndimage as ndi
 NETWORK_PIXEL = 0.25  # µm: images sampled finer than this are made smaller for the networks
 
 _workers: dict[str, Worker] = {}
+_pythons: dict[str, str] = {}  # chosen on the Settings page: "all" and, per network, another Python
+NETWORKS = ("cellpose", "stardist", "instanseg", "spotiflow", "trackastra")
+
+
+def set_pythons(python: str = "", per_network: dict | None = None) -> None:
+    _pythons.clear()
+    _pythons["all"] = str(python or "").strip().strip('"')
+    for name, path in (per_network or {}).items():
+        if name in NETWORKS and str(path or "").strip():
+            _pythons[name] = str(path).strip().strip('"')
+
+
+def python_for(op: str = "") -> str:
+    """The Python that runs this network: its own, the general one, or the models environment."""
+    if op == "stardist" and not _pythons.get(op):  # its own environment goes before the general one
+        own = default_python(op)
+        if "stardist-env" in own:
+            return own
+    return _pythons.get(op) or _pythons.get("all") or default_python(op)
 _lock = threading.Lock()
 
 
-def default_python() -> str:
-    """The Python that holds the networks, or '' when there is none."""
+def default_python(op: str = "") -> str:
+    """The Python that holds the networks, or '' when there is none.
+
+    StarDist has an environment of its own (`stardist-env`): it needs TensorFlow, and the TensorFlow that can
+    live next to the other networks is a hundred times slower on Windows.
+    """
     env = os.environ.get("FOCI_ANALYZER_MODELS_PYTHON")
     if env and Path(env).is_file():
         return env
-    for sub in ("Scripts/python.exe", "bin/python"):
-        p = Path(sys.prefix).parent / "models-env" / sub
-        if p.is_file():
-            return str(p)
+    for folder in (["stardist-env"] if op == "stardist" else []) + ["models-env"]:
+        for sub in ("Scripts/python.exe", "bin/python"):
+            p = Path(sys.prefix).parent / folder / sub
+            if p.is_file():
+                return str(p)
     return sys.executable if importlib.util.find_spec("torch") else ""
 
 
@@ -100,11 +124,11 @@ def _friendly(error: str, op: str) -> str:
     return f"{op}: {error}"
 
 
-def worker(python: str = "") -> Worker:
-    python = python.strip().strip('"') or default_python()
+def worker(op: str = "", python: str = "") -> Worker:
+    python = python or python_for(op)
     if not python:
         raise ValueError("the neural networks are not installed: run 'install.bat' again and choose the networks, or give the Python of "
-                         "an environment that has them under Nuclei / cells > Advanced > Python of the models")
+                         "an environment that has them on the Settings page")
     if not Path(python).is_file():
         raise ValueError(f"Python of the models not found: {python}")
     with _lock:
@@ -133,7 +157,7 @@ def available() -> dict:
 
 
 def versions(python: str = "") -> dict:
-    return worker(python).call("ping")[1]
+    return worker(python=python).call("ping")[1]
 
 
 def segment(img: np.ndarray, second: np.ndarray | None, cal, seg) -> np.ndarray:
@@ -150,11 +174,11 @@ def segment(img: np.ndarray, second: np.ndarray | None, cal, seg) -> np.ndarray:
         small = ndi.zoom(img.astype(np.float32), zoom, order=1)
         small2 = ndi.zoom(second.astype(np.float32), zoom, order=1) if second is not None else None
         params.update(diameter=d * f, pixel_size=cal.pixel_size / f, anisotropy=params["anisotropy"] * f)
-        out, _ = worker(seg.python).call(seg.method, {"img": small, "second": small2}, params)
+        out, _ = worker(seg.method).call(seg.method, {"img": small, "second": small2}, params)
         lab = out["labels"]
         back = [np.minimum((np.arange(n) * f).astype(np.int64), lab.shape[i + 1] - 1) for i, n in enumerate(img.shape[1:])]
         return lab[:, back[0][:, None], back[1][None, :]]
-    out, _ = worker(seg.python).call(seg.method, {"img": np.ascontiguousarray(img), "second": second}, params)
+    out, _ = worker(seg.method).call(seg.method, {"img": np.ascontiguousarray(img), "second": second}, params)
     return out["labels"]
 
 
@@ -162,7 +186,7 @@ def spots(raw: np.ndarray, cal, fc) -> tuple[np.ndarray, np.ndarray]:
     """Spot positions (n, 3: z, y, x) and probabilities from Spotiflow, most probable first."""
     fwhm = fc.size / cal.pixel_size
     scale = 1.0 if 1.5 <= fwhm <= 5 else min(4.0, max(0.25, 3.0 / fwhm))
-    out, _ = worker().call("spotiflow", {"img": np.ascontiguousarray(raw)},
+    out, _ = worker("spotiflow").call("spotiflow", {"img": np.ascontiguousarray(raw)},
                            {"model": "" if fc.spotiflow_model == "general" else fc.spotiflow_model, "scale": scale, "floor": 0.1})
     return out["pos"].reshape(-1, 3), out["prob"]
 
@@ -173,7 +197,7 @@ def track(labels: list, images: list | None = None) -> list | None:
         return None
     try:
         masks = np.stack([lab.max(0) for lab in labels])
-        out, _ = worker().call("trackastra", {"imgs": np.stack(images), "masks": masks})
+        out, _ = worker("trackastra").call("trackastra", {"imgs": np.stack(images), "masks": masks})
     except ValueError:
         return None
     frames: list[dict] = [{} for _ in labels]

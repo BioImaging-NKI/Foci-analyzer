@@ -7,6 +7,7 @@ from collections import OrderedDict
 
 import numpy as np
 
+from .analysis import edf
 from .io import ImageInfo, read_image
 
 
@@ -39,13 +40,21 @@ class OpenImage:
         self._planes: dict[tuple, np.ndarray] = {}
         self._lock = threading.Lock()
 
-    def plane(self, t: int, c: int, z: int | None, level: int = 0) -> np.ndarray:
-        """Channel c (0-based) of frame t as 16-bit: slice z, or the max projection when z is None."""
+    def plane(self, t: int, c: int, z: int | str | None, level: int = 0) -> np.ndarray:
+        """Channel c (0-based) of frame t as 16-bit: slice z, the max projection when z is None, or the
+        projection "edf" or "sum" (the sum is shown divided by the number of slices, to keep its brightness)."""
         key = (t, c, z, level)
         with self._lock:
             if key not in self._planes:
                 stack = self.data[t, c]
-                full = stack.max(axis=0) if z is None else stack[z]
+                if z is None:
+                    full = stack.max(axis=0)
+                elif z == "edf":
+                    full = edf(stack)[0]
+                elif z == "sum":
+                    full = stack.mean(axis=0, dtype=np.float32)
+                else:
+                    full = stack[z]
                 self._planes[key] = to_uint16(downsample(full, level) * self.scale if self.scale != 1.0 else downsample(full, level))
             return self._planes[key]
 

@@ -38,8 +38,8 @@ if exist "%TARGET%\models-env\Scripts\python.exe" (
     set "CHOICE=%FOCI_ANALYZER_NETWORKS%"
 ) else (
     echo.
-    echo  Neural networks: Cellpose and InstanSeg ^(nuclei and cells^), Spotiflow ^(foci^), Trackastra ^(tracking^).
-    echo    1  Install them ^(about 6 GB; recommended^)
+    echo  Neural networks: Cellpose, StarDist and InstanSeg ^(nuclei and cells^), Spotiflow ^(foci^), Trackastra ^(tracking^).
+    echo    1  Install them ^(about 7 GB; recommended^)
     echo    2  Not now. Threshold segmentation and watershed foci work without them, and an existing
     echo       environment can be given in the window under Nuclei / cells - Advanced.
     set /p "CHOICE=  Your choice [1]: "
@@ -59,6 +59,11 @@ if "%CHOICE%"=="1" (
     )
     if errorlevel 1 goto :failed
     "%UV%" pip install --python "!MPY!" "cellpose>=3.1,<4" spotiflow instanseg-torch trackastra
+    if errorlevel 1 goto :failed
+    rem StarDist in an environment of its own: it needs an older TensorFlow than fits next to the others
+    "%UV%" venv "%TARGET%\stardist-env" --python 3.11
+    if errorlevel 1 goto :failed
+    "%UV%" pip install --python "%TARGET%\stardist-env\Scripts\python.exe" "tensorflow==2.15.*" stardist "numpy<2"
     if errorlevel 1 goto :failed
 )
 

@@ -62,6 +62,12 @@ def _columns(df) -> dict:
     return {c: [row[j] for row in d["data"]] for j, c in enumerate(d["columns"])}
 
 
+def _columns(df) -> dict:
+    """A table as {column: values} for JSON (NaN becomes null)."""
+    d = json.loads(df.to_json(orient="split", index=False))
+    return {c: [row[j] for row in d["data"]] for j, c in enumerate(d["columns"])}
+
+
 class App:
     """What the window works on: the settings, the experiment, the opened images and the results."""
 
@@ -79,10 +85,20 @@ class App:
         self.results = batch.Results()
         self.progress = batch.Progress()
         self._planes: OrderedDict[tuple, np.ndarray] = OrderedDict()
+        self.last: OrderedDict[tuple, pipeline.FrameResult] = OrderedDict()  # what the viewer shows, per image and frame
+        self.program = {"python": "", "pythons": {}}  # of this computer, not of an analysis
+        self.warm = False  # start the networks ahead of their first use (the window does, tests do not)
+        self._warming: set[str] = set()
         self._load()
 
     # ---- state on disk
     def _load(self) -> None:
+        try:
+            saved = json.loads((home() / "program.json").read_text(encoding="utf-8"))
+            self.program = {"python": str(saved.get("python", "")), "pythons": dict(saved.get("pythons", {}))}
+        except (OSError, ValueError, AttributeError):
+            pass
+        models.set_pythons(self.program["python"], self.program["pythons"])
         try:
             self.settings = config.load(home() / "last_settings.toml")
         except (OSError, ValueError, TypeError):
@@ -105,7 +121,69 @@ class App:
         with self.lock:
             self.settings = settings
         config.save(settings, home() / "last_settings.toml")
+        self.warm_up()
         return config.to_dict(settings)
+
+    # ---- the networks
+    def warm_up(self) -> None:
+        """Start the model process and import the networks in use, so their first use does not wait for it."""
+        s = self.settings
+        ops = ({s.segmentation.method} & {"cellpose", "stardist", "instanseg"}) | (
+            {"spotiflow"} if any(f.method == "spotiflow" for f in s.foci) else set())
+        ops -= self._warming
+        if not self.warm or not ops:
+            return
+        self._warming |= ops
+
+        def go():
+            for op in ops:
+                try:
+                    models.worker(op).call("warm", params={"ops": [op]})
+                except ValueError:
+                    pass
+
+        threading.Thread(target=go, daemon=True).start()
+
+    def program_info(self) -> dict:
+        """For the Settings page: which networks there are, from which Python, and whether they use the GPU."""
+        asked: dict[str, dict] = {}
+        rows = []
+        for op in models.NETWORKS:
+            py = models.python_for(op)
+            if py not in asked:
+                try:
+                    asked[py] = models.versions(py) if py else {"error": "no Python with the networks"}
+                except ValueError as e:
+                    asked[py] = {"error": str(e)}
+            info = asked[py]
+            version = info.get("instanseg-torch" if op == "instanseg" else op)
+            rows.append({"name": op, "python": py, "version": version, "torch": info.get("torch"),
+                         "device": info.get("device"), "gpu": info.get("gpu"), "gpu_memory": info.get("gpu_memory"),
+                         "error": info.get("error")})
+        return {"version": __version__, "app_python": sys.version.split()[0], "home": str(home()),
+                "default_python": models.default_python(), **self.program, "networks": rows}
+
+    def set_program(self, body: dict) -> dict:
+        pythons = body.get("pythons") if isinstance(body.get("pythons"), dict) else {}
+        self.program = {"python": str(body.get("python", "")).strip().strip('"'),
+                        "pythons": {k: str(v).strip().strip('"') for k, v in pythons.items() if k in models.NETWORKS and str(v).strip()}}
+        for path in [self.program["python"], *self.program["pythons"].values()]:
+            if path and not Path(path).is_file():
+                raise ApiError(f"there is no such file: {path} (give the python.exe of the environment)")
+        home().mkdir(parents=True, exist_ok=True)
+        (home() / "program.json").write_text(json.dumps(self.program), encoding="utf-8")
+        models.set_pythons(self.program["python"], self.program["pythons"])
+        self._warming.clear()
+        return self.program_info()
+
+    def cancel(self) -> dict:
+        """Stop what is being analyzed: before its next stage, and at once when a network is running."""
+        self.cache.cancelled = True
+        if self.progress.running:
+            self.progress.stop = True
+        models.stop_all()
+        self._warming.clear()
+        return {"stopped": True}
 
     def set_conditions(self, items: list[dict], output: str = "", save: bool = True) -> dict:
         try:
@@ -161,10 +239,11 @@ class App:
     def _plane_args(self, q: dict, info):
         try:
             t, level = int(q.get("t", 0)), int(q.get("level", 0))
-            z = None if q.get("z", "mip") == "mip" else int(q["z"])
+            z = q.get("z", "mip")
+            z = None if z == "mip" else z if z in ("edf", "sum") else int(z)
         except (KeyError, ValueError) as e:
             raise ApiError("t, z and level must be numbers (z may be 'mip')") from e
-        if not (0 <= t < info.frames and 0 <= level <= 8 and (z is None or 0 <= z < info.slices)):
+        if not (0 <= t < info.frames and 0 <= level <= 8 and (not isinstance(z, int) or 0 <= z < info.slices)):
             raise ApiError("outside the image")
         return t, z, level
 
@@ -201,10 +280,25 @@ class App:
             settings = self.settings
         try:
             with self.compute_lock:
-                return pipeline.analyze_frame(self.cache, f"{image_id}|{t}", im.data[t], im.info, settings,
-                                              only_candidates)
+                r = pipeline.analyze_frame(self.cache, f"{image_id}|{t}", im.data[t], im.info, settings,
+                                           only_candidates)
         except ValueError as e:
-            raise ApiError(str(e)) from e
+            raise ApiError("stopped" if self.cache.cancelled else str(e)) from e
+        if not only_candidates:
+            with self.lock:
+                self.last[(image_id, t)] = r
+                self.last.move_to_end((image_id, t))
+                while len(self.last) > 3:
+                    self.last.popitem(last=False)
+        return r
+
+    def shown(self, image_id: str, t: int) -> pipeline.FrameResult:
+        """The last finished analysis of this frame: overlays never start an analysis themselves."""
+        with self.lock:
+            r = self.last.get((image_id, t))
+        if r is None:
+            raise ApiError("this image is not analyzed yet", 404)
+        return r
 
     def activity(self) -> dict:
         """What the analysis of the shown image is doing now (for the status bar)."""
@@ -214,21 +308,33 @@ class App:
         name, note, step, steps, start = now
         network = next((m for m in ("cellpose", "instanseg", "stardist", "spotiflow") if m in note.lower()), "")
         if network and not models.warm(network):
-            note += ": loading the network, the first time takes about half a minute"
+            note += ": starting the network, the first time can take up to a minute"
         return {"busy": True, "stage": name, "text": note, "step": step, "steps": steps,
                 "seconds": time.time() - start}
 
     def preview(self, body: dict) -> dict:
         if "settings" in body:
             self.set_settings(body["settings"])
+        self.cache.cancelled = False
         r = self.frame(body.get("path", ""), int(body.get("t", 0)))
+        coloc = []
+        for a in r.channels:  # per pair of channels: how many foci of a lie on a focus of b
+            for b in r.channels:
+                col = f"with_ch{b.channel}"
+                rows = r.foci[r.foci["channel"] == a.channel] if col in r.foci and a is not b else []
+                if len(rows):
+                    chance = r.cells.get(f"chance_ch{a.channel}_with_ch{b.channel}")
+                    chance = None if chance is None or chance.isna().all() else float(chance.mean())
+                    coloc.append({"a": a.channel, "b": b.channel, "n": len(rows),
+                                  "with": int(rows[col].fillna(0).astype(float).sum()), "chance": chance})
         return {"key": r.key, "cells": int(r.labels.max()), "channels": [c.summary() for c in r.channels],
                 "remarks": r.remarks, "pixel_size": r.cal.pixel_size, "binning": r.binning, "border": r.border,
-                "table": _columns(r.cells)}
+                "table": _columns(r.cells), "coloc": coloc, "dimension": self.settings.foci_general.dimension}
 
     def candidates(self, q: dict) -> bytes:
-        """Per candidate: x, y, z (image pixels), height, cell, and 1 when it is a focus (float32)."""
-        r = self.frame(q.get("path", ""), int(q.get("t", 0)))
+        """Per candidate: x, y, z (image pixels), height, cell, and 1 when it is a focus, 2 when that
+        focus colocalizes with a focus of another channel (float32)."""
+        r = self.shown(q.get("path", ""), int(q.get("t", 0)))
         ch = next((c for c in r.channels if str(c.channel) == q.get("ch")), None)
         if ch is None:
             raise ApiError("no such foci channel")
@@ -236,7 +342,12 @@ class App:
         off = r.border + (r.binning - 1) / 2
         out[:, 0], out[:, 1] = ch.pos[:, 2] * r.binning + off, ch.pos[:, 1] * r.binning + off
         out[:, 2], out[:, 3], out[:, 4] = ch.pos[:, 0], ch.height, ch.cell
-        out[ch.kept, 5] = 1
+        kept = np.flatnonzero(ch.kept) if ch.kept.dtype == bool else ch.kept
+        out[kept, 5] = 1
+        cols = [c for c in r.foci.columns if c.startswith("with_ch")]
+        rows = r.foci[r.foci["channel"] == ch.channel] if cols else []
+        if len(rows) == len(kept) and len(kept):
+            out[kept[rows[cols].fillna(0).astype(float).to_numpy().any(axis=1)], 5] = 2
         if ch.labels is not None and ch.labels.shape[0] == 1:
             out[:, 2] = -1  # found in a projection: shown in every slice
         return out.tobytes()
@@ -245,7 +356,7 @@ class App:
         """A region of the label image of the cells or of the foci of one channel, in image pixels."""
         im = self.image(q.get("path", ""))
         t, z, level = self._plane_args(q, im.info)
-        r = self.frame(q.get("path", ""), t)
+        r = self.shown(q.get("path", ""), t)
         kind = q.get("kind", "cells")
         key = (r.key, kind, q.get("ch"), z)
         with self.lock:
@@ -258,7 +369,7 @@ class App:
                 if ch is None:
                     raise ApiError("no such foci channel")
                 lab = ch.labels
-            small = lab[0] if lab.shape[0] == 1 else (lab.max(0) if z is None else lab[z])
+            small = lab[0] if lab.shape[0] == 1 else (lab[z] if isinstance(z, int) else lab.max(0))
             if r.binning > 1:
                 small = np.repeat(np.repeat(small, r.binning, 0), r.binning, 1)
             plane = np.zeros((im.info.height, im.info.width), "<u2")
@@ -399,6 +510,7 @@ def make_handler(app: App):
                 "/api/image/region": lambda: self._binary(app.region(q)),
                 "/api/overlay": lambda: self._binary(app.overlay(q)),
                 "/api/candidates": lambda: self._binary(app.candidates(q)),
+                "/api/program": lambda: self._json(app.program_info()),
                 "/api/activity": lambda: self._json(app.activity()),
                 "/api/batch": lambda: self._json(app.progress.to_dict()),
                 "/api/results": lambda: self._send(200, app.results_json(), "application/json"),
@@ -423,6 +535,8 @@ def make_handler(app: App):
                 "/api/experiment": lambda: app.set_conditions(body.get("conditions", []), body.get("output", "")),
                 "/api/pick": lambda: {"paths": pick("files" if body.get("kind") == "files" else "folder")},
                 "/api/preview": lambda: app.preview(body),
+                "/api/cancel": app.cancel,
+                "/api/program": lambda: app.set_program(body),
                 "/api/batch/start": lambda: app.start_batch(body),
                 "/api/batch/stop": stop,
                 "/api/stats": lambda: app.compare(body),
@@ -440,8 +554,10 @@ def make_handler(app: App):
     return Handler
 
 
-def make_server(port: int = 8770, app: App | None = None) -> tuple[ThreadingHTTPServer, App]:
+def make_server(port: int = 8770, app: App | None = None, warm: bool = False) -> tuple[ThreadingHTTPServer, App]:
     app = app or App()
+    app.warm = warm
+    app.warm_up()
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(app))
     server.daemon_threads = True
     return server, app

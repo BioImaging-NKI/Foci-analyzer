@@ -10,7 +10,9 @@ reproduce the Fiji results. Design, state per milestone and open items: `plan.md
   `C:/PythonProjects/Foci-Analyzer/.venv/Scripts/python.exe` directly. The file `.venv` in the project folder
   is a placeholder that stops uv from making an environment in surfdrive: never delete it.
 - Networks: `C:/PythonProjects/Foci-Analyzer/models-env` (torch 2.6 cu124, cellpose 3.1, spotiflow,
-  instanseg-torch, trackastra; no StarDist). Found automatically because it is next to `.venv`.
+  instanseg-torch, trackastra) and `stardist-env` (Python 3.11, TensorFlow 2.15, stardist; TensorFlow 2.21 in
+  models-env was 100 times slower, so keep them apart). Found automatically because they are next to `.venv`.
+  Per computer another Python can be given on the Settings page (`~/.foci_analyzer/program.json`).
 - Tests: `python -m pytest -q -p no:warnings`; lint: `python -m ruff check src tests`.
 - The user's window state is in `~/.foci_analyzer`. Test with a separate one:
   `.claude/launch.json` → `foci-analyzer-test` (port 8771, `--home C:/PythonProjects/Foci-Analyzer/test-home`).
@@ -32,8 +34,10 @@ reproduce the Fiji results. Design, state per milestone and open items: `plan.md
 - `analysis.py`: the image analysis as plain functions; all arrays `Z, Y, X` (Z = 1 for 2D).
 - `pipeline.py`: one frame as cached stages: prepare → segment → per foci channel filter → candidates →
   extents → cells → tables. `stages.py`: the cache, with time per stage.
-- `models.py` + `model_worker.py`: networks in a worker process with its own Python. The worker must not
-  import `foci_analyzer`.
+- `models.py` + `model_worker.py`: networks in a worker process with its own Python (one per environment).
+  The worker must not import `foci_analyzer`. `App.cancel()` kills the workers; `warm_up()` starts them early.
+- Preview: `App.frame()` computes and stores the result in `App.last`; overlays and candidates only read
+  `App.last` (they never start an analysis). `StageCache.now` feeds the status bar, `.cancelled` stops it.
 - `batch.py`: all images (parallel processes without networks), tables to the results folder.
   `tracking.py`: overlap linking, or Trackastra. `stats.py`: tests with Holm correction.
 - `server.py`: standard-library server on 127.0.0.1; `/api/*` needs the token written into the page and a

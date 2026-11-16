@@ -32,7 +32,7 @@ def main(argv: list[str] | None = None) -> int:
 
     url = f"http://127.0.0.1:{args.port}/"
     try:
-        server, _ = make_server(args.port)
+        server, _ = make_server(args.port, warm=True)
     except OSError as e:
         if _already_running(url):  # started twice: show the window that is there
             if not args.no_browser:

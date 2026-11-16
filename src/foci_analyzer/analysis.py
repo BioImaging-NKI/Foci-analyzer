@@ -6,6 +6,8 @@ Sizes come in µm and are converted with the `Calibration`.
 
 from __future__ import annotations
 
+import os
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 import numpy as np
@@ -71,8 +73,13 @@ def segment_threshold(img: np.ndarray, cal: Calibration, min_diameter: float) ->
     dist = ndi.gaussian_filter(dist, (0.25 * r / zf if img.shape[0] > 1 else 0, 0.25 * r, 0.25 * r))
     # one seed per object: maxima of the distance map that rise at least `h` above their saddle to a
     # higher maximum, so a dent in an outline does not split a nucleus
-    peaks = morphology.h_maxima(dist, max(1.5, 0.2 * r)) > 0
-    markers, _ = ndi.label(peaks, structure=np.ones((3, 3, 3)))
+    # (found on a coarser grid: the seeds need no pixel precision and this is several times faster)
+    # and in whole numbers of 1/16 pixel: sorting those is much faster than sorting floats)
+    f = max(1, int(r / 4))
+    coarse = np.round(np.minimum(dist[:, ::f, ::f], 4000) * 16).astype(np.uint16)
+    peaks = morphology.h_maxima(coarse, round(16 * max(1.5, 0.2 * r))) > 0
+    markers = np.zeros(dist.shape, np.int32)
+    markers[:, ::f, ::f], _ = ndi.label(peaks, structure=np.ones((3, 3, 3)))
     return segmentation.watershed(-dist, markers, mask=mask).astype(np.int32)
 
 
@@ -106,6 +113,15 @@ def expand(labels: np.ndarray, cal: Calibration, distance: float) -> np.ndarray:
 
 
 # ---------------------------------------------------------------- foci: filtering
+_pool = ThreadPoolExecutor(max(2, min(8, (os.cpu_count() or 2) // 2)), thread_name_prefix="filter")
+
+
+def together(*jobs):
+    """The results of functions that run at the same time (the filters of scipy release the interpreter)."""
+    futures = [_pool.submit(j) for j in jobs[1:]]
+    return [jobs[0](), *(f.result() for f in futures)]
+
+
 def sigma_px(size: float, cal: Calibration, slices: int, z_elongation: float) -> tuple[float, float, float]:
     """The Gaussian sigma of a focus with this diameter (its FWHM), per axis in pixels."""
     s = size / FWHM
@@ -138,14 +154,20 @@ def spot_filter(img: np.ndarray, sigma: tuple[float, float, float], method: str)
     img = img.astype(np.float32, copy=False)
     if method == "DoG":
         a, b = (tuple(0.8 * s for s in sigma), tuple(1.28 * s for s in sigma))
-        return ndi.gaussian_filter(img, a) - ndi.gaussian_filter(img, b)
+        ga, gb = together(lambda: ndi.gaussian_filter(img, a), lambda: ndi.gaussian_filter(img, b))
+        ga -= gb
+        return ga
     if method == "LoG":
-        out = np.zeros_like(img)
-        for axis, s in enumerate(sigma):
-            if s >= 0.3:  # a thinner axis has no second derivative worth using
-                order = [0, 0, 0]
-                order[axis] = 2
-                out -= s * s * ndi.gaussian_filter(img, sigma, order=order)
+        def second(axis):
+            order = [0, 0, 0]
+            order[axis] = 2
+            return lambda: sigma[axis] ** 2 * ndi.gaussian_filter(img, sigma, order=order)
+
+        # a thinner axis has no second derivative worth using
+        parts = together(*(second(axis) for axis, s in enumerate(sigma) if s >= 0.3))
+        out = -parts[0]
+        for part in parts[1:]:
+            out -= part
         return out
     if method == "wavelet":
         j = max(1, round(float(np.log2(max(2 * sigma[1], 1.0)))))

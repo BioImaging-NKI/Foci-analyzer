@@ -16,14 +16,14 @@ void main() {
 }`;
 const FS_LABELS = `#version 300 es
 precision highp float; precision highp usampler2D;
-uniform usampler2D tex; uniform vec2 d; uniform vec4 color; in vec2 uv; out vec4 o;
+uniform usampler2D tex; uniform vec2 d; uniform vec4 color; uniform float fill; in vec2 uv; out vec4 o;
 void main() {
   uint c = texture(tex, uv).r;
   if (c == 0u) discard;
   bool edge = texture(tex, uv + vec2(d.x, 0.0)).r != c || texture(tex, uv - vec2(d.x, 0.0)).r != c
            || texture(tex, uv + vec2(0.0, d.y)).r != c || texture(tex, uv - vec2(0.0, d.y)).r != c;
-  if (!edge) discard;
-  o = color;
+  if (!edge && fill <= 0.0) discard;
+  o = edge ? color : vec4(color.rgb, color.a * fill);  // the inside lightly filled, the outline solid
 }`;
 
 function program(gl, fs) {
@@ -61,7 +61,12 @@ export class Viewer {
   }
 
   setImage(width, height) { this.W = width; this.H = height; this.maxLevel = Math.min(8, Math.max(0, Math.ceil(Math.log2(Math.max(width, height) / TILE)))); }
-  requestDraw() { if (!this.dirty) { this.dirty = true; requestAnimationFrame(() => { this.dirty = false; this.draw(); }); } }
+  requestDraw() {
+    if (this.dirty) return;
+    this.dirty = true;
+    const go = () => { if (this.dirty) { this.dirty = false; this.draw(); } };
+    requestAnimationFrame(go); setTimeout(go, 150);  // the timer: a browser may hold back animation frames
+  }
 
   // ---- view
   size() { const r = this.canvas.parentElement.getBoundingClientRect(); return [r.width, r.height]; }
@@ -163,7 +168,7 @@ export class Viewer {
         const image = layer.type === "image", pr = image ? this.pImage : this.pLabels;
         gl.useProgram(pr.p); gl.uniform1i(pr.u.tex, 0);
         if (image) { gl.blendFunc(gl.ONE, gl.ONE); gl.uniform2f(pr.u.range, layer.lo, layer.hi); gl.uniform3fv(pr.u.color, layer.color); }
-        else { gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.uniform4fv(pr.u.color, layer.color); }
+        else { gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.uniform4fv(pr.u.color, layer.color); gl.uniform1f(pr.u.fill, layer.fill || 0); }
         this._tile(layer, layer.key, this.maxLevel, 0, 0);  // the coarsest level is always kept as a stand-in
         for (let ty_ = y0; ty_ <= y1; ty_++) for (let tx_ = x0; tx_ <= x1; tx_++) {
           const tw = Math.min(TILE, lw - tx_ * TILE), th = Math.min(TILE, lh - ty_ * TILE);
@@ -191,10 +196,11 @@ export class Viewer {
   _top(dpr, cw, ch) {
     const ctx = this.top.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, cw, ch);
     if (!this.W) return;
-    const { s, tx, ty } = this.view, r = 1.8;
+    // dots that shrink a little when zoomed out, so they do not cover the image
+    const { s, tx, ty } = this.view, r = Math.max(1, Math.min(2.6, 1.3 * Math.sqrt(s)));
     for (const m of this.markers) {
       if (!m.on || !m.pts) continue;
-      ctx.fillStyle = m.color; ctx.beginPath();
+      ctx.fillStyle = m.color; ctx.beginPath(); const rings = new Path2D();
       const p = m.pts, n = p.length / 6; let shown = 0;
       for (let i = 0; i < n; i++) {
         const o = i * 6;
@@ -204,8 +210,9 @@ export class Viewer {
         if (x < -4 || y < -4 || x > cw + 4 || y > ch + 4) continue;
         if (++shown > 60000) break;
         ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, 6.2832);
+        if (p[o + 5] === 2) { rings.moveTo(x + r + 1.3, y); rings.arc(x, y, r + 1.3, 0, 6.2832); }  // colocalizes
       }
-      ctx.fill();
+      ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 0.8; ctx.stroke(rings);
     }
     if (this.pixelSize) {  // scale bar
       const um = 110 / s * this.pixelSize, e = Math.pow(10, Math.floor(Math.log10(um)));

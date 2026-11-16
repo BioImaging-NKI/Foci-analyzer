@@ -248,7 +248,7 @@ slice / projection switch and smooth wheel zoom. The WebGL viewer replaces it.
 | 0 | Scaffold: package, settings schema, TIFF reader, experiment scan, server, GUI shell, simple viewer, tests | done |
 | 1 | WebGL tile viewer with label and marker layers | done |
 | 2 | Foci by seeded watershed (§5.3) with live preview (§5.6); threshold segmentation and labels from file | done |
-| 3 | Deep-learning segmentation back-ends | done: Cellpose, InstanSeg (tested); StarDist written, not tested (no TensorFlow installed) |
+| 3 | Deep-learning segmentation back-ends | done: Cellpose, InstanSeg, StarDist (tested; StarDist in its own `stardist-env`) |
 | 4 | Spotiflow | done |
 | 5 | Measurements, colocalization, batch run, storage | done |
 | 6 | Results page | done (first version) |
@@ -295,12 +295,16 @@ nuclear stain (`Hi-res 3D`). Default: Cellpose.
 
 ### Open, in order of use to you
 
-1. **Speed**: GPU filters (PyTorch in the worker) and "analyze the current view only" for large images;
-   Cellpose with a given diameter skips its size model.
+1. **Speed**. Done: filters and foci channels in parallel threads (foci part of a 1024² × 8 image with two
+   channels 2.9 → 1.9 s), batch with networks three images at a time, networks started when the window
+   opens, faster threshold segmentation (1.7 → 0.7 s); the whole 3D test image 4.5 → 2.8 s, as max
+   projection 2.1 → 1.1 s. Measured and not done: filters on the GPU (the
+   processor part is now 1 to 2 s per image, and sending the image to the model process costs about as much
+   as it would win). Still open: "analyze the current view only" for very large images.
 2. **Results page**: per-track graphs for time-lapse, export of the graph data, more flags.
 3. **Manual** with `/anthropic-skills:update-manual` (methods are already in the context help).
-4. **StarDist** test (needs TensorFlow in the models environment) and Cellpose 4 (`cpsam`) through an
-   existing environment: written, not tested.
+4. Cellpose 4 (`cpsam`) through an existing environment (Settings page > own Python for cellpose):
+   written, not tested.
 5. **Foci tracking over time** (registration of the nucleus, then linking foci): foci have ids and
    positions per frame and a `track` column of their cell, nothing more yet.
 6. Validation against the Fiji outputs per data set (only `3-channel` was compared, by total counts).

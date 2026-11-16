@@ -65,9 +65,6 @@ class SegmentationSettings:
                              advanced=True, min=0, max=1, step=0.05, when={"method": ["cellpose", "instanseg", "stardist"]})
     labels_folder: str = opt("", "Labels folder", "For 'labels from file': a folder with label images (TIFF) "
                              "that have the same name as the images.", when={"method": ["labels from file"]})
-    python: str = opt("", "Python of the models", "Path of the python.exe of another environment that holds the "
-                      "model (for example an existing Cellpose environment). Empty = the environment of "
-                      "Foci Analyzer.", advanced=True, when={"method": ["cellpose", "instanseg", "stardist"]})
 
 
 @dataclass

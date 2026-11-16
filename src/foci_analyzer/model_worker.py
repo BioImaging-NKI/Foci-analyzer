@@ -35,9 +35,30 @@ def ping(arrays, p):
     out = {k: _version(k) for k in ("torch", "cellpose", "stardist", "instanseg-torch", "spotiflow", "trackastra")}
     try:
         out["device"] = _device()
+        if out["device"] == "cuda":
+            import torch
+            out["gpu"] = torch.cuda.get_device_name(0)
+            out["gpu_memory"] = round(torch.cuda.get_device_properties(0).total_memory / 2**30, 1)
     except Exception:  # noqa: BLE001
         out["device"] = None
     return {}, out
+
+
+def warm(arrays, p):
+    """Import the libraries (the slow part of the first use) before the user asks for them."""
+    import importlib
+
+    import torch
+    if torch.cuda.is_available():
+        torch.zeros(1, device="cuda")
+    names = {"cellpose": "cellpose.models", "instanseg": "instanseg", "stardist": "stardist.models",
+             "spotiflow": "spotiflow.model", "trackastra": "trackastra.model"}
+    for op in p.get("ops", []):
+        try:
+            importlib.import_module(names[op])
+        except Exception:  # noqa: BLE001, S110  the real call reports what is missing
+            pass
+    return {}, {}
 
 
 # ---------------------------------------------------------------- segmentation
@@ -81,7 +102,16 @@ def stardist(arrays, p):
     from stardist.models import StarDist2D
     name = p.get("model") or "2D_versatile_fluo"
     if ("stardist", name) not in _models:
-        _models[("stardist", name)] = StarDist2D.from_pretrained(name)
+        import os
+        if os.path.isdir(name):  # a model of your own: its folder
+            model = StarDist2D(None, name=os.path.basename(os.path.normpath(name)), basedir=os.path.dirname(os.path.normpath(name)))
+        else:
+            try:
+                model = StarDist2D.from_pretrained(name)
+            except OSError:  # Windows without the right to make symbolic links: use the unpacked folder itself
+                base = os.path.join(os.path.expanduser("~"), ".keras", "models", "StarDist2D", name)
+                model = StarDist2D(None, name=f"{name}_extracted", basedir=base)
+        _models[("stardist", name)] = model
     model = _models[("stardist", name)]
     img = arrays["img"]
     scale = min(1.0, 40.0 / p["diameter"]) if p.get("diameter") else 1.0  # the model likes nuclei of about 40 px
@@ -157,7 +187,7 @@ def trackastra(arrays, p):
     return {"links": np.array(rows, np.int32).reshape(-1, 4)}, {}
 
 
-OPS = {"ping": ping, "cellpose": cellpose, "stardist": stardist, "instanseg": instanseg, "spotiflow": spotiflow,
+OPS = {"ping": ping, "warm": warm, "cellpose": cellpose, "stardist": stardist, "instanseg": instanseg, "spotiflow": spotiflow,
        "trackastra": trackastra}
 
 

@@ -11,7 +11,7 @@ import json
 import os
 import threading
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -112,10 +112,11 @@ def run(images: list[ImageEntry], s: config.Settings, folder: str, results: Resu
     progress.running, progress.done, progress.total, progress.errors, progress.stop = True, 0, len(images), [], False
     cells, foci, per_image = [], [], {}
     try:
-        # the networks share one GPU, so images are only analyzed side by side without them
+        # Without networks: processes side by side. With networks: threads in this process, so the one model
+        # process (and its GPU) is used by one image at a time while the other images read and do their foci.
         networks = s.segmentation.method in ("cellpose", "stardist", "instanseg") or any(
             f.method == "spotiflow" for f in s.foci)
-        workers = 1 if networks else min(len(images), max(1, (os.cpu_count() or 2) // 2), 6)
+        workers = min(len(images), 3 if networks else min(max(1, (os.cpu_count() or 2) // 2), 6))
         done: dict[int, tuple] = {}
 
         def finished(i, entry, get):
@@ -133,7 +134,7 @@ def run(images: list[ImageEntry], s: config.Settings, folder: str, results: Resu
                 finished(i, entry, lambda entry=entry: analyze_image(entry, s, compute_lock))
         else:
             progress.current = f"{workers} images at a time"
-            with ProcessPoolExecutor(workers) as pool:
+            with (ThreadPoolExecutor if networks else ProcessPoolExecutor)(workers) as pool:
                 futures = {pool.submit(analyze_image, entry, s): (i, entry) for i, entry in enumerate(images)}
                 for fut in as_completed(futures):
                     finished(*futures[fut], fut.result)

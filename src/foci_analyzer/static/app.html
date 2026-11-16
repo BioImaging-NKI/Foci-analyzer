@@ -14,6 +14,7 @@
     <button data-page="experiment" class="on">Experiment</button>
     <button data-page="analyze">Analyze</button>
     <button data-page="results">Results</button>
+    <button data-page="settings">Settings</button>
   </nav>
   <button id="theme" title="Light or dark window">Theme: auto</button>
   <button id="quit" title="Stop Foci Analyzer. Closing the browser tab alone leaves it running.">Quit</button>
@@ -63,28 +64,44 @@
   <section id="viewer">
     <div id="viewer-bar">
       <select id="image-select" title="Image"></select>
-      <span class="seg" id="mode" title="Slice: one Z slice. Max projection: the brightest value over Z (key P)">
-        <button data-mode="slice">Slice</button><button data-mode="mip" class="on">Max projection</button></span><span><kbd>P</kbd>
+      <button id="analyze-now" class="primary" title="Analyze the shown image with the current settings and show the result in the image (key A). Nothing is written to the results folder.">Analyze this image <kbd>A</kbd></button>
+      <label title="After the first analysis of an image: repeat it after every change of a setting (key L)"><input type="checkbox" id="live" checked> Live <kbd>L</kbd></label>
+      <span id="mode-wrap" hidden title="Slice: one Z slice. Max projection: the brightest value over Z. A third choice appears when the foci are detected on another projection (key P)">
+        <span class="seg" id="mode"><button data-mode="slice">Slice</button><button data-mode="mip" class="on">Max projection</button><button data-mode="det" hidden></button></span> <kbd>P</kbd>
       </span>
       <label id="z-wrap" hidden title="Z slice (keys , and .; also [ and ] when there is no time-lapse)">Z <kbd>,</kbd><kbd>.</kbd> <input id="z" type="range" min="0" max="0" value="0"> <span id="z-label"></span></label>
       <label id="t-wrap" hidden title="Time frame (keys [ and ])">T <kbd>[</kbd><kbd>]</kbd> <input id="t" type="range" min="0" max="0" value="0"> <span id="t-label"></span></label>
       <button id="fit" title="Show the whole image (key 0)">Fit <kbd>0</kbd></button>
-      <span class="toggles">
-        <label title="Outlines of nuclei or cells (key C)"><input type="checkbox" id="show-cells" checked> Cells <kbd>C</kbd></label>
-        <label title="Outlines of the foci (key F)"><input type="checkbox" id="show-foci" checked> Foci <kbd>F</kbd></label>
-        <label title="A dot on every focus; follows the threshold slider directly (key M)"><input type="checkbox" id="show-markers" checked> Markers <kbd>M</kbd></label>
-        <label title="Analyze the shown image again after every change of a setting (key L)"><input type="checkbox" id="live" checked> Live <kbd>L</kbd></label>
-      </span>
-      <span class="help" data-help="Wheel: zoom. Drag: move. Click a cell: its numbers. Keys: 1-9 channels on/off, C cells, F foci outlines, M markers, P slice or projection, , and . previous and next slice, [ and ] previous and next frame (or slice, when there is no time-lapse), 0 fit. The viewer loads large images in tiles at the resolution that is needed."></span>
+      <span class="help" data-help="Wheel: zoom. Drag: move. Click a cell: its numbers on the right. Keys: A analyze this image, L live, 1-9 channels on/off, C cells, F foci, M markers, P slice or projection, , and . previous and next slice, [ and ] previous and next frame (or slice, when there is no time-lapse), 0 fit. The viewer loads large images in tiles at the resolution that is needed."></span>
     </div>
     <div id="canvas-wrap">
       <canvas id="canvas"></canvas><canvas id="markers"></canvas>
       <div id="viewer-empty">Choose an image on the Experiment page.</div>
-      <div id="cell-info" hidden></div>
     </div>
-    <div id="preview-info" class="muted"></div>
-    <div id="channels"></div>
   </section>
+  <aside id="display">
+    <div class="section">
+      <h3>Channels <span class="help" data-help="Per channel: show or hide (keys 1-9), the colour (click the square), and the darkest and brightest value shown (drag the two ends of the slider). Auto sets the contrast from the image. This changes the display only, never the measurements."></span></h3>
+      <div id="channels"></div>
+    </div>
+    <div class="section">
+      <h3>Overlays <span class="help" data-help="Cells: outlines of the nuclei or cells. Foci: the detected foci, lightly filled, per foci channel. Markers: a dot on every focus; the dots follow the threshold slider at once, the outlines when the analysis has been repeated. A white ring marks a focus that colocalizes with a focus of another channel."></span></h3>
+      <div id="overlays">
+        <label><input type="checkbox" id="show-cells" checked> Cells <kbd>C</kbd></label>
+        <label><input type="checkbox" id="show-foci" checked> Foci <kbd>F</kbd></label>
+        <div id="foci-toggles"></div>
+        <label><input type="checkbox" id="show-markers" checked> Markers <kbd>M</kbd></label>
+      </div>
+    </div>
+    <div class="section">
+      <h3>This image</h3>
+      <div id="preview-info" class="muted"></div>
+    </div>
+    <div class="section">
+      <h3>Selected cell</h3>
+      <div id="cell-info" class="muted"></div>
+    </div>
+  </aside>
 </main>
 
 <main id="page-results" class="page" hidden>
@@ -100,9 +117,21 @@
   </div>
 </main>
 
+<main id="page-settings" class="page" hidden>
+  <section class="card">
+    <h2>Neural networks <span class="help" data-help="Which networks Foci Analyzer can use on this computer, from which Python environment, and whether they run on the graphics card. Leave the boxes empty to use the environment that was installed with Foci Analyzer. To use your own environment (for example an existing Cellpose 4 installation), give the path of its python.exe, for all networks or for one of them."></span></h2>
+    <div id="program" class="muted">Open this page to ask the networks.</div>
+  </section>
+  <section class="card">
+    <h2>Program</h2>
+    <div id="program-about"></div>
+  </section>
+</main>
+
 <footer id="statusbar">
   <span id="status">Ready</span>
   <div id="busy" hidden><div id="busy-bar"></div></div>
+  <button id="cancel" hidden title="Stop what is being analyzed now">Cancel</button>
 </footer>
 
 <div id="help-pop" hidden></div>

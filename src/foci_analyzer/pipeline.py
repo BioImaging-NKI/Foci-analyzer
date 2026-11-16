@@ -7,6 +7,7 @@ repeats the extents and measurements only.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from itertools import combinations
 from pathlib import Path
@@ -129,15 +130,17 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
     n_cells = int(labels.max())
     general = s.foci_general
 
-    channels, keys = [], [k_seg]
-    for n, fc in enumerate(s.foci):
+    for fc in s.foci:
         if fc.channel > data.shape[0]:
             raise ValueError(f"the image has no channel {fc.channel}")
+
+    def one(n, fc):  # one foci channel; the channels are done at the same time
 
         def detect(fc=fc):
             raw = an.project(data[fc.channel - 1], general.dimension)
             sigma = an.sigma_px(fc.size, cal, raw.shape[0], general.z_elongation)
-            return raw, an.spot_filter(raw, sigma, fc.filter), an.background(raw, sigma), sigma
+            F, bg = an.together(lambda: an.spot_filter(raw, sigma, fc.filter), lambda: an.background(raw, sigma))
+            return raw, F, bg, sigma
 
         k_det, (raw, F, bg, sigma) = cache.run(
             "filter", {"ch": fc.channel, "dim": general.dimension, "size": fc.size, "filter": fc.filter,
@@ -170,9 +173,8 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
             threshold, height_unit = fc.sensitivity, "× noise"
         res = ChannelResult(fc.channel, fc.method, noise, threshold, floor, height_unit, pos, height, cell)
         res.raw = raw
-        channels.append(res)
         if only_candidates:
-            continue
+            return res, None
 
         def extents(fc=fc, F=F, unit=unit, pos=pos, height=height, cell=cell, cellmap=cellmap, raw=raw, bg=bg,
                     threshold=threshold):
@@ -191,7 +193,15 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
         k_ext, (res.labels, res.kept, res.table) = cache.run(
             "extents", {"thr": threshold, "extent": fc.extent, "min": fc.min_size, "max": fc.max_size},
             (k_cand,), extents, f"Outlining and measuring the foci of channel {fc.channel}", (5 + 3 * n, steps))
-        keys.append(k_ext)
+        return res, k_ext
+
+    if len(s.foci) > 1:
+        with ThreadPoolExecutor(len(s.foci), thread_name_prefix="channel") as pool:
+            done = list(pool.map(one, range(len(s.foci)), s.foci))
+    else:
+        done = [one(n, fc) for n, fc in enumerate(s.foci)]
+    channels = [d[0] for d in done]
+    keys = [k_seg, *(d[1] for d in done if d[1])]
 
     if only_candidates:
         empty = pd.DataFrame()
