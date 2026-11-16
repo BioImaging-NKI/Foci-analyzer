@@ -15,3 +15,6 @@ First working version. There are no earlier results to compare with.
 - Experiments with conditions, batch run, tables as CSV, Results page with tests (Holm corrected).
 - Time-lapse: tracking of cells by overlap or Trackastra.
 - Reads TIFF, CZI and LIF.
+- Status bar at the bottom: what the program is doing, step and progress bar, and when it is ready.
+  Shortcut keys are shown next to their buttons; `[` and `]` step through slices when there is no time-lapse.
+  Results do not change.

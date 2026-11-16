@@ -13,6 +13,7 @@ import secrets
 import subprocess
 import sys
 import threading
+import time
 import urllib.parse
 from collections import OrderedDict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -205,6 +206,18 @@ class App:
         except ValueError as e:
             raise ApiError(str(e)) from e
 
+    def activity(self) -> dict:
+        """What the analysis of the shown image is doing now (for the status bar)."""
+        now = self.cache.now
+        if now is None:
+            return {"busy": False}
+        name, note, step, steps, start = now
+        network = next((m for m in ("cellpose", "instanseg", "stardist", "spotiflow") if m in note.lower()), "")
+        if network and not models.warm(network):
+            note += ": loading the network, the first time takes about half a minute"
+        return {"busy": True, "stage": name, "text": note, "step": step, "steps": steps,
+                "seconds": time.time() - start}
+
     def preview(self, body: dict) -> dict:
         if "settings" in body:
             self.set_settings(body["settings"])
@@ -386,6 +399,7 @@ def make_handler(app: App):
                 "/api/image/region": lambda: self._binary(app.region(q)),
                 "/api/overlay": lambda: self._binary(app.overlay(q)),
                 "/api/candidates": lambda: self._binary(app.candidates(q)),
+                "/api/activity": lambda: self._json(app.activity()),
                 "/api/batch": lambda: self._json(app.progress.to_dict()),
                 "/api/results": lambda: self._send(200, app.results_json(), "application/json"),
             }

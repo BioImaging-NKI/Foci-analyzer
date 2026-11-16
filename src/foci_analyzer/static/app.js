@@ -58,7 +58,7 @@ function renderImages() {
 }
 async function scan() {
   try {
-    status("Looking for images…");
+    status("Looking for images…", false, -1);
     Object.assign(S, await (await api("/api/experiment", { conditions: S.conditions, output: $("output").value })).json());
     renderConditions(); renderImages(); status(`${S.images.length} images`);
     return true;
@@ -164,7 +164,7 @@ async function openImage(id) {
   $("image-select").value = id;
   if (!id) return;
   try {
-    status("Reading image…");
+    status("Reading the image…", false, -1);
     const info = await (await api(`/api/image/info?path=${encodeURIComponent(id)}`)).json();
     if (load !== V.load) return;
     Object.assign(V, { id, info, z: Math.floor(info.slices / 2), t: 0, preview: null, prevKey: "", cand: [] });
@@ -211,17 +211,30 @@ let previewBusy = false, previewAgain = false;
 async function runPreview() {
   if (!V.id) return;
   if (previewBusy) { previewAgain = true; return; }
-  previewBusy = true; status("Analyzing…");
-  const id = V.id, t = V.t;
+  previewBusy = true; status("Analyzing the shown image…", false, -1);
+  const id = V.id, t = V.t, start = performance.now();
+  // what the server is doing, asked a few times per second while it works
+  const watch = setInterval(async () => {
+    try {
+      const a = await (await api("/api/activity")).json();
+      if (!previewBusy || !a.busy) return;
+      const secs = a.seconds >= 2 ? ` · ${Math.round(a.seconds)} s` : "";
+      status(`${a.text}… (step ${a.step} of ${a.steps})${secs}`, false, a.steps ? (a.step - 0.5) / a.steps : -1);
+    } catch { /* the answer of the analysis itself reports problems */ }
+  }, 300);
   try {
     const r = await (await api("/api/preview", { path: id, t, settings: S.settings })).json();
     const cand = await Promise.all(r.channels.map(async (ch) =>
       new Float32Array(await (await api(`/api/candidates?path=${encodeURIComponent(id)}&t=${t}&ch=${ch.channel}`)).arrayBuffer())));
     if (id === V.id && t === V.t) {
       V.prevKey = V.preview ? V.preview.key : ""; V.preview = r; V.cand = cand;
-      syncLayers(); previewInfo(); status("");
-    }
+      syncLayers(); previewInfo();
+      const secs = (performance.now() - start) / 1000;
+      status(`Ready · ${r.cells} ${r.cells === 1 ? "cell" : "cells"}, ${r.channels.map((c) => `${c.foci} foci in channel ${c.channel}`).join(", ")}`
+        + ` · analyzed in ${secs < 10 ? secs.toFixed(1) : Math.round(secs)} s`);
+    } else status("");
   } catch (e) { status(e.message, true); }
+  clearInterval(watch);
   previewBusy = false;
   if (previewAgain) { previewAgain = false; runPreview(); }
 }
@@ -274,6 +287,10 @@ function syncMode() {
   $("z-label").textContent = i ? `${V.z + 1} / ${i.slices}` : ""; $("t-label").textContent = i ? `${V.t + 1} / ${i.frames}` : "";
 }
 function setMode(mode) { if (!V.info || V.info.slices === 1) return; V.mode = mode; syncMode(); syncLayers(); }
+function stepZ(d) {  // the slice keys: they also leave the max projection, otherwise nothing would be seen
+  if (!V.info || V.info.slices === 1) return;
+  if (V.mode !== "slice") { V.mode = "slice"; setZ(V.z); } else setZ(V.z + d);
+}
 function setZ(z) { if (!V.info) return; V.z = Math.min(V.info.slices - 1, Math.max(0, z)); $("z").value = V.z; syncMode(); syncLayers(); }
 function setT(t) {
   if (!V.info) return;
@@ -310,11 +327,12 @@ document.addEventListener("keydown", (e) => {
   const tag = e.target.tagName, type = e.target.type;
   if (tag === "SELECT" || tag === "TEXTAREA" || (tag === "INPUT" && !["checkbox", "range", "color"].includes(type))) return;
   const toggle = (id) => { $(id).checked = !$(id).checked; $(id).onchange({ target: $(id) }); };
-  const k = e.key.toLowerCase();
+  const k = { BracketLeft: "[", BracketRight: "]", Comma: ",", Period: "." }[e.code] || e.key.toLowerCase();
+  const frames = V.info && V.info.frames > 1;
   if (k >= "1" && k <= "9" && V.ch[+k - 1]) { V.ch[+k - 1].on = !V.ch[+k - 1].on; renderChannels(); syncLayers(); }
   else if (k === "c") toggle("show-cells"); else if (k === "f") toggle("show-foci"); else if (k === "m") toggle("show-markers");
   else if (k === "l") toggle("live"); else if (k === "p") setMode(V.mode === "mip" ? "slice" : "mip");
-  else if (k === ",") setZ(V.z - 1); else if (k === ".") setZ(V.z + 1);
+  else if (k === "," || (k === "[" && !frames)) stepZ(-1); else if (k === "." || (k === "]" && !frames)) stepZ(1);
   else if (k === "[") setT(V.t - 1); else if (k === "]") setT(V.t + 1); else if (k === "0") viewer.fit();
   else return;
   e.preventDefault();
@@ -326,6 +344,7 @@ function showProgress(b) {
   S.batch = b;
   $("progress").hidden = !b.running; $("run").disabled = $("run-one").disabled = b.running;
   $("progress-bar").style.width = `${b.total ? 100 * b.done / b.total : 0}%`;
+  if (b.running) status(`Analyzing all images: ${b.done} of ${b.total}${b.current ? ` · ${b.current}` : ""}`, false, b.total ? b.done / b.total : -1);
   $("progress-text").textContent = b.running ? `${b.done} of ${b.total} images${b.current ? ` · ${b.current}` : ""}`
     : b.errors && b.errors.length ? b.errors.join("\n") : "";
 }

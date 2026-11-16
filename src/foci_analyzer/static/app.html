@@ -15,7 +15,6 @@
     <button data-page="analyze">Analyze</button>
     <button data-page="results">Results</button>
   </nav>
-  <span id="status"></span>
   <button id="theme" title="Light or dark window">Theme: auto</button>
   <button id="quit" title="Stop Foci Analyzer. Closing the browser tab alone leaves it running.">Quit</button>
 </header>
@@ -65,18 +64,18 @@
     <div id="viewer-bar">
       <select id="image-select" title="Image"></select>
       <span class="seg" id="mode" title="Slice: one Z slice. Max projection: the brightest value over Z (key P)">
-        <button data-mode="slice">Slice</button><button data-mode="mip" class="on">Max projection</button>
+        <button data-mode="slice">Slice</button><button data-mode="mip" class="on">Max projection</button></span><span><kbd>P</kbd>
       </span>
-      <label id="z-wrap" hidden title="Z slice (keys , and .)">Z <input id="z" type="range" min="0" max="0" value="0"> <span id="z-label"></span></label>
-      <label id="t-wrap" hidden title="Time frame (keys [ and ])">T <input id="t" type="range" min="0" max="0" value="0"> <span id="t-label"></span></label>
-      <button id="fit" title="Show the whole image (key 0)">Fit</button>
+      <label id="z-wrap" hidden title="Z slice (keys , and .; also [ and ] when there is no time-lapse)">Z <kbd>,</kbd><kbd>.</kbd> <input id="z" type="range" min="0" max="0" value="0"> <span id="z-label"></span></label>
+      <label id="t-wrap" hidden title="Time frame (keys [ and ])">T <kbd>[</kbd><kbd>]</kbd> <input id="t" type="range" min="0" max="0" value="0"> <span id="t-label"></span></label>
+      <button id="fit" title="Show the whole image (key 0)">Fit <kbd>0</kbd></button>
       <span class="toggles">
-        <label title="Outlines of nuclei or cells (key C)"><input type="checkbox" id="show-cells" checked> Cells</label>
-        <label title="Outlines of the foci (key F)"><input type="checkbox" id="show-foci" checked> Foci</label>
-        <label title="A dot on every focus; follows the threshold slider directly (key M)"><input type="checkbox" id="show-markers" checked> Markers</label>
-        <label title="Analyze the shown image again after every change of a setting (key L)"><input type="checkbox" id="live" checked> Live</label>
+        <label title="Outlines of nuclei or cells (key C)"><input type="checkbox" id="show-cells" checked> Cells <kbd>C</kbd></label>
+        <label title="Outlines of the foci (key F)"><input type="checkbox" id="show-foci" checked> Foci <kbd>F</kbd></label>
+        <label title="A dot on every focus; follows the threshold slider directly (key M)"><input type="checkbox" id="show-markers" checked> Markers <kbd>M</kbd></label>
+        <label title="Analyze the shown image again after every change of a setting (key L)"><input type="checkbox" id="live" checked> Live <kbd>L</kbd></label>
       </span>
-      <span class="help" data-help="Wheel: zoom. Drag: move. Click a cell: its numbers. Keys: 1-9 channels on/off, C cells, F foci outlines, M markers, P slice or projection, , and . previous and next slice, [ and ] previous and next frame, 0 fit. The viewer loads large images in tiles at the resolution that is needed."></span>
+      <span class="help" data-help="Wheel: zoom. Drag: move. Click a cell: its numbers. Keys: 1-9 channels on/off, C cells, F foci outlines, M markers, P slice or projection, , and . previous and next slice, [ and ] previous and next frame (or slice, when there is no time-lapse), 0 fit. The viewer loads large images in tiles at the resolution that is needed."></span>
     </div>
     <div id="canvas-wrap">
       <canvas id="canvas"></canvas><canvas id="markers"></canvas>
@@ -100,6 +99,11 @@
     </section>
   </div>
 </main>
+
+<footer id="statusbar">
+  <span id="status">Ready</span>
+  <div id="busy" hidden><div id="busy-bar"></div></div>
+</footer>
 
 <div id="help-pop" hidden></div>
 <script>window.TOKEN = "{{TOKEN}}";</script>

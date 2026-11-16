@@ -46,6 +46,7 @@ class Worker:
         self.python = python
         self.lock = threading.Lock()
         self.proc: subprocess.Popen | None = None
+        self.done: set[str] = set()  # operations that ran in this process: their network is in memory
         self.dir = tempfile.mkdtemp(prefix="foci_models_")
         self.log = Path(self.dir) / "worker.log"
 
@@ -59,6 +60,7 @@ class Worker:
     def call(self, op: str, arrays: dict | None = None, params: dict | None = None) -> tuple[dict, dict]:
         with self.lock:
             if self.proc is None or self.proc.poll() is not None:
+                self.done.clear()
                 self._start()
             req = {"op": op, "params": params or {}, "out": str(Path(self.dir) / "out.npz")}
             if arrays:
@@ -82,6 +84,7 @@ class Worker:
                 with np.load(req["out"]) as f:
                     out = {k: f[k] for k in f.files}
                 Path(req["out"]).unlink()
+            self.done.add(op)
             return out, answer.get("info", {})
 
     def stop(self) -> None:
@@ -108,6 +111,12 @@ def worker(python: str = "") -> Worker:
         if python not in _workers:
             _workers[python] = Worker(python)
         return _workers[python]
+
+
+def warm(op: str) -> bool:
+    """Whether this network ran before in a model process that is still there (so it is in memory)."""
+    with _lock:
+        return any(op in w.done and w.proc is not None and w.proc.poll() is None for w in _workers.values())
 
 
 def stop_all() -> None:

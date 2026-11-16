@@ -28,16 +28,26 @@ class StageCache:
         self._lock = threading.Lock()
         self.computed: list[str] = []  # names of the stages that really ran (for tests)
         self.seconds: dict[str, float] = {}  # time spent per stage name
+        self.now: tuple | None = None  # the stage being computed: name, note, step, of steps, start time
 
-    def run(self, name: str, params: dict, inputs: tuple[str, ...], compute: Callable[[], Any]) -> tuple[str, Any]:
-        """The key and the result of a stage; `compute` is only called when the result is not there yet."""
+    def run(self, name: str, params: dict, inputs: tuple[str, ...], compute: Callable[[], Any],
+            note: str = "", step: tuple[int, int] = (0, 0)) -> tuple[str, Any]:
+        """The key and the result of a stage; `compute` is only called when the result is not there yet.
+
+        `note` (what is being done, for the user) and `step` (number, of how many) are shown in the status
+        bar while the stage is computed.
+        """
         key = stage_key(name, params, *inputs)
         with self._lock:
             if key in self._items:
                 self._items.move_to_end(key)
                 return key, self._items[key]
         start = time.perf_counter()
-        value = compute()
+        self.now = (name, note or name, step[0], step[1], time.time())
+        try:
+            value = compute()
+        finally:
+            self.now = None
         self.seconds[name] = self.seconds.get(name, 0.0) + time.perf_counter() - start
         with self._lock:
             self._items[key] = value

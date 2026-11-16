@@ -22,7 +22,15 @@ export async function api(path, body) {
   if (!r.ok) { let m = r.statusText; try { m = (await r.json()).error; } catch { /* not JSON */ } throw new Error(m); }
   return r;
 }
-export function status(text, error = false) { const s = $("status"); s.textContent = text; s.classList.toggle("error", error); }
+// The status bar at the bottom. `progress`: undefined = not busy, -1 = busy for an unknown time, 0..1 = how far.
+export function status(text, error = false, progress) {
+  const s = $("status"), busy = progress !== undefined;
+  s.textContent = text || (busy ? "Working…" : "Ready"); s.title = s.textContent;
+  s.classList.toggle("error", error); s.classList.toggle("busy", busy && !error);
+  $("busy").hidden = !busy; $("busy").classList.toggle("unknown", progress === -1);
+  if (busy && progress >= 0) $("busy-bar").style.width = `${Math.round(100 * Math.min(1, progress))}%`;
+  else $("busy-bar").style.width = "";
+}
 
 // a number as people read it: 3 significant digits, no exponent for ordinary sizes
 export function fmt(v) {

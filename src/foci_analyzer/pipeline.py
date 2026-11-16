@@ -119,15 +119,18 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
     remarks: list[str] = []
     if info.slices > 1 and info.z_spacing is None and info.unit == "µm":
         remarks.append("no Z spacing in the file: taken equal to the pixel size")
+    steps = 2 + 3 * len(s.foci) + (0 if only_candidates else 2)
     k_prep, (data, cal, border) = cache.run("prepare", asdict(s.image) | {"k": "p"}, (image_key,),
-                                            lambda: _prepare(data, info, s))
+                                            lambda: _prepare(data, info, s), "Preparing the image", (1, steps))
     seg_params = asdict(s.segmentation) | {"n": s.image.nuclei_channel, "c": s.image.cell_channel}
-    k_seg, labels = cache.run("segment", seg_params, (k_prep,), lambda: _segment(data, cal, s, info.name))
+    what = "cells" if s.image.cell_channel else "nuclei"
+    k_seg, labels = cache.run("segment", seg_params, (k_prep,), lambda: _segment(data, cal, s, info.name),
+                              f"Finding the {what} ({s.segmentation.method})", (2, steps))
     n_cells = int(labels.max())
     general = s.foci_general
 
     channels, keys = [], [k_seg]
-    for fc in s.foci:
+    for n, fc in enumerate(s.foci):
         if fc.channel > data.shape[0]:
             raise ValueError(f"the image has no channel {fc.channel}")
 
@@ -138,7 +141,8 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
 
         k_det, (raw, F, bg, sigma) = cache.run(
             "filter", {"ch": fc.channel, "dim": general.dimension, "size": fc.size, "filter": fc.filter,
-                       "ze": general.z_elongation}, (k_prep,), detect)
+                       "ze": general.z_elongation}, (k_prep,), detect,
+            f"Filtering channel {fc.channel}", (3 + 3 * n, steps))
 
         def candidates(fc=fc, raw=raw, F=F, sigma=sigma):
             cellmap = an.match_z(an.expand(labels, cal, general.outside_distance), raw.shape[0])
@@ -155,7 +159,8 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
         k_cand, (cellmap, unit, noise, floor, pos, height, cell) = cache.run(
             "candidates", {"scope": fc.threshold_scope, "out": general.outside_distance, "method": fc.method,
                            "model": fc.spotiflow_model if fc.method == "spotiflow" else ""}, (k_det, k_seg),
-            candidates)
+            candidates, f"Finding foci in channel {fc.channel}"
+            + (" (Spotiflow)" if fc.method == "spotiflow" else ""), (4 + 3 * n, steps))
 
         if fc.method == "spotiflow":
             threshold, height_unit = fc.probability, "probability"
@@ -185,7 +190,7 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
 
         k_ext, (res.labels, res.kept, res.table) = cache.run(
             "extents", {"thr": threshold, "extent": fc.extent, "min": fc.min_size, "max": fc.max_size},
-            (k_cand,), extents)
+            (k_cand,), extents, f"Outlining and measuring the foci of channel {fc.channel}", (5 + 3 * n, steps))
         keys.append(k_ext)
 
     if only_candidates:
@@ -194,12 +199,14 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
 
     pairs = [c.channel for c in channels] if s.colocalization.enabled else []
     _, base = cache.run("cells", {"pairs": pairs, "dim": general.dimension}, (k_seg,),
-                        lambda: _cell_base(data, labels, n_cells, cal, channels, pairs))
+                        lambda: _cell_base(data, labels, n_cells, cal, channels, pairs),
+                        "Measuring the cells", (steps - 1, steps))
 
     def tables():
         return _tables(data, base, labels, n_cells, cal, channels, s)
 
-    key, (cells, foci) = cache.run("tables", asdict(s.colocalization), tuple(keys), tables)
+    key, (cells, foci) = cache.run("tables", asdict(s.colocalization), tuple(keys), tables,
+                                  "Making the tables", (steps, steps))
     return FrameResult(key, cal, s.image.xy_binning, border, labels, channels, cells, foci, remarks)
 
 
