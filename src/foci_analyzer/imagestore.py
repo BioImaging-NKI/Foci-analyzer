@@ -31,6 +31,11 @@ def to_uint16(plane: np.ndarray) -> np.ndarray:
 class OpenImage:
     def __init__(self, data: np.ndarray, info: ImageInfo):
         self.data, self.info = data, info
+        self.scale = 1.0  # display only: brings float or 32-bit values into the 16-bit range of the viewer
+        if data.dtype.kind == "f" or data.dtype.itemsize > 2:
+            top = float(np.nanmax(data[0]))
+            if top > 65535 or (data.dtype.kind == "f" and 0 < top < 256):
+                self.scale = 60000.0 / top
         self._planes: dict[tuple, np.ndarray] = {}
         self._lock = threading.Lock()
 
@@ -41,7 +46,7 @@ class OpenImage:
             if key not in self._planes:
                 stack = self.data[t, c]
                 full = stack.max(axis=0) if z is None else stack[z]
-                self._planes[key] = to_uint16(downsample(full, level))
+                self._planes[key] = to_uint16(downsample(full, level) * self.scale if self.scale != 1.0 else downsample(full, level))
             return self._planes[key]
 
     def display_range(self, c: int) -> tuple[int, int]:
@@ -58,14 +63,14 @@ class ImageStore:
         self._open: OrderedDict[str, OpenImage] = OrderedDict()
         self._lock = threading.Lock()
 
-    def get(self, path: str) -> OpenImage:
+    def get(self, key: str, path: str, series: int = 0) -> OpenImage:
         with self._lock:
-            if path in self._open:
-                self._open.move_to_end(path)
-                return self._open[path]
-        image = OpenImage(*read_image(path))
+            if key in self._open:
+                self._open.move_to_end(key)
+                return self._open[key]
+        image = OpenImage(*read_image(path, series))
         with self._lock:
-            self._open[path] = image
+            self._open[key] = image
             while len(self._open) > self.keep:
                 self._open.popitem(last=False)
         return image

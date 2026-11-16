@@ -13,6 +13,9 @@ dependencies = [
     "tifffile>=2024.8",
     "pandas>=2.2",
     "tomli-w>=1.0",
+    "pylibczirw>=6.1.0",
+    "readlif>=0.6.6",
+    "plotly>=7.1.0",
 ]
 
 [project.scripts]

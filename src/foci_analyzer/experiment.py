@@ -1,4 +1,4 @@
-"""An experiment: conditions, each with one or more folders of images."""
+"""An experiment: conditions, each with one or more folders (or single files) of images."""
 
 from __future__ import annotations
 
@@ -6,13 +6,13 @@ from dataclasses import asdict, dataclass, field
 from fnmatch import fnmatch
 from pathlib import Path
 
-from .io import EXTENSIONS
+from .io import EXTENSIONS, list_series
 
 
 @dataclass
 class Condition:
     name: str
-    folders: list[str] = field(default_factory=list)
+    folders: list[str] = field(default_factory=list)  # folders, or image files
     pattern: str = "*"  # file-name pattern, without the extension
     recursive: bool = False
 
@@ -23,6 +23,8 @@ class ImageEntry:
     name: str
     condition: str
     folder: str
+    series: int = 0
+    id: str = ""  # what the window uses to name the image: the path, with the series for files with several
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -48,19 +50,32 @@ def scan(conditions: list[Condition]) -> tuple[list[ImageEntry], list[str]]:
     for cond in conditions:
         for folder in cond.folders:
             root = Path(folder)
-            if not root.is_dir():
+            if root.is_file():
+                found = [root] if root.suffix.lower() in EXTENSIONS else []
+                if not found:
+                    remarks.append(f"{cond.name}: not an image that can be read: {folder}")
+            elif not root.is_dir():
                 remarks.append(f"{cond.name}: folder not found: {folder}")
                 continue
-            files = root.rglob("*") if cond.recursive else root.iterdir()
-            found = sorted(p for p in files if p.is_file() and p.suffix.lower() in EXTENSIONS
-                           and fnmatch(p.stem, cond.pattern))
-            if not found:
-                remarks.append(f"{cond.name}: no images in {folder}")
+            else:
+                files = root.rglob("*") if cond.recursive else root.iterdir()
+                found = sorted(p for p in files if p.is_file() and p.suffix.lower() in EXTENSIONS
+                               and fnmatch(p.stem, cond.pattern))
+                if not found:
+                    remarks.append(f"{cond.name}: no images in {folder}")
             for p in found:
                 key = str(p.resolve()).lower()
                 if key in seen:
                     remarks.append(f"{p.name} is in both '{seen[key]}' and '{cond.name}'; kept in the first")
                     continue
                 seen[key] = cond.name
-                images.append(ImageEntry(str(p), p.stem, cond.name, str(p.parent)))
+                try:
+                    series = list_series(p)
+                except Exception as e:  # noqa: BLE001  a file that cannot be opened is a remark, not a failure
+                    remarks.append(f"{p.name} cannot be read: {e}")
+                    continue
+                for i, s in enumerate(series):
+                    many = len(series) > 1
+                    images.append(ImageEntry(str(p), f"{p.stem} · {s}" if many else p.stem, cond.name, str(p.parent),
+                                             i, f"{p}::{i}" if many else str(p)))
     return images, remarks

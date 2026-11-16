@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Foci Analyzer</title>
+<script>try { const t = localStorage.getItem("fa.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
@@ -15,16 +16,30 @@
     <button data-page="results">Results</button>
   </nav>
   <span id="status"></span>
+  <button id="theme" title="Light or dark window">Theme: auto</button>
 </header>
 
 <main id="page-experiment" class="page">
   <section class="card">
-    <h2>Conditions</h2>
-    <p class="hint">A condition is a group of images that belong together, from one or more folders.</p>
+    <h2>Images <span class="help" data-help="The quick way: choose images or a folder and go to Analyze. To compare groups, make one condition per group below instead."></span></h2>
+    <div class="row">
+      <button id="quick-files" class="primary">Open images…</button>
+      <button id="quick-folder">Open a folder…</button>
+      <span class="muted">or build conditions below to compare groups</span>
+    </div>
+  </section>
+  <section class="card">
+    <h2>Conditions <span class="help" data-help="A condition is a group of images that belong together (for example 'control' and 'irradiated'). A condition can have several folders: each folder then counts as one experiment (replicate) in the statistics. 'Files named' filters on the file name; * stands for anything."></span></h2>
     <div id="conditions"></div>
     <div class="row">
       <button id="add-condition">Add condition</button>
       <button id="scan" class="primary">Find images</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <label for="output">Results folder</label>
+      <input type="text" id="output" placeholder="Foci_Analyzer_results next to the first image" style="flex:1">
+      <button id="pick-output">Choose…</button>
+      <span class="help" data-help="Where the tables of the analysis are written (cells.csv, foci.csv, settings.toml). Empty = a folder 'Foci_Analyzer_results' next to the first image."></span>
     </div>
     <ul id="remarks"></ul>
   </section>
@@ -35,27 +50,59 @@
 </main>
 
 <main id="page-analyze" class="page" hidden>
-  <aside id="settings"></aside>
+  <aside id="side">
+    <div id="settings"></div>
+    <div class="section" id="run-box">
+      <button id="run" class="primary">Analyze all images</button>
+      <button id="run-one">This image only</button>
+      <span class="help" data-help="Runs the analysis with the current settings on all images of the experiment and writes the tables to the results folder. Images are analyzed side by side when no neural network is used."></span>
+      <div id="progress" hidden><div id="progress-bar"></div></div>
+      <div id="progress-text" class="muted"></div>
+    </div>
+  </aside>
   <section id="viewer">
     <div id="viewer-bar">
       <select id="image-select" title="Image"></select>
-      <span class="seg" id="mode">
+      <span class="seg" id="mode" title="Slice: one Z slice. Max projection: the brightest value over Z (key P)">
         <button data-mode="slice">Slice</button><button data-mode="mip" class="on">Max projection</button>
       </span>
-      <label id="z-wrap" hidden>Z <input id="z" type="range" min="0" max="0" value="0"> <span id="z-label"></span></label>
-      <button id="fit">Fit</button>
-      <span id="view-info" class="muted"></span>
+      <label id="z-wrap" hidden title="Z slice (keys , and .)">Z <input id="z" type="range" min="0" max="0" value="0"> <span id="z-label"></span></label>
+      <label id="t-wrap" hidden title="Time frame (keys [ and ])">T <input id="t" type="range" min="0" max="0" value="0"> <span id="t-label"></span></label>
+      <button id="fit" title="Show the whole image (key 0)">Fit</button>
+      <span class="toggles">
+        <label title="Outlines of nuclei or cells (key C)"><input type="checkbox" id="show-cells" checked> Cells</label>
+        <label title="Outlines of the foci (key F)"><input type="checkbox" id="show-foci" checked> Foci</label>
+        <label title="A dot on every focus; follows the threshold slider directly (key M)"><input type="checkbox" id="show-markers" checked> Markers</label>
+        <label title="Analyze the shown image again after every change of a setting (key L)"><input type="checkbox" id="live" checked> Live</label>
+      </span>
+      <span class="help" data-help="Wheel: zoom. Drag: move. Click a cell: its numbers. Keys: 1-9 channels on/off, C cells, F foci outlines, M markers, P slice or projection, , and . previous and next slice, [ and ] previous and next frame, 0 fit. The viewer loads large images in tiles at the resolution that is needed."></span>
     </div>
-    <div id="canvas-wrap"><canvas id="canvas"></canvas><div id="viewer-empty">Choose an image on the Experiment page.</div></div>
+    <div id="canvas-wrap">
+      <canvas id="canvas"></canvas><canvas id="markers"></canvas>
+      <div id="viewer-empty">Choose an image on the Experiment page.</div>
+      <div id="cell-info" hidden></div>
+    </div>
+    <div id="preview-info" class="muted"></div>
     <div id="channels"></div>
   </section>
 </main>
 
 <main id="page-results" class="page" hidden>
-  <section class="card"><h2>Results</h2><p class="hint">The statistics page comes after the analysis (plan.md, section 8).</p></section>
+  <div id="results-layout">
+    <aside id="results-side" class="card"></aside>
+    <section id="results-main">
+      <div id="results-banner" class="banner" hidden></div>
+      <div class="card"><div id="plot"></div></div>
+      <div class="card" id="stats-card"></div>
+      <div class="card" id="images-card"></div>
+      <div class="card" id="check-card"></div>
+    </section>
+  </div>
 </main>
 
+<div id="help-pop" hidden></div>
 <script>window.TOKEN = "{{TOKEN}}";</script>
+<script src="/static/plotly.min.js" defer></script>
 <script type="module" src="/static/app.js"></script>
 </body>
 </html>

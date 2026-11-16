@@ -15,88 +15,135 @@ import tomli_w
 
 
 def opt(default: Any, label: str, help: str = "", *, advanced: bool = False, choices: list[str] | None = None,
-        min: float | None = None, max: float | None = None, step: float | None = None, unit: str = ""):
-    """A setting with what the window needs to show it."""
+        min: float | None = None, max: float | None = None, step: float | None = None, unit: str = "",
+        slider: bool = False):
+    """A setting with what the window needs to show it. `help` is the context help (the ? in the form)."""
     meta = {"label": label, "help": help, "advanced": advanced, "choices": choices, "min": min, "max": max,
-            "step": step, "unit": unit}
+            "step": step, "unit": unit, "slider": slider}
     return field(default=default, metadata=meta)
 
 
 @dataclass
 class ImageSettings:
     """Image"""
-    nuclei_channel: int = opt(1, "Nuclei channel", "Channel with the nuclei (0 = none).", min=0)
-    cell_channel: int = opt(0, "Cell channel", "Channel with cytoplasm or membrane (0 = none).", min=0)
-    xy_binning: int = opt(1, "XY binning", "Average n × n pixels before the analysis.", advanced=True, min=1)
-    crop_border: int = opt(0, "Remove border", "Pixels removed from every image edge.", advanced=True, min=0,
-                           unit="px")
+    nuclei_channel: int = opt(1, "Nuclei channel", "The channel with the nuclear stain (for example DAPI). "
+                              "Foci are counted per nucleus. 0 = no nuclei channel.", min=0)
+    cell_channel: int = opt(0, "Cell channel", "A channel that shows whole cells (cytoplasm or membrane). When "
+                            "set, cells are segmented instead of nuclei and foci are counted per cell. "
+                            "0 = none. With both channels at 0 the whole image is treated as one cell.", min=0)
+    xy_binning: int = opt(1, "XY binning", "Average n × n pixels before the analysis. Use it for images "
+                          "sampled much finer than the foci size; it reduces noise and time.", advanced=True,
+                          min=1)
+    crop_border: int = opt(0, "Remove border", "Pixels removed from every image edge before the analysis, for "
+                           "example a dark stitching border.", advanced=True, min=0, unit="px")
 
 
 @dataclass
 class SegmentationSettings:
     """Nuclei / cells"""
-    method: str = opt("cellpose", "Method", "How nuclei or cells are found.",
-                      choices=["cellpose", "stardist", "instanseg", "threshold", "labels from file"])
-    dimension: str = opt("2D", "Segment in", "2D uses a projection of the stack; the labels then hold for "
-                         "all slices.", choices=["2D", "3D"])
-    min_diameter: float = opt(4.0, "Smallest diameter", "Smaller objects are removed.", min=0, unit="µm")
-    max_diameter: float = opt(50.0, "Largest diameter", "Larger objects are removed.", min=0, unit="µm")
-    exclude_on_edges: bool = opt(True, "Remove objects on the image edge", advanced=True)
+    method: str = opt("threshold", "Method", "How nuclei or cells are found. Cellpose, StarDist and InstanSeg "
+                      "are neural networks and need the models to be installed. 'threshold' smooths the image, "
+                      "applies an Otsu threshold and splits touching objects on the distance map. 'labels from "
+                      "file' reads label images made elsewhere.",
+                      choices=["threshold", "cellpose", "stardist", "instanseg", "labels from file"])
+    dimension: str = opt("2D", "Segment in", "2D segments the maximum projection of the stack; the outlines "
+                         "then hold for all slices. This is faster and often more robust, and can be combined "
+                         "with foci detection in 3D. 3D segments the stack itself.", choices=["2D", "3D"])
+    min_diameter: float = opt(4.0, "Smallest diameter", "Objects with a smaller diameter (of a circle with "
+                              "the same area) are removed.", min=0, unit="µm")
+    max_diameter: float = opt(50.0, "Largest diameter", "Objects with a larger diameter are removed. "
+                              "0 = no limit.", min=0, unit="µm")
+    exclude_on_edges: bool = opt(True, "Remove objects on the image edge", "A nucleus that is cut by the image "
+                                 "edge has an incomplete foci count.", advanced=True)
     model: str = opt("", "Model", "Model name or path; empty = the default of the method.", advanced=True)
-    diameter: float = opt(0.0, "Expected diameter", "0 = automatic.", advanced=True, min=0, unit="µm")
-    probability: float = opt(0.5, "Probability / flow threshold", advanced=True, min=0, max=1, step=0.05)
-    labels_folder: str = opt("", "Labels folder", "For 'labels from file': label images with the same name "
-                             "as the images.", advanced=True)
+    diameter: float = opt(0.0, "Expected diameter", "For Cellpose: the typical diameter. 0 = automatic.",
+                          advanced=True, min=0, unit="µm")
+    probability: float = opt(0.5, "Probability threshold", "Lower finds more and larger objects.",
+                             advanced=True, min=0, max=1, step=0.05)
+    labels_folder: str = opt("", "Labels folder", "For 'labels from file': a folder with label images (TIFF) "
+                             "that have the same name as the images.", advanced=True)
+    python: str = opt("", "Python of the models", "Path of the python.exe of another environment that holds the "
+                      "model (for example an existing Cellpose environment). Empty = the environment of "
+                      "Foci Analyzer.", advanced=True)
 
 
 @dataclass
 class FociGeneralSettings:
     """Foci"""
-    dimension: str = opt("3D", "Detect foci in", "For stacks: in 3D, on a projection, or in every slice "
-                         "separately. Ignored for 2D images.",
-                         choices=["3D", "max projection", "extended depth of focus", "sum projection",
-                                  "every slice"])
-    outside_distance: float = opt(0.0, "Distance outside cells", "Foci up to this distance outside a cell "
-                                  "still count (-1 = whole image).", advanced=True, min=-1, unit="µm")
+    dimension: str = opt("3D", "Detect foci in", "For stacks. 3D detects foci in the stack with filters that "
+                         "work in X, Y and Z. A projection detects them in one plane, which is often more "
+                         "reliable for thin samples and few slices. Ignored for 2D images.",
+                         choices=["3D", "max projection", "extended depth of focus", "sum projection"])
+    outside_distance: float = opt(0.0, "Distance outside cells", "Foci up to this distance outside a nucleus "
+                                  "or cell still count for it. -1 = every focus counts for the nearest cell.",
+                                  advanced=True, min=-1, unit="µm")
+    z_elongation: float = opt(2.0, "Axial elongation", "How much longer a focus is in Z than in XY because "
+                              "of the microscope optics. Used for the filter size in Z (3D detection).",
+                              advanced=True, min=0.5, max=10, step=0.5, unit="×")
 
 
 @dataclass
 class FociChannelSettings:
     """Foci channel"""
-    channel: int = opt(2, "Channel", min=1)
-    method: str = opt("watershed", "Method", "Seeded watershed, or the Spotiflow network.",
+    channel: int = opt(2, "Channel", "The channel with the foci.", min=1)
+    method: str = opt("watershed", "Method", "watershed: the image is filtered so that spots of the foci size "
+                      "stand out, local maxima above the threshold become foci, and a seeded watershed gives "
+                      "every focus its extent. spotiflow: a neural network finds the spots and gives each a "
+                      "probability; the extents are found in the same way.",
                       choices=["watershed", "spotiflow"])
-    size: float = opt(0.5, "Foci size", "Expected diameter of a focus.", min=0.05, step=0.05, unit="µm")
-    sensitivity: float = opt(5.0, "Threshold", "Watershed: times the noise of the filtered image. Lower finds "
-                             "more foci.", min=1, max=50, step=0.1, unit="× noise")
+    size: float = opt(0.5, "Foci size", "Expected diameter of a focus (full width at half maximum). It sets "
+                      "the filter scale and the smallest distance between two foci.", min=0.05, step=0.05,
+                      unit="µm")
+    sensitivity: float = opt(8.0, "Threshold", "A local maximum is a focus when it is this many times higher "
+                             "than the noise of the filtered image. The noise is 1.4826 × the median absolute "
+                             "deviation of the filtered values inside the cells, which is hardly influenced "
+                             "by the foci themselves. Lower finds more foci. The viewer follows this slider "
+                             "directly.", min=1, max=50, step=0.1, unit="× noise", slider=True)
     probability: float = opt(0.5, "Spotiflow probability", "Spots below this probability are left out.",
-                             advanced=True, min=0, max=1, step=0.01)
-    min_size: int = opt(3, "Smallest focus", advanced=True, min=1, unit="voxels")
-    max_size: int = opt(9999, "Largest focus", advanced=True, min=1, unit="voxels")
-    extent: str = opt("half maximum", "Focus extent", "Where a focus ends: at half of its own peak, or at the "
-                      "threshold.", advanced=True, choices=["half maximum", "threshold"])
-    threshold_scope: str = opt("per image", "Threshold from", "A fixed value is the fair choice when "
-                               "conditions are compared.", advanced=True,
+                             advanced=True, min=0, max=1, step=0.01, slider=True)
+    filter: str = opt("DoG", "Filter", "DoG: difference of two Gaussians around the foci size. LoG: Laplacian "
+                      "of Gaussian at the foci size; slightly sharper, more sensitive to noise. wavelet: "
+                      "product of two à trous wavelet planes; good for foci of mixed size on uneven "
+                      "background. All work in 3D for 3D detection.", advanced=True,
+                      choices=["DoG", "LoG", "wavelet"])
+    extent: str = opt("half maximum", "Focus extent", "Where a focus ends: at half of its own peak height "
+                      "(size does not depend on the threshold), or at the threshold.", advanced=True,
+                      choices=["half maximum", "threshold"])
+    min_size: int = opt(2, "Smallest focus", "Smaller foci are removed.", advanced=True, min=1, unit="voxels")
+    max_size: int = opt(9999, "Largest focus", "Larger foci are removed.", advanced=True, min=1, unit="voxels")
+    threshold_scope: str = opt("per image", "Noise from", "per image: one noise value from all cells of the "
+                               "image. per cell: every cell its own noise. fixed value: the same absolute "
+                               "threshold for all images, which is the fair choice when conditions differ "
+                               "strongly in foci numbers.", advanced=True,
                                choices=["per image", "per cell", "fixed value"])
-    fixed_threshold: float = opt(0.0, "Fixed threshold", "In units of the filtered image.", advanced=True, min=0)
-    spotiflow_model: str = opt("general", "Spotiflow model", "Name or path.", advanced=True)
+    fixed_threshold: float = opt(0.0, "Fixed threshold", "For 'fixed value': the threshold in units of the "
+                                 "filtered image. The viewer shows the value that the current image uses.",
+                                 advanced=True, min=0)
+    spotiflow_model: str = opt("general", "Spotiflow model", "Name of a pretrained model or a path.",
+                               advanced=True)
 
 
 @dataclass
 class ColocalizationSettings:
     """Colocalization"""
-    enabled: bool = opt(True, "Colocalize foci channels", "Used when there are two or more foci channels.")
-    method: str = opt("overlap", "Method", choices=["overlap", "centroid distance"])
+    enabled: bool = opt(True, "Colocalize foci channels", "Used when there are two or more foci channels; "
+                        "every pair of channels is compared.")
+    method: str = opt("overlap", "Method", "overlap: two foci colocalize when they share voxels. centroid "
+                      "distance: when their centres are closer than the largest distance.",
+                      choices=["overlap", "centroid distance"])
     min_overlap: int = opt(1, "Smallest overlap", advanced=True, min=1, unit="voxels")
     max_distance: float = opt(0.3, "Largest distance", advanced=True, min=0, step=0.05, unit="µm")
-    chance_repeats: int = opt(0, "Chance control repeats", "Random placements per cell (0 = off).",
-                              advanced=True, min=0)
+    chance_repeats: int = opt(0, "Chance control repeats", "The colocalization expected by chance: the foci of "
+                              "the second channel are placed at random positions in the cell this many times "
+                              "(0 = off).", advanced=True, min=0)
 
 
 @dataclass
 class TimelapseSettings:
     """Time-lapse"""
-    tracking: str = opt("off", "Track cells", choices=["off", "overlap", "trackastra"])
+    tracking: str = opt("off", "Track cells", "Follow nuclei or cells over the frames. overlap: a cell is "
+                        "linked to the cell it overlaps most in the previous frame. trackastra: a neural "
+                        "network that also handles divisions.", choices=["off", "overlap", "trackastra"])
 
 
 @dataclass
