@@ -83,6 +83,47 @@ def segment_threshold(img: np.ndarray, cal: Calibration, min_diameter: float) ->
     return segmentation.watershed(-dist, markers, mask=mask).astype(np.int32)
 
 
+def stitch_slices(labels: np.ndarray, threshold: float = 0.5) -> np.ndarray:
+    """3D objects from objects found per slice ("2.5D"): an object continues in the next slice when at least
+    `threshold` of the smaller of the two lies on the other, best overlap first. (Relative to the smaller one,
+    not the union: the top and bottom slices of a nucleus are small caps on a larger section.) A nucleus that
+    a network splits in two in one slice (often in out-of-focus slices) stays one object: every piece that
+    lies on it joins it.
+
+    `labels` (Z, Y, X) has its own numbering in every slice; the result is numbered over the whole stack.
+    """
+    out = np.zeros(labels.shape, np.int32)
+    if labels.shape[0] == 0:
+        return out
+    nxt = 1
+    for z in range(labels.shape[0]):
+        cur = labels[z].astype(np.int64)
+        ids = np.unique(cur[cur > 0])
+        lut = np.zeros(int(cur.max()) + 1, np.int32)
+        if z > 0 and ids.size and out[z - 1].any():
+            prev = out[z - 1].astype(np.int64)
+            m = (cur > 0) & (prev > 0)
+            k = int(prev.max()) + 1
+            pairs, inter = np.unique(cur[m] * k + prev[m], return_counts=True)
+            a, b = np.divmod(pairs, k)
+            area_a = np.bincount(cur.ravel(), minlength=int(cur.max()) + 1)
+            area_b = np.bincount(prev.ravel(), minlength=k)
+            iou = inter / np.minimum(area_a[a], area_b[b])
+            for i in np.argsort(-iou):
+                if iou[i] < threshold:
+                    break
+                if lut[a[i]] == 0:  # each piece joins the object it lies on most
+                    lut[a[i]] = b[i]
+        for i in ids:
+            if lut[i] == 0:
+                lut[i] = nxt
+                nxt += 1
+            else:
+                nxt = max(nxt, int(lut[i]) + 1)
+        out[z] = lut[cur]
+    return out
+
+
 def filter_labels(labels: np.ndarray, cal: Calibration, min_diameter: float, max_diameter: float,
                   exclude_edges: bool) -> np.ndarray:
     """Remove objects that are too small, too large or on the image edge; number the rest 1..n."""

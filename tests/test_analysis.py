@@ -226,6 +226,25 @@ def test_preview_overlays_parts_and_cancel(tmp_path, monkeypatch):
     assert app.preview({"path": image, "settings": s})["cells"] == 2  # a new request clears the stop
 
 
+def test_stitch_slices():
+    z0 = np.zeros((3, 20, 20), np.int32)
+    z0[0, 2:8, 2:8], z0[1, 3:9, 3:9], z0[2, 3:9, 3:9] = 1, 2, 5  # one object, numbered differently per slice
+    z0[0, 12:18, 12:18] = 2  # an object in the first slice only
+    z0[2, 12:18, 2:8] = 1  # a new object in the last slice
+    out = an.stitch_slices(z0)
+    assert out[0, 5, 5] == out[1, 5, 5] == out[2, 5, 5] == 1
+    assert len({out[0, 15, 15], out[2, 15, 5], 1}) == 3 and out.max() == 3
+    apart = np.zeros((2, 20, 20), np.int32)
+    apart[0, 0:5, 0:5], apart[1, 4:9, 4:9] = 1, 1  # barely touching: two objects
+    assert an.stitch_slices(apart).max() == 2
+    cap = np.zeros((2, 20, 20), np.int32)
+    cap[0, 2:18, 2:18], cap[1, 8:12, 8:12] = 1, 1  # a small cap on a large section: one object
+    assert an.stitch_slices(cap).max() == 1
+    split = np.zeros((2, 20, 20), np.int32)
+    split[0, 2:18, 2:18], split[1, 2:18, 2:9], split[1, 2:18, 11:18] = 1, 1, 2  # split in the second slice
+    assert an.stitch_slices(split).max() == 1
+
+
 def test_wavelet_counts_like_dog():
     data, info, _ = synthetic(seed=3)
     counts = {}

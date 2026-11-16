@@ -53,7 +53,10 @@ class SegmentationSettings:
                       choices=["stardist", "cellpose", "instanseg", "threshold", "labels from file"])
     dimension: str = opt("2D", "Segment in", "2D segments the maximum projection of the stack; the outlines "
                          "then hold for all slices. This is faster and often more robust, and can be combined "
-                         "with foci detection in 3D. 3D segments the stack itself.", choices=["2D", "3D"])
+                         "with foci detection in 3D. 3D segments the stack itself: Cellpose in real 3D for "
+                         "stacks of 20 slices or more; StarDist, InstanSeg and Cellpose on thinner stacks "
+                         "segment every slice and link the slices where objects overlap (\"2.5D\"); "
+                         "threshold works in 3D directly.", choices=["2D", "3D"])
     min_diameter: float = opt(4.0, "Smallest diameter", "Objects with a smaller diameter (of a circle with "
                               "the same area) are removed.", min=0, unit="µm")
     max_diameter: float = opt(50.0, "Largest diameter", "Objects with a larger diameter are removed. "

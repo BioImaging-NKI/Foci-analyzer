@@ -41,6 +41,10 @@ First working version. There are no earlier results to compare with.
 - Spotiflow works on finely sampled images (it failed when the image had to be rescaled).
 - Results page: `Tracks` graph (one line per tracked cell) and `Save graph data` (CSV of what the graph shows).
 - `Also save label images`: a batch run can write the cells and the foci of every channel as label TIFFs.
+- StarDist and InstanSeg in 3D ("2.5D"): every slice is segmented and the slices are linked where objects
+  overlap (at least half of the smaller one); pieces of a nucleus that the network split in one slice stay one
+  nucleus. On `3-channel` 24 nuclei (2D: 21); on the organoid 55 (2D: 26, nuclei on top of each other merge
+  in a projection).
 - Status bar at the bottom: what the program is doing, step and progress bar, and when it is ready.
   Shortcut keys are shown next to their buttons; `[` and `]` step through slices when there is no time-lapse.
   Results do not change.

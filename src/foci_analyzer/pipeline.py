@@ -110,13 +110,12 @@ def _segment(data: np.ndarray, cal: an.Calibration, s: Settings, name: str) -> n
     else:
         if seg.method == "stardist" and s.image.cell_channel:
             raise ValueError("StarDist finds nuclei only: choose Cellpose or InstanSeg for a cell channel, or set the cell channel to 0")
-        if seg.method in ("stardist", "instanseg") and img.shape[0] > 1:
-            raise ValueError(f"{seg.method} segments in 2D only: choose 'Segment in: 2D' (the foci can still be detected in 3D), "
-                             "or Cellpose for 3D")
         second = data[s.image.nuclei_channel - 1] if s.image.cell_channel and s.image.nuclei_channel else None
         if second is not None and second.shape[0] != img.shape[0]:
             second = second.max(0)[None]
         labels = models.segment(img, second, cal, seg)
+        if seg.method in ("stardist", "instanseg") and labels.shape[0] > 1:
+            labels = an.stitch_slices(labels)  # 2D networks: every slice, then linked into 3D objects
     return an.filter_labels(labels, cal, seg.min_diameter, seg.max_diameter, seg.exclude_on_edges)
 
 
