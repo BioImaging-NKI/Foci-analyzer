@@ -8,16 +8,20 @@ Under construction: `plan.md` has the design and the state per milestone.
 
 Double-click `install.bat`. It needs an internet connection and no Python: it fetches
 [uv](https://docs.astral.sh/uv/), installs the program in `%LOCALAPPDATA%\FociAnalyzer`, asks whether to add
-the neural networks (Cellpose, InstanSeg, Spotiflow, Trackastra; about 6 GB) and puts a shortcut on the
+the neural networks (StarDist, Cellpose, InstanSeg, Spotiflow, Trackastra; about 7 GB) and puts a shortcut on the
 desktop. Run it again to update or to add the networks later.
 
 ## Use
 
 1. **Experiment**: open images or a folder, or make one condition per group you want to compare.
-2. **Analyze**: choose the channels and move the threshold slider while you look at the image. The `?` next
-   to every setting explains it. `Analyze all images` writes the tables to the results folder.
-3. **Results**: graphs per condition with tests, a list per image and the cells to check. A click on a point
-   opens that cell in the viewer.
+2. **Analyze**: choose the channels, press `Analyze this image` and move the threshold slider while you look
+   at the image. The `?` next to every setting explains it. The panel on the right has the channels, the
+   overlays (cells, foci, markers, the colocalization map, a colour per cell for any of its numbers) and the
+   numbers of the image and of a clicked cell. `Analyze all images` writes the tables to the results folder.
+3. **Results**: graphs per condition with tests (also colocalization against chance, and tracks of a
+   time-lapse), a list per image and the cells to check. A click on a point opens that cell in the viewer.
+4. **Settings**: which networks are installed, whether they use the graphics card, and which Python runs
+   them (your own Cellpose environment can be given there).
 
 Images: TIFF (ImageJ, OME), Zeiss CZI and Leica LIF; 2D, stacks, time-lapse.
 
@@ -29,5 +33,6 @@ uv run foci-analyzer
 uv run pytest -q
 ```
 
-The networks live in a separate environment (`models-env` next to the program environment, or the path in
-`FOCI_ANALYZER_MODELS_PYTHON`, or the setting *Python of the models*).
+The networks live in separate environments next to the program environment: `models-env` (PyTorch: Cellpose,
+InstanSeg, Spotiflow, Trackastra) and `stardist-env` (TensorFlow 2.15: StarDist). Another Python can be given
+on the Settings page, or with `FOCI_ANALYZER_MODELS_PYTHON`.
