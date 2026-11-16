@@ -57,6 +57,7 @@
       <button id="run" class="primary">Analyze all images</button>
       <button id="run-one">This image only</button>
       <span class="help" data-help="Runs the analysis with the current settings on all images of the experiment and writes the tables to the results folder. Images are analyzed side by side when no neural network is used."></span>
+      <label style="flex-basis:100%" title="Also write the outlines as label images (TIFF) to the folder 'labels' in the results folder: one file for the cells and one per foci channel, to look at in Fiji or napari"><input type="checkbox" id="save-labels"> Also save label images</label>
       <div id="progress" hidden><div id="progress-bar"></div></div>
       <div id="progress-text" class="muted"></div>
     </div>

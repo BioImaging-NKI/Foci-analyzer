@@ -22,6 +22,9 @@ reproduce the Fiji results. Design, state per milestone and open items: `plan.md
   `Cellpose4`, `Spotiflow`.
 - Git: private repository `bvandenbroek/Foci-Analyzer-Python` (to move to BioImaging-NKI); commit and push
   per milestone is agreed. `TestData/` and `LiFT/` stay out of it.
+- After every change in `static/*.js`: load the test window and check that `window.FA` exists before
+  committing. A `//` comment put in the middle of a one-line statement swallows the rest of the line and
+  the whole window stays empty (this happened twice); use `/* */` there.
 - The project path contains `&`: in cmd it must be quoted; write multi-line Python to a file in the
   scratchpad instead of a heredoc, and edit project files with the Edit/Write tools, not `sed` with `\n`.
 

@@ -450,7 +450,8 @@ class App:
         images = [i for i in self.images if not wanted or i.id in wanted]
         self.progress.running = True
         threading.Thread(target=batch.run, daemon=True, args=(
-            images, self.settings, self.results_folder(), self.results, self.progress, self.compute_lock)).start()
+            images, self.settings, self.results_folder(), self.results, self.progress, self.compute_lock,
+            bool(body.get("labels")))).start()
         return self.progress.to_dict()
 
     def results_json(self) -> bytes:

@@ -316,7 +316,8 @@ nuclear stain (`Hi-res 3D`). Default: Cellpose.
 7. Tested on all test sets with every method (2026-11-16): StarDist found nuclei everywhere and is the
    default; Cellpose failed on `1-channel` (0 cells) and `Hi-res 3D` first image (1 cell); threshold fails on
    the dense organoid (1 cell). Not tested: Cellpose 4, the installer's StarDist step, real time-lapse data.
-8. Not built: saving label images, foci tracking, the manual.
+8. Not built: foci tracking, the manual. Cellpose 4 (`cpsam`) was tested through the existing environment
+   `C:/PythonProjects/Cellpose4/.venv` (works; about 28 s per 1024² image on the Quadro RTX 3000).
 
 ---
 

@@ -172,8 +172,11 @@ def test_batch_writes_tables(tmp_path):
               for n in ("one", "two")]
     import threading
     results, progress = batch.Results(), batch.Progress()
-    batch.run(images, settings(), str(tmp_path / "out"), results, progress, threading.Lock())
+    batch.run(images, settings(), str(tmp_path / "out"), results, progress, threading.Lock(), labels=True)
     assert not progress.errors and progress.done == 2
+    saved = tifffile.imread(tmp_path / "out" / "labels" / "cond_one_foci_ch2.tif")
+    assert saved.shape == (5, 128, 160) and saved.max() == 9
+    assert tifffile.imread(tmp_path / "out" / "labels" / "cond_one_cells.tif").max() == 2
     assert len(results.cells) == 4 and results.cells["foci_ch2"].sum() == 18
     again = batch.Results()
     assert again.load(tmp_path / "out") and len(again.foci) == len(results.foci)

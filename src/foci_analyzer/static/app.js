@@ -464,9 +464,11 @@ async function poll() {
   } catch (e) { status(e.message, true); }
 }
 async function run(images) {
-  try { showProgress(await (await api("/api/batch/start", { settings: S.settings, images })).json()); poll(); }
+  try { showProgress(await (await api("/api/batch/start", { settings: S.settings, images, labels: $("save-labels").checked })).json()); poll(); }
   catch (e) { status(e.message, true); }
 }
+$("save-labels").checked = store("fa.labels") === true;
+$("save-labels").onchange = (e) => store("fa.labels", e.target.checked);
 $("run").onclick = () => run(null);
 $("run-one").onclick = () => { if (V.id) run([V.id]); else status("Choose an image first", true); };
 
