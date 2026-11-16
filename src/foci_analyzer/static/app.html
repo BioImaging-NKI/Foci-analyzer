@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foci Analyzer</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header>
+  <span class="brand">Foci Analyzer</span>
+  <nav id="tabs">
+    <button data-page="experiment" class="on">Experiment</button>
+    <button data-page="analyze">Analyze</button>
+    <button data-page="results">Results</button>
+  </nav>
+  <span id="status"></span>
+</header>
+
+<main id="page-experiment" class="page">
+  <section class="card">
+    <h2>Conditions</h2>
+    <p class="hint">A condition is a group of images that belong together, from one or more folders.</p>
+    <div id="conditions"></div>
+    <div class="row">
+      <button id="add-condition">Add condition</button>
+      <button id="scan" class="primary">Find images</button>
+    </div>
+    <ul id="remarks"></ul>
+  </section>
+  <section class="card">
+    <h2>Images <span id="image-count" class="muted"></span></h2>
+    <table id="images"><thead><tr><th>Image</th><th>Condition</th><th>Folder</th></tr></thead><tbody></tbody></table>
+  </section>
+</main>
+
+<main id="page-analyze" class="page" hidden>
+  <aside id="settings"></aside>
+  <section id="viewer">
+    <div id="viewer-bar">
+      <select id="image-select" title="Image"></select>
+      <span class="seg" id="mode">
+        <button data-mode="slice">Slice</button><button data-mode="mip" class="on">Max projection</button>
+      </span>
+      <label id="z-wrap" hidden>Z <input id="z" type="range" min="0" max="0" value="0"> <span id="z-label"></span></label>
+      <button id="fit">Fit</button>
+      <span id="view-info" class="muted"></span>
+    </div>
+    <div id="canvas-wrap"><canvas id="canvas"></canvas><div id="viewer-empty">Choose an image on the Experiment page.</div></div>
+    <div id="channels"></div>
+  </section>
+</main>
+
+<main id="page-results" class="page" hidden>
+  <section class="card"><h2>Results</h2><p class="hint">The statistics page comes after the analysis (plan.md, section 8).</p></section>
+</main>
+
+<script>window.TOKEN = "{{TOKEN}}";</script>
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>

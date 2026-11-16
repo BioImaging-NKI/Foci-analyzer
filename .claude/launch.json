@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "foci-analyzer-test",
+      "runtimeExecutable": "C:/PythonProjects/Foci-Analyzer/.venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "foci_analyzer",
+        "--port",
+        "8771",
+        "--no-browser",
+        "--home",
+        "C:/PythonProjects/Foci-Analyzer/test-home"
+      ],
+      "port": 8771
+    }
+  ]
+}
