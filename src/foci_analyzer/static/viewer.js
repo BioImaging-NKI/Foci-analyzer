@@ -223,7 +223,7 @@ export class Viewer {
         if (x < -4 || y < -4 || x > cw + 4 || y > ch + 4) continue;
         if (++shown > 60000) break;
         ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, 6.2832);
-        if (p[o + 5] === 2) { rings.moveTo(x + r + 1.3, y); rings.arc(x, y, r + 1.3, 0, 6.2832); }  // colocalizes
+        if (p[o + 5] === 2 && s >= 1.5) {  // only when zoomed in: at a distance the rings would hide the image rings.moveTo(x + r + 1.3, y); rings.arc(x, y, r + 1.3, 0, 6.2832); }  // colocalizes
       }
       ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 0.8; ctx.stroke(rings);
     }

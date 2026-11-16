@@ -302,13 +302,21 @@ nuclear stain (`Hi-res 3D`). Default: Cellpose.
    processor part is now 1 to 2 s per image, and sending the image to the model process costs about as much
    as it would win). "Visible part only" for images from 6 megapixels: the preview analyzes what the viewer
    shows (at least 1024 px wide), a dashed frame marks it.
-2. **Results page**: per-track graphs for time-lapse, export of the graph data, more flags.
+2. **Results page**: done: colocalization graph with chance control, tracks graph, `Save graph data`.
+   Open: more flags.
 3. **Manual** with `/anthropic-skills:update-manual` (methods are already in the context help).
 4. Cellpose 4 (`cpsam`) through an existing environment (Settings page > own Python for cellpose):
    written, not tested.
 5. **Foci tracking over time** (registration of the nucleus, then linking foci): foci have ids and
    positions per frame and a `track` column of their cell, nothing more yet.
-6. Validation against the Fiji outputs per data set (only `3-channel` was compared, by total counts).
+6. Comparison with the Fiji outputs (foci per cell, StarDist nuclei): `3-channel` Fiji 41 and 26 (ch 2, 3),
+   ours 43 and 37 at threshold 12 in 3D; `Deconvolved with cytoplasm` Fiji 10.5, ours 4 at foci size 0.5 µm
+   and 8 to 12 at 0.2 µm; `Hi-res 3D` Fiji 259 (ch 1), ours 120 at 0.5 µm and 250 at 0.3 µm. The foci size
+   setting decides the count as much as the threshold does: no defect found, not tuned further.
+7. Tested on all test sets with every method (2026-11-16): StarDist found nuclei everywhere and is the
+   default; Cellpose failed on `1-channel` (0 cells) and `Hi-res 3D` first image (1 cell); threshold fails on
+   the dense organoid (1 cell). Not tested: Cellpose 4, the installer's StarDist step, real time-lapse data.
+8. Not built: saving label images, foci tracking, the manual.
 
 ---
 

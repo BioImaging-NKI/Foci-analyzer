@@ -178,3 +178,55 @@ def test_batch_writes_tables(tmp_path):
     again = batch.Results()
     assert again.load(tmp_path / "out") and len(again.foci) == len(results.foci)
     assert again.meta["settings"] == config.to_dict(settings())
+
+
+def test_preview_overlays_parts_and_cancel(tmp_path, monkeypatch):
+    """The window's side of an analysis: preview, overlays of every kind, a part of the image, cancel."""
+    monkeypatch.setenv("FOCI_ANALYZER_HOME", str(tmp_path / "home"))
+    from foci_analyzer.server import ApiError, App
+    data, _, _ = synthetic()
+    path = tmp_path / "one.tif"
+    tifffile.imwrite(path, data.transpose(1, 0, 2, 3), imagej=True, metadata={"axes": "ZCYX", "spacing": ZS, "unit": "micron"},
+                     resolution=(1 / PX, 1 / PX))
+    app = App()
+    app.set_conditions([{"name": "c", "folders": [str(path)], "pattern": "*", "recursive": False}])
+    image = app.images[0].id
+    with pytest.raises(ApiError):  # an overlay never starts an analysis itself
+        app.overlay({"path": image, "kind": "cells"})
+    s = config.to_dict(settings())
+    s["colocalization"]["enabled"] = True
+    p = app.preview({"path": image, "settings": s})
+    assert p["cells"] == 2 and [c["foci"] for c in p["channels"]] == [9, 9] and p["part"] is None
+    assert {(c["a"], c["b"]): c["with"] for c in p["coloc"]} == {(2, 3): 9, (3, 2): 9}
+    assert all(c["chance"] is not None and c["chance"] < 0.5 for c in p["coloc"])
+    for kind, extra in (("cells", {}), ("foci", {"ch": "2"}), ("coloc", {}), ("overlap", {}), ("value", {"col": "foci_ch2"})):
+        raw, w, h = app.overlay({"path": image, "kind": kind, "z": "mip", **extra})
+        plane = np.frombuffer(raw, "<u2").reshape(h, w)
+        assert (w, h) == (160, 128) and plane.any(), kind
+        if kind == "value":  # the cell with 6 foci is the top of the colour scale, the one with 3 the bottom
+            assert set(np.unique(plane)) == {0, 1, 255}
+    cand = np.frombuffer(app.candidates({"path": image, "ch": "2"}), "<f4").reshape(-1, 6)
+    assert (cand[:, 5] == 2).sum() == 9  # every focus colocalizes
+    # only the left half: one nucleus, and everything is placed where it is in the whole image
+    part = app.preview({"path": image, "settings": s, "box": [0, 0, 80, 128]})
+    assert part["cells"] == 1 and part["offset"] == [0, 0] and part["part"][2:] == [80, 128]
+    right = app.preview({"path": image, "settings": s, "box": [72, 0, 160, 128]})
+    assert right["cells"] == 1 and right["offset"] == [72, 0]
+    cand = np.frombuffer(app.candidates({"path": image, "ch": "2"}), "<f4").reshape(-1, 6)
+    assert cand[cand[:, 5] > 0, 0].min() > 90  # x of the foci of the right nucleus, in image pixels
+    assert app.cancel() == {"stopped": True}
+    s["foci"][0]["size"] = 0.7  # something new to compute: it is stopped before it starts
+    app.set_settings(s)
+    app.cache.cancelled = True
+    with pytest.raises(ApiError, match="stopped"):
+        app.frame(image, 0)
+    assert app.preview({"path": image, "settings": s})["cells"] == 2  # a new request clears the stop
+
+
+def test_wavelet_counts_like_dog():
+    data, info, _ = synthetic(seed=3)
+    counts = {}
+    for flt in ("DoG", "wavelet"):
+        r = pipeline.analyze_frame(StageCache(), "w", data, info, settings(filter=flt))
+        counts[flt] = [len(c.kept) for c in r.channels]
+    assert counts["wavelet"] == counts["DoG"] == [9, 9]

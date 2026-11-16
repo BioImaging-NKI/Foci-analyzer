@@ -39,6 +39,7 @@ First working version. There are no earlier results to compare with.
 - Wavelet filter: its noise estimate was too high, so it found far fewer foci than DoG at the same threshold;
   it now finds a comparable number. Results with the wavelet filter change.
 - Spotiflow works on finely sampled images (it failed when the image had to be rescaled).
+- Results page: `Tracks` graph (one line per tracked cell) and `Save graph data` (CSV of what the graph shows).
 - Status bar at the bottom: what the program is doing, step and progress bar, and when it is ready.
   Shortcut keys are shown next to their buttons; `[` and `]` step through slices when there is no time-lapse.
   Results do not change.

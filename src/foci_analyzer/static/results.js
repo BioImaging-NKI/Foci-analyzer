@@ -9,7 +9,7 @@ const HELP = {
   table: "Per cell: one value per nucleus or cell (for example the number of foci). Per focus: one value per focus (for example its size).",
   measure: "What is shown. foci chN = number of foci of channel N in the cell; total and mean intensity are above the local background; fraction chA with chB = share of the A foci that colocalize with a B focus; pearson and manders are intensity-based colocalization inside the cell; height = peak of the focus in threshold units.",
   coloc: "Per pair of foci channels: the share of the foci of one channel that colocalize with a focus of the other, per cell (boxes) with the mean per image (dots). Grey: the share expected when the foci of the other channel lay at random places in the same cell (the chance control). A share clearly above the grey box means real colocalization.",
-  plot: "Points and box: every cell is a point, the box shows median and quartiles, the large dots are the means per image. Histogram: the distribution per condition. Scatter: two measures against each other. Over time: the mean per frame of a time-lapse.",
+  plot: "Points and box: every cell is a point, the box shows median and quartiles, the large dots are the means per image. Histogram: the distribution per condition. Scatter: two measures against each other. Over time: the mean per frame of a time-lapse. Tracks: one line per tracked cell over time (needs tracking to be on), with the mean per condition as a thick line.",
   unit: "What counts as one independent value in the test. Cells of one image are not independent of each other, so a test per cell easily gives very small p-values. Per image or per folder (one folder = one experiment) tests the means, which is the careful choice. Per cell uses Mann-Whitney, means use the Welch t-test; all pairwise p-values are Holm-corrected.",
 };
 const R = { cells: null, foci: null, meta: {}, loaded: false };
@@ -60,7 +60,9 @@ function render() {
   if (!ms.includes(C.measure)) C.measure = ms.find((m) => m.startsWith("foci_ch")) || ms[0];
   if (!ms.includes(C.x)) C.x = ms.find((m) => m === "area") || ms[0];
   const timelapse = R.cells.frame.some((f) => f > 1), coloc = C.table === "cells" && pairs().length > 0;
+  const tracked = timelapse && C.table === "cells" && !!R.cells.track && R.cells.track.some((v) => typeof v === "number" && v > 0);
   if (C.plot === "time" && !timelapse) C.plot = "points";
+  if (C.plot === "tracks" && !tracked) C.plot = timelapse ? "time" : "points";
   if (C.plot === "coloc" && !coloc) C.plot = "points";
   if (C.plot === "coloc" && !/^fraction_/.test(C.measure)) C.measure = pairs()[0][0];  // the table below then tests that share
   const select = (key, options, help) => {
@@ -76,7 +78,7 @@ function render() {
     field("Table", select("table", [["cells", "Per cell"], ...(R.foci ? [["foci", "Per focus"]] : [])], HELP.table)),
     C.table === "foci" && channels.length > 1 ? field("Channel", select("channel", [[0, "all"], ...channels.map((c) => [c, `channel ${c}`])], "")) : null,
     field("Measure", select("measure", ms.map((m) => [m, nice(m)]), HELP.measure)),
-    field("Graph", select("plot", [["points", "Points and box"], ["violin", "Violin"], ["histogram", "Histogram"], ["scatter", "Scatter"], ...(timelapse ? [["time", "Over time"]] : []), ...(coloc ? [["coloc", "Colocalization"]] : [])], C.plot === "coloc" ? HELP.coloc : HELP.plot)),
+    field("Graph", select("plot", [["points", "Points and box"], ["violin", "Violin"], ["histogram", "Histogram"], ["scatter", "Scatter"], ...(timelapse ? [["time", "Over time"]] : []), ...(tracked ? [["tracks", "Tracks"]] : []), ...(coloc ? [["coloc", "Colocalization"]] : [])], C.plot === "coloc" ? HELP.coloc : HELP.plot)),
     C.plot === "scatter" ? field("Against", select("x", ms.map((m) => [m, nice(m)]), "The measure on the horizontal axis.")) : null,
     field("Test per", select("unit", [["cell", C.table === "foci" ? "focus" : "cell"], ["image", "image"], ["folder", "folder"]], HELP.unit)),
     el("label", { class: "small" }, el("input", { type: "checkbox", checked: C.log, onchange: (e) => { C.log = e.target.checked; changed(); } }), " logarithmic axis"),
@@ -85,6 +87,7 @@ function render() {
       el("input", { type: "checkbox", checked: !C.off.includes(c), onchange: (e) => { C.off = e.target.checked ? C.off.filter((x) => x !== c) : [...C.off, c]; changed(); } }),
       el("span", { style: `color:${PALETTE[i % PALETTE.length]}`, textContent: " ● " }), c))),
     el("div", { class: "row", style: "margin-top:12px" },
+      el("button", { textContent: "Save graph data", title: "The values in this graph as a CSV file, one row per cell or focus", onclick: saveGraphData }),
       el("button", { textContent: "Open results folder", title: R.meta.folder || "", onclick: async () => { try { await api("/api/results/open", {}); } catch (e) { status(e.message, true); } } }),
       helpIcon("The folder holds cells.csv (one row per cell), foci.csv (one row per focus), settings.toml (the settings of this analysis) and run.json. The tables open in Excel, R or Python.")));
   draw(); drawStats(); drawImages(); drawCheck();
@@ -167,6 +170,23 @@ function draw() {
       traces.push({ type: "scattergl", mode: "markers", x: ii.map((i) => x[i]), y: ii.map((i) => y[i]), customdata: ii, name: c, text: ii.map(hover),
         hovertemplate: "%{text}<br>%{x:.3g}, %{y:.3g}<extra></extra>", marker: { color: color(c), size: 5, opacity: 0.55 } }); });
     layout.showlegend = true; layout.xaxis.title = { text: nice(C.x) };
+  } else if (C.plot === "tracks") {
+    conds.forEach((c) => {
+      const tracks = new Map(), per = new Map();
+      for (const i of by.get(c)) {
+        if (!(t.track[i] > 0)) continue;
+        const key = `${t.path[i]}|${t.track[i]}`, a = tracks.get(key) || []; a.push(i); tracks.set(key, a);
+        const f = per.get(t.frame[i]) || []; f.push(y[i]); per.set(t.frame[i], f);
+      }
+      [...tracks.values()].slice(0, 400).forEach((ii) => {
+        ii.sort((a, b) => t.frame[a] - t.frame[b]);
+        traces.push({ type: "scatter", mode: "lines", x: ii.map((i) => t.frame[i]), y: ii.map((i) => y[i]), customdata: ii, showlegend: false, opacity: 0.5,
+          text: ii.map((i) => `${t.image[i]} · track ${t.track[i]}`), hovertemplate: "%{text}<br>frame %{x}: %{y:.3g}<extra></extra>", line: { color: color(c), width: 1 } });
+      });
+      const fr = [...per.keys()].sort((a, b) => a - b);
+      traces.push({ type: "scatter", mode: "lines", x: fr, y: fr.map((f) => per.get(f).reduce((a, b) => a + b, 0) / per.get(f).length), name: c, line: { color: color(c), width: 3.5 } });
+    });
+    layout.showlegend = true; layout.xaxis.title = { text: "frame" };
   } else {
     conds.forEach((c) => {
       const per = new Map();
@@ -181,6 +201,16 @@ function draw() {
   window.Plotly.react(plot, traces, layout, { displaylogo: false, responsive: true, modeBarButtonsToRemove: ["lasso2d", "select2d"] });
   plot.removeAllListeners && plot.removeAllListeners("plotly_click");
   plot.on("plotly_click", (ev) => { const p = ev.points[0]; if (p && Number.isInteger(p.customdata)) openRow(t, p.customdata); });
+}
+// the rows behind the graph as a CSV file
+function saveGraphData() {
+  const t = table(), idx = rows(t);
+  const cols = ["condition", "folder", "image", "frame", "cell", ...(t.focus ? ["focus", "channel"] : []), ...(t.track ? ["track"] : []),
+    ...(C.plot === "coloc" ? pairs().flatMap(([a, b]) => (b ? [a, b] : [a])) : [...(C.plot === "scatter" ? [C.x] : []), C.measure])];
+  const cell = (v) => v === null || v === undefined ? "" : /[",\n]/.test(String(v)) ? `"${String(v).replaceAll('"', '""')}"` : String(v);
+  const text = [cols.join(","), ...idx.map((i) => cols.map((c) => cell(t[c][i])).join(","))].join("\n");
+  const a = el("a", { href: URL.createObjectURL(new Blob([text], { type: "text/csv" })), download: `foci_analyzer_${C.plot === "coloc" ? "colocalization" : C.measure}.csv` });
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 function pathOf(t, i) {
   if (t.path) return t.path[i];
