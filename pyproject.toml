@@ -13,7 +13,7 @@ dependencies = [
     "tifffile>=2024.8",
     "pandas>=2.2",
     "tomli-w>=1.0",
-    "pylibczirw>=6.1.0",
+    "pylibczirw>=6.1.0; sys_platform != 'darwin' or platform_machine == 'arm64'",  # no package for Intel Macs
     "readlif>=0.6.6",
     "plotly>=7.1.0",
 ]

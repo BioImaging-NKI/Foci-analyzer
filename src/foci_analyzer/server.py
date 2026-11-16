@@ -170,7 +170,7 @@ class App:
                         "pythons": {k: str(v).strip().strip('"') for k, v in pythons.items() if k in models.NETWORKS and str(v).strip()}}
         for path in [self.program["python"], *self.program["pythons"].values()]:
             if path and not Path(path).is_file():
-                raise ApiError(f"there is no such file: {path} (give the python.exe of the environment)")
+                raise ApiError(f"there is no such file: {path} (give the python of the environment: python.exe in its Scripts folder on Windows, bin/python elsewhere)")
         home().mkdir(parents=True, exist_ok=True)
         (home() / "program.json").write_text(json.dumps(self.program), encoding="utf-8")
         models.set_pythons(self.program["python"], self.program["pythons"])
@@ -483,7 +483,10 @@ class App:
         folder = self.results.meta.get("folder") or self.results_folder()
         if not folder or not Path(folder).is_dir():
             raise ApiError("there is no results folder yet")
-        os.startfile(folder)
+        if sys.platform == "win32":
+            os.startfile(folder)
+        else:
+            subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", folder])
         return {"folder": folder}
 
 

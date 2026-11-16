@@ -11,6 +11,15 @@ from pathlib import Path
 import numpy as np
 import tifffile
 
+
+def _czi():
+    try:
+        from pylibCZIrw import czi
+    except ImportError as e:
+        raise ValueError("CZI files cannot be read on this computer (the CZI reader pylibCZIrw has no version for "
+                         "it, for example an Intel Mac); export the images as TIFF") from e
+    return czi
+
 EXTENSIONS = (".tif", ".tiff", ".czi", ".lif")
 _MICRON = {"micron", "microns", "um", "µm", "μm", "\\u00b5m"}
 _AXES = "TCZYX"
@@ -62,7 +71,7 @@ def list_series(path: str | Path) -> list[str]:
         from readlif.reader import LifFile
         return [im["name"] for im in LifFile(str(path)).image_list]
     if ext == ".czi":
-        from pylibCZIrw import czi
+        czi = _czi()
         with czi.open_czi(str(path)) as doc:
             scenes = sorted(doc.scenes_bounding_rectangle)
         return [f"scene {s + 1}" for s in scenes] if len(scenes) > 1 else [""]
@@ -86,7 +95,7 @@ def _read_tiff(path: Path):
 
 
 def _read_czi(path: Path, series: int):
-    from pylibCZIrw import czi
+    czi = _czi()
     with czi.open_czi(str(path)) as doc:
         box = doc.total_bounding_box
         scenes = sorted(doc.scenes_bounding_rectangle)

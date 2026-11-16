@@ -20,7 +20,10 @@ _models: dict = {}
 
 def _device() -> str:
     import torch
-    return "cuda" if torch.cuda.is_available() else "cpu"
+    if torch.cuda.is_available():
+        return "cuda"
+    mps = getattr(torch.backends, "mps", None)
+    return "mps" if mps is not None and mps.is_available() else "cpu"  # mps: the graphics chip of Apple Silicon
 
 
 def _version(name: str):
@@ -65,7 +68,7 @@ def warm(arrays, p):
 def cellpose(arrays, p):
     from cellpose import models
     major = int((_version("cellpose") or "3").split(".")[0])
-    gpu = _device() == "cuda"
+    gpu = _device() != "cpu"
     img, second = arrays["img"], arrays.get("second")
     name = p.get("model") or ("cpsam" if major >= 4 else ("nuclei" if second is None and p.get("nuclei") else "cyto3"))
     auto = major < 4 and not p.get("diameter") and name in ("nuclei", "cyto3", "cyto2", "cyto")

@@ -1,2 +1,6 @@
 * text=auto eol=lf
 *.bat text eol=crlf
+*.cmd eol=crlf
+*.iss eol=crlf
+*.ps1 eol=crlf
+*.sh eol=lf
