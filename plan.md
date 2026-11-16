@@ -305,8 +305,17 @@ nuclear stain (`Hi-res 3D`). Default: Cellpose.
 2. **Results page**: done: colocalization graph with chance control, tracks graph, `Save graph data`.
    Open: more flags.
 3. **Manual** with `/anthropic-skills:update-manual` (methods are already in the context help).
-4. Cellpose 4 (`cpsam`) through an existing environment (Settings page > own Python for cellpose):
-   written, not tested.
+4. **Installers** (2026-11-17): one script `installer/install.py` (standard library + uv) does the work on
+   every system; `FociAnalyzer-Setup.exe` (Inno Setup, 14 MB: program + uv; pages for the networks and for
+   own environments; unattended `/NETWORKS=` `/OWN=`), `install.sh` for macOS and Linux, `install.bat` for
+   developers. All in one folder per user, Python and download cache included; uninstall removes the folder.
+   Tested here: setup.exe silent install and uninstall; install.py with all networks (7.3 GB, CUDA) and
+   `installer/check.py` passing for all five networks from the installed copy. macOS: no Apple developer
+   account needed, because files fetched by curl in Terminal are not quarantined; PyTorch networks use the
+   Apple graphics chip (MPS); StarDist on the processor; no CZI on Intel Macs (no pylibCZIrw package).
+   Linux: CUDA for PyTorch and for StarDist (tensorflow[and-cuda]). macOS and Linux are only tested on
+   GitHub's machines (workflow `build`, run by hand or for a tag). Open: code-signing certificate (asked);
+   `install.sh` as a one-line download needs a public repository; no icon yet.
 5. **Foci tracking over time** (registration of the nucleus, then linking foci): foci have ids and
    positions per frame and a `track` column of their cell, nothing more yet.
 6. Comparison with the Fiji outputs (foci per cell, StarDist nuclei): `3-channel` Fiji 41 and 26 (ch 2, 3),
@@ -315,7 +324,7 @@ nuclear stain (`Hi-res 3D`). Default: Cellpose.
    setting decides the count as much as the threshold does: no defect found, not tuned further.
 7. Tested on all test sets with every method (2026-11-16): StarDist found nuclei everywhere and is the
    default; Cellpose failed on `1-channel` (0 cells) and `Hi-res 3D` first image (1 cell); threshold fails on
-   the dense organoid (1 cell). Not tested: Cellpose 4, the installer's StarDist step, real time-lapse data.
+   the dense organoid (1 cell). Not tested: real time-lapse data.
 8. Not built: foci tracking, the manual. Cellpose 4 (`cpsam`) was tested through the existing environment
    `C:/PythonProjects/Cellpose4/.venv` (works; about 28 s per 1024² image on the Quadro RTX 3000).
 
@@ -334,7 +343,10 @@ nuclear stain (`Hi-res 3D`). Default: Cellpose.
 
 - **D1** Networks in a separate environment by default; the installer asks, and any existing environment
   can be given in the settings. Done.
-- **D2** Default segmentation: Cellpose (see the measurements above); InstanSeg for speed.
+- **D2** Default segmentation: StarDist (since 2026-11-16: found the nuclei in every test set, fastest);
+  Cellpose for cells and real 3D; InstanSeg for tissue. StarDist and InstanSeg do 3D as 2.5D.
 - **D3** Foci extent at half maximum. Done.
 - **D4** Git repository with a commit per milestone. Done.
 - **D5** Package and command: `foci_analyzer` / `foci-analyzer`.
+- **D6** Installers: Inno Setup on Windows (no certificate yet: SmartScreen warns once), a Terminal script on
+  macOS and Linux (no Apple developer account: not needed this way).

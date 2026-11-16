@@ -4,12 +4,21 @@ Detection, quantification and colocalization of foci in nuclei and cells, in a b
 computer. Python successor of the [Foci Analyzer](https://imagej.net/plugins/foci-analyzer) Fiji macro.
 Under construction: `plan.md` has the design and the state per milestone.
 
-## Install (Windows)
+## Install
 
-Double-click `install.bat`. It needs an internet connection and no Python: it fetches
-[uv](https://docs.astral.sh/uv/), installs the program in `%LOCALAPPDATA%\FociAnalyzer`, asks whether to add
-the neural networks (StarDist, Cellpose, InstanSeg, Spotiflow, Trackastra; about 7 GB) and puts a shortcut on the
-desktop. Run it again to update or to add the networks later.
+No Python is needed beforehand; an internet connection is. Everything goes into one folder, and removing it
+removes the program. Run the installer again to update or to add networks.
+
+- **Windows**: run `FociAnalyzer-Setup-<version>.exe`. It asks which neural networks to install (StarDist,
+  Cellpose, InstanSeg, Spotiflow, Trackastra; about 7 GB together) and whether you want to use networks from
+  an environment you already have. Windows may warn about an unknown publisher: choose *More info* > *Run
+  anyway*.
+- **macOS and Linux**: unpack the program, open a Terminal in its folder and type `sh install.sh`. It asks the
+  same questions, installs in `~/FociAnalyzer` and adds Foci Analyzer to Applications (macOS) or to the
+  applications menu (Linux).
+
+To check an installation: `<install folder>/.venv/Scripts/python.exe installer/check.py` (Windows; on macOS
+and Linux `.venv/bin/python`) runs every installed network on a made-up image.
 
 ## Use
 
@@ -32,6 +41,10 @@ uv sync
 uv run foci-analyzer
 uv run pytest -q
 ```
+
+Installers: `installer/install.py` does the work on every system; `installer/build-windows.ps1` builds the
+Windows setup (needs Inno Setup 6). The GitHub workflow `build` tests on Windows, Linux and macOS, and
+builds and tries the installers when run by hand or for a version tag.
 
 The networks live in separate environments next to the program environment: `models-env` (PyTorch: Cellpose,
 InstanSeg, Spotiflow, Trackastra) and `stardist-env` (TensorFlow 2.15: StarDist). Another Python can be given

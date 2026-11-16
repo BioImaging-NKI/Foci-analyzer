@@ -45,6 +45,9 @@ First working version. There are no earlier results to compare with.
   overlap (at least half of the smaller one); pieces of a nucleus that the network split in one slice stay one
   nucleus. On `3-channel` 24 nuclei (2D: 21); on the organoid 55 (2D: 26, nuclei on top of each other merge
   in a projection).
+- Installers: `FociAnalyzer-Setup.exe` for Windows (choose the networks, or use your own environments) and
+  `install.sh` for macOS and Linux. On Apple Silicon the PyTorch networks use the graphics chip.
+  `installer/check.py` checks an installation. Results do not change.
 - Status bar at the bottom: what the program is doing, step and progress bar, and when it is ready.
   Shortcut keys are shown next to their buttons; `[` and `]` step through slices when there is no time-lapse.
   Results do not change.

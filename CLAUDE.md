@@ -48,7 +48,12 @@ reproduce the Fiji results. Design, state per milestone and open items: `plan.md
 - `static/`: `app.js` (pages, form, preview, batch), `viewer.js` (WebGL2 tile viewer), `results.js`
   (Plotly graphs, tests), `util.js`; plain JavaScript modules, no build step. Plotly comes from the
   `plotly` Python package.
-- `install.bat`: installation for users without Python (uv, app environment, optional networks, shortcut).
+- `installer/`: `install.py` (the installation on every system, standard library + uv), `FociAnalyzer.iss`
+  + `build-windows.ps1` (setup.exe; Inno Setup 6 is installed per user here), `run-install.cmd`, `check.py`
+  (every installed network on a made-up image). `install.sh` (macOS, Linux) and `install.bat` (developers)
+  call `install.py`. Network versions are pinned in `install.py`; change them only after testing them together.
+- `.github/workflows/build.yml`: tests on three systems per push; installers only by hand or for a tag (the
+  private repository pays for minutes, macOS counts ten times).
 
 ## Working agreements
 - Present a detailed plan before implementing difficult parts.
