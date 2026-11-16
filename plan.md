@@ -314,7 +314,10 @@ nuclear stain (`Hi-res 3D`). Default: Cellpose.
    account needed, because files fetched by curl in Terminal are not quarantined; PyTorch networks use the
    Apple graphics chip (MPS); StarDist on the processor; no CZI on Intel Macs (no pylibCZIrw package).
    Linux: CUDA for PyTorch and for StarDist (tensorflow[and-cuda]). macOS and Linux are only tested on
-   GitHub's machines (workflow `build`, run by hand or for a tag). Open: code-signing certificate (asked);
+   GitHub's machines (workflow `build`, run by hand or for a tag); run 43981554773 passed on all three:
+   install with all networks on macOS (Apple Silicon, PyTorch on MPS) and Linux (processor) in about 2 min,
+   `check.py` ok for all five networks, the window starts; setup.exe silent install with StarDist and
+   Spotiflow, check ok, uninstall leaves nothing. Not tested by a person on a Mac or Linux desktop. Open: code-signing certificate (asked);
    `install.sh` as a one-line download needs a public repository; no icon yet.
 5. **Foci tracking over time** (registration of the nucleus, then linking foci): foci have ids and
    positions per frame and a `track` column of their cell, nothing more yet.
