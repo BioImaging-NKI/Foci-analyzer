@@ -48,7 +48,9 @@ def analyze_image(entry: ImageEntry, s: config.Settings, compute_lock: threading
     """The tables of one image (all frames), with the columns that say where a row comes from."""
     data, info = read_image(entry.path, entry.series)
     cache = StageCache(keep=24)
-    cells, foci, labels = [], [], []
+    cells, foci, labels, frames = [], [], [], []
+    ch = s.image.cell_channel or s.image.nuclei_channel
+    remark = ""
     for t in range(info.frames):
         if compute_lock:
             with compute_lock:
@@ -60,16 +62,18 @@ def analyze_image(entry: ImageEntry, s: config.Settings, compute_lock: threading
             df.insert(0, "frame", t + 1)
             out.append(df)
         labels.append(r.labels)
+        if ch and s.timelapse.tracking == "trackastra":
+            frames.append(data[t, ch - 1].max(0))
     cells, foci = pd.concat(cells, ignore_index=True), pd.concat(foci, ignore_index=True)
     if info.frames > 1 and s.timelapse.tracking != "off":
-        tracking.add_tracks(cells, foci, labels, s.timelapse)
+        remark = tracking.add_tracks(cells, foci, labels, s.timelapse, frames or None)
     for df in (cells, foci):
         for i, (col, value) in enumerate((("condition", entry.condition), ("image", entry.name),
                                           ("folder", entry.folder))):
             df.insert(i, col, value)
     cells["path"] = entry.id
     meta = {"unit": info.unit, "pixel_size": r.cal.pixel_size, "frames": info.frames, "slices": info.slices,
-            "frame_interval": info.frame_interval}
+            "frame_interval": info.frame_interval, "remark": remark}
     return cells, foci, meta
 
 

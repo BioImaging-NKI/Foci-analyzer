@@ -42,12 +42,18 @@ def link_overlap(labels: list[np.ndarray]) -> list[dict[int, tuple[int, int]]]:
     return out
 
 
-def add_tracks(cells: pd.DataFrame, foci: pd.DataFrame, labels: list[np.ndarray], settings) -> None:
-    """Add the columns `track` and `parent` to the cell table and `track` to the foci table."""
-    links = None
+def add_tracks(cells: pd.DataFrame, foci: pd.DataFrame, labels: list[np.ndarray], settings,
+               images: list[np.ndarray] | None = None) -> str:
+    """Add the columns `track` and `parent` to the cell table and `track` to the foci table.
+
+    Returns a remark when Trackastra was asked for but could not be used.
+    """
+    links, remark = None, ""
     if settings.tracking == "trackastra":
         from . import models
-        links = models.track(labels)
+        links = models.track(labels, images)
+        if links is None:
+            remark = "Trackastra could not be used; cells were followed by overlap"
     if links is None:
         links = link_overlap(labels)
     track = {(t + 1, cell): v for t, frame in enumerate(links) for cell, v in frame.items()}
@@ -56,3 +62,4 @@ def add_tracks(cells: pd.DataFrame, foci: pd.DataFrame, labels: list[np.ndarray]
     cells["parent"] = [track.get(k, (0, 0))[1] for k in keys]
     if len(foci):
         foci["track"] = [track.get(k, (0, 0))[0] for k in zip(foci["frame"], foci["cell"], strict=True)]
+    return remark

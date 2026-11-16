@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
+import time
 from collections import OrderedDict
 from collections.abc import Callable
 from typing import Any
@@ -25,7 +26,8 @@ class StageCache:
         self.keep = keep
         self._items: OrderedDict[str, Any] = OrderedDict()
         self._lock = threading.Lock()
-        self.computed: list[str] = []  # names of the stages that really ran (for tests and timing)
+        self.computed: list[str] = []  # names of the stages that really ran (for tests)
+        self.seconds: dict[str, float] = {}  # time spent per stage name
 
     def run(self, name: str, params: dict, inputs: tuple[str, ...], compute: Callable[[], Any]) -> tuple[str, Any]:
         """The key and the result of a stage; `compute` is only called when the result is not there yet."""
@@ -34,7 +36,9 @@ class StageCache:
             if key in self._items:
                 self._items.move_to_end(key)
                 return key, self._items[key]
+        start = time.perf_counter()
         value = compute()
+        self.seconds[name] = self.seconds.get(name, 0.0) + time.perf_counter() - start
         with self._lock:
             self._items[key] = value
             self.computed.append(name)

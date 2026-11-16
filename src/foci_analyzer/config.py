@@ -16,10 +16,13 @@ import tomli_w
 
 def opt(default: Any, label: str, help: str = "", *, advanced: bool = False, choices: list[str] | None = None,
         min: float | None = None, max: float | None = None, step: float | None = None, unit: str = "",
-        slider: bool = False):
-    """A setting with what the window needs to show it. `help` is the context help (the ? in the form)."""
+        slider: bool = False, when: dict | None = None):
+    """A setting with what the window needs to show it. `help` is the context help (the ? in the form).
+
+    `when` names settings of the same group and the values for which this one is shown.
+    """
     meta = {"label": label, "help": help, "advanced": advanced, "choices": choices, "min": min, "max": max,
-            "step": step, "unit": unit, "slider": slider}
+            "step": step, "unit": unit, "slider": slider, "when": when}
     return field(default=default, metadata=meta)
 
 
@@ -41,11 +44,11 @@ class ImageSettings:
 @dataclass
 class SegmentationSettings:
     """Nuclei / cells"""
-    method: str = opt("threshold", "Method", "How nuclei or cells are found. Cellpose, StarDist and InstanSeg "
+    method: str = opt("cellpose", "Method", "How nuclei or cells are found. Cellpose, StarDist and InstanSeg "
                       "are neural networks and need the models to be installed. 'threshold' smooths the image, "
                       "applies an Otsu threshold and splits touching objects on the distance map. 'labels from "
                       "file' reads label images made elsewhere.",
-                      choices=["threshold", "cellpose", "stardist", "instanseg", "labels from file"])
+                      choices=["cellpose", "instanseg", "stardist", "threshold", "labels from file"])
     dimension: str = opt("2D", "Segment in", "2D segments the maximum projection of the stack; the outlines "
                          "then hold for all slices. This is faster and often more robust, and can be combined "
                          "with foci detection in 3D. 3D segments the stack itself.", choices=["2D", "3D"])
@@ -55,16 +58,16 @@ class SegmentationSettings:
                               "0 = no limit.", min=0, unit="µm")
     exclude_on_edges: bool = opt(True, "Remove objects on the image edge", "A nucleus that is cut by the image "
                                  "edge has an incomplete foci count.", advanced=True)
-    model: str = opt("", "Model", "Model name or path; empty = the default of the method.", advanced=True)
+    model: str = opt("", "Model", "Model name or path; empty = the default of the method.", advanced=True, when={"method": ["cellpose", "instanseg", "stardist"]})
     diameter: float = opt(0.0, "Expected diameter", "For Cellpose: the typical diameter. 0 = automatic.",
-                          advanced=True, min=0, unit="µm")
+                          advanced=True, min=0, unit="µm", when={"method": ["cellpose", "instanseg", "stardist"]})
     probability: float = opt(0.5, "Probability threshold", "Lower finds more and larger objects.",
-                             advanced=True, min=0, max=1, step=0.05)
+                             advanced=True, min=0, max=1, step=0.05, when={"method": ["cellpose", "instanseg", "stardist"]})
     labels_folder: str = opt("", "Labels folder", "For 'labels from file': a folder with label images (TIFF) "
-                             "that have the same name as the images.", advanced=True)
+                             "that have the same name as the images.", when={"method": ["labels from file"]})
     python: str = opt("", "Python of the models", "Path of the python.exe of another environment that holds the "
                       "model (for example an existing Cellpose environment). Empty = the environment of "
-                      "Foci Analyzer.", advanced=True)
+                      "Foci Analyzer.", advanced=True, when={"method": ["cellpose", "instanseg", "stardist"]})
 
 
 @dataclass
@@ -98,29 +101,29 @@ class FociChannelSettings:
                              "than the noise of the filtered image. The noise is 1.4826 × the median absolute "
                              "deviation of the filtered values inside the cells, which is hardly influenced "
                              "by the foci themselves. Lower finds more foci. The viewer follows this slider "
-                             "directly.", min=1, max=50, step=0.1, unit="× noise", slider=True)
+                             "directly.", min=1, max=50, step=0.1, unit="× noise", slider=True, when={"method": ["watershed"]})
     probability: float = opt(0.5, "Spotiflow probability", "Spots below this probability are left out.",
-                             advanced=True, min=0, max=1, step=0.01, slider=True)
+                             min=0, max=1, step=0.01, slider=True, when={"method": ["spotiflow"]})
     filter: str = opt("DoG", "Filter", "DoG: difference of two Gaussians around the foci size. LoG: Laplacian "
                       "of Gaussian at the foci size; slightly sharper, more sensitive to noise. wavelet: "
                       "product of two à trous wavelet planes; good for foci of mixed size on uneven "
                       "background. All work in 3D for 3D detection.", advanced=True,
-                      choices=["DoG", "LoG", "wavelet"])
+                      choices=["DoG", "LoG", "wavelet"], when={"method": ["watershed"]})
     extent: str = opt("half maximum", "Focus extent", "Where a focus ends: at half of its own peak height "
                       "(size does not depend on the threshold), or at the threshold.", advanced=True,
-                      choices=["half maximum", "threshold"])
+                      choices=["half maximum", "threshold"], when={"method": ["watershed"]})
     min_size: int = opt(2, "Smallest focus", "Smaller foci are removed.", advanced=True, min=1, unit="voxels")
     max_size: int = opt(9999, "Largest focus", "Larger foci are removed.", advanced=True, min=1, unit="voxels")
     threshold_scope: str = opt("per image", "Noise from", "per image: one noise value from all cells of the "
                                "image. per cell: every cell its own noise. fixed value: the same absolute "
                                "threshold for all images, which is the fair choice when conditions differ "
                                "strongly in foci numbers.", advanced=True,
-                               choices=["per image", "per cell", "fixed value"])
+                               choices=["per image", "per cell", "fixed value"], when={"method": ["watershed"]})
     fixed_threshold: float = opt(0.0, "Fixed threshold", "For 'fixed value': the threshold in units of the "
                                  "filtered image. The viewer shows the value that the current image uses.",
-                                 advanced=True, min=0)
+                                 advanced=True, min=0, when={"method": ["watershed"], "threshold_scope": ["fixed value"]})
     spotiflow_model: str = opt("general", "Spotiflow model", "Name of a pretrained model or a path.",
-                               advanced=True)
+                               advanced=True, when={"method": ["spotiflow"]})
 
 
 @dataclass
@@ -131,8 +134,8 @@ class ColocalizationSettings:
     method: str = opt("overlap", "Method", "overlap: two foci colocalize when they share voxels. centroid "
                       "distance: when their centres are closer than the largest distance.",
                       choices=["overlap", "centroid distance"])
-    min_overlap: int = opt(1, "Smallest overlap", advanced=True, min=1, unit="voxels")
-    max_distance: float = opt(0.3, "Largest distance", advanced=True, min=0, step=0.05, unit="µm")
+    min_overlap: int = opt(1, "Smallest overlap", advanced=True, min=1, unit="voxels", when={"method": ["overlap"]})
+    max_distance: float = opt(0.3, "Largest distance", advanced=True, min=0, step=0.05, unit="µm", when={"method": ["centroid distance"]})
     chance_repeats: int = opt(0, "Chance control repeats", "The colocalization expected by chance: the foci of "
                               "the second channel are placed at random positions in the cell this many times "
                               "(0 = off).", advanced=True, min=0)

@@ -37,7 +37,7 @@ def synthetic(seed=0, slices=5, shift=0.0):
 
 def settings(**foci):
     s = config.Settings()
-    s.segmentation.exclude_on_edges = False
+    s.segmentation.exclude_on_edges, s.segmentation.method = False, "threshold"
     s.foci = [config.FociChannelSettings(channel=2, **foci), config.FociChannelSettings(channel=3, **foci)]
     return s
 

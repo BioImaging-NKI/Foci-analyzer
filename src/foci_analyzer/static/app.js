@@ -98,7 +98,7 @@ function settingsChanged(delay = 300) {
   }, delay);
 }
 function control(f, group, sectionKey, index) {
-  const set = (v, delay) => { group[f.key] = v; settingsChanged(delay); };
+  const set = (v, delay) => { group[f.key] = v; settingsChanged(delay); if (f.type === "choice") renderSettings(); };
   const id = `f${Math.random().toString(36).slice(2)}`, v = group[f.key];
   const number = (e) => { const n = f.type === "int" ? parseInt(e.target.value, 10) : parseFloat(e.target.value); return Number.isFinite(n) ? n : null; };
   let input, range = null;
@@ -116,7 +116,8 @@ function control(f, group, sectionKey, index) {
     el("div", { class: "control" }, input, f.unit ? el("span", { class: "unit", textContent: f.unit }) : null), range);
 }
 function fieldsOf(section, group, index) {
-  const basic = section.fields.filter((f) => !f.advanced), adv = section.fields.filter((f) => f.advanced);
+  const shown = section.fields.filter((f) => !f.when || Object.entries(f.when).every(([k, values]) => values.includes(group[k])));
+  const basic = shown.filter((f) => !f.advanced), adv = shown.filter((f) => f.advanced);
   const open = store(`fa.adv.${section.key}`);
   return [...basic.map((f) => control(f, group, section.key, index)),
     adv.length ? el("details", { class: "advanced", open: !!open, ontoggle: (e) => store(`fa.adv.${section.key}`, e.target.open) },

@@ -85,7 +85,8 @@ class App:
         try:
             self.settings = config.load(home() / "last_settings.toml")
         except (OSError, ValueError, TypeError):
-            pass  # no or unusable file: start from the defaults
+            if not models.default_python():  # no networks installed: start with the method that needs none
+                self.settings.segmentation.method = "threshold"
         try:
             saved = json.loads((home() / "last_experiment.json").read_text(encoding="utf-8"))
             if isinstance(saved, list):
