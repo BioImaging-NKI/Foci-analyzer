@@ -66,6 +66,7 @@
       <select id="image-select" title="Image"></select>
       <button id="analyze-now" class="primary" title="Analyze the shown image with the current settings and show the result in the image (key A). Nothing is written to the results folder.">Analyze this image <kbd>A</kbd></button>
       <label title="After the first analysis of an image: repeat it after every change of a setting (key L)"><input type="checkbox" id="live" checked> Live <kbd>L</kbd></label>
+      <label id="part-wrap" hidden title="For a large image: analyze only the part that is visible in the viewer when Analyze this image is pressed, which is much faster. The numbers can differ a little from those of the whole image, because the noise is then estimated in that part only. Analyze all images always uses whole images."><input type="checkbox" id="part"> Visible part only</label>
       <span id="mode-wrap" hidden title="Slice: one Z slice. Max projection: the brightest value over Z. A third choice appears when the foci are detected on another projection (key P)">
         <span class="seg" id="mode"><button data-mode="slice">Slice</button><button data-mode="mip" class="on">Max projection</button><button data-mode="det" hidden></button></span> <kbd>P</kbd>
       </span>

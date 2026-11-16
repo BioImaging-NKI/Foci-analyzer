@@ -58,7 +58,7 @@ export class Viewer {
   constructor(canvas, top, fetchTile) {
     this.canvas = canvas; this.top = top; this.fetchTile = fetchTile;
     this.W = 0; this.H = 0; this.view = { s: 1, tx: 0, ty: 0 };
-    this.layers = []; this.markers = []; this.zslice = null; this.pixelSize = null; this.unit = "µm";
+    this.layers = []; this.markers = []; this.zslice = null; this.box = null; this.pixelSize = null; this.unit = "µm";
     this.onclick = null; this.onview = null;
     this.tiles = new Map(); this.queue = []; this.busy = 0; this.wanted = new Set(); this.frame = 0; this.dirty = false;
     const gl = this.gl = canvas.getContext("webgl2", { alpha: false, antialias: false });
@@ -226,6 +226,11 @@ export class Viewer {
         if (p[o + 5] === 2) { rings.moveTo(x + r + 1.3, y); rings.arc(x, y, r + 1.3, 0, 6.2832); }  // colocalizes
       }
       ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 0.8; ctx.stroke(rings);
+    }
+    if (this.box) {  // the analyzed part of a large image
+      const [bx, by, bw, bh] = this.box;
+      ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = 1; ctx.setLineDash([6, 4]);
+      ctx.strokeRect(tx + bx * s, ty + by * s, bw * s, bh * s); ctx.setLineDash([]);
     }
     if (this.pixelSize) {  // scale bar
       const um = 110 / s * this.pixelSize, e = Math.pow(10, Math.floor(Math.log10(um)));

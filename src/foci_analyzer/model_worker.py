@@ -90,8 +90,18 @@ def cellpose(arrays, p):
             kw.update(channels=[1, 2], channel_axis=1 if three_d else 0)
     elif major < 4:
         kw.update(channels=[0, 0])
-    if three_d:
+    if three_d and img.shape[0] >= 20:
         kw.update(do_3D=True, z_axis=0, anisotropy=float(p.get("anisotropy", 1.0)))
+    elif three_d:
+        # a thin stack: every slice in 2D and the slices linked by overlap, which is much faster and does
+        # not split nuclei the way the full 3D mode does with few slices
+        kw.update(do_3D=False, z_axis=0, stitch_threshold=0.4)
+        if auto:  # the size model works on one plane: the diameter comes from the max projection
+            size_kw = {"channels": kw["channels"]}
+            if second is not None:
+                size_kw["channel_axis"] = 0
+            kw["diameter"] = float(model.sz.eval(x.max(0), **size_kw)[0])
+            model = model.cp
     masks = model.eval(x, **kw)[0]
     return {"labels": np.asarray(masks).reshape(img.shape).astype(np.int32)}, {"model": name}
 
@@ -154,6 +164,7 @@ def spotiflow(arrays, p):
     kw = {"prob_thresh": float(p.get("floor", 0.1)), "verbose": False, "device": _device()}
     if p.get("scale") and abs(p["scale"] - 1) > 0.05:
         kw["scale"] = float(p["scale"])
+        kw["subpix"] = False  # Spotiflow has no sub-pixel positions for a rescaled image; whole pixels are enough here
     if getattr(model.config, "is_3d", False):
         pts, details = model.predict(img, **kw)
         pos = np.round(pts).astype(np.int32).reshape(-1, 3)

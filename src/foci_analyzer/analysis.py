@@ -172,7 +172,11 @@ def spot_filter(img: np.ndarray, sigma: tuple[float, float, float], method: str)
     if method == "wavelet":
         j = max(1, round(float(np.log2(max(2 * sigma[1], 1.0)))))
         planes = _atrous(img, j + 1, in_z=sigma[0] >= 0.5)
-        return np.sqrt(np.clip(planes[j - 1], 0, None) * np.clip(planes[j], 0, None))
+        # Signed: positive only where both planes are positive (a focus), negative elsewhere. Keeping the
+        # negative side gives the noise estimate the typical size of the product in places without foci.
+        a, b = planes[j - 1], planes[j]
+        mag = np.sqrt(np.abs(a * b))
+        return np.where((a > 0) & (b > 0), mag, -mag)
     raise ValueError(f"unknown filter '{method}'")
 
 

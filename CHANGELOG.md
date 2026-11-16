@@ -26,6 +26,19 @@ First working version. There are no earlier results to compare with.
   detected on (max, EDF, sum) is shown in the viewer. No flicker when changing slices.
 - Settings page: the networks, their versions, where they run (graphics card or processor) and from which
   Python; `Python of the models` moved there and can differ per network.
+- Colocalization: a map in the viewer (white outline = colocalizing focus, white fill = overlap; key O),
+  the share per pair of channels next to the image, and a Colocalization graph on the Results page with the
+  chance control in grey. The chance control is now on by default (10 repeats) and in both directions: the
+  cell table gets `chance_...` columns. `Colour cells by` fills the cells with a colour for any of their numbers.
+- Large images (from 6 megapixels): `Visible part only` analyzes just what the viewer shows; a dashed frame
+  marks that part. `Analyze all images` always uses whole images.
+- StarDist is the default segmentation (it found the nuclei in all test sets and is the fastest). StarDist
+  and InstanSeg say so when asked for 3D or (StarDist) a cell channel. Cellpose 3D on stacks of fewer than
+  20 slices now segments every slice and links the slices (8 times faster, no over-splitting): results of
+  3D Cellpose change.
+- Wavelet filter: its noise estimate was too high, so it found far fewer foci than DoG at the same threshold;
+  it now finds a comparable number. Results with the wavelet filter change.
+- Spotiflow works on finely sampled images (it failed when the image had to be rescaled).
 - Status bar at the bottom: what the program is doing, step and progress bar, and when it is ready.
   Shortcut keys are shown next to their buttons; `[` and `]` step through slices when there is no time-lapse.
   Results do not change.

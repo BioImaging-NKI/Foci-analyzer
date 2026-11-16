@@ -162,8 +162,11 @@ function channelColor(c) {
   if (saved) return unhex(saved);
   if (c + 1 === S.settings.image.nuclei_channel) return NUCLEI;
   if (c + 1 === S.settings.image.cell_channel) return CELLS;
-  const foci = S.settings.foci.map((f) => f.channel - 1), i = foci.indexOf(c);
-  return OTHER[(i >= 0 ? i : foci.length + c) % OTHER.length];
+  // the foci channels first, then the rest, each the next colour: no two channels alike while colours last
+  const n = V.info ? V.info.channels : c + 1, special = [S.settings.image.nuclei_channel - 1, S.settings.image.cell_channel - 1];
+  const foci = [...new Set(S.settings.foci.map((f) => f.channel - 1))].filter((x) => !special.includes(x));
+  const rest = [...Array(n).keys()].filter((x) => !special.includes(x) && !foci.includes(x));
+  return OTHER[Math.max(0, [...foci, ...rest].indexOf(c)) % OTHER.length];
 }
 function updateChannelColors() { V.ch.forEach((ch, c) => { ch.color = channelColor(c); }); renderChannels(); syncLayers(); }
 
@@ -181,6 +184,8 @@ async function openImage(id, analyze = false) {
     if (info.slices === 1) V.mode = "mip";
     $("z").max = info.slices - 1; $("z").value = V.z; $("t").max = info.frames - 1; $("t").value = 0;
     $("viewer-empty").hidden = true; showCell(null);
+    const large = info.width * info.height >= LARGE;
+    $("part-wrap").hidden = !large; $("part").checked = large;
     viewer.setImage(info.width, info.height); viewer.pixelSize = info.pixel_size; viewer.unit = info.unit;
     renderCellColor(); renderChannels(); syncMode(); syncLayers(); viewer.fit(); status("");
     previewInfo();
@@ -232,6 +237,7 @@ function syncLayers() {
       layers.push({ type: "labels", key, prevKey: slot("overlap", key), url: region("/api/overlay?kind=overlap"), color: [1, 1, 1, 1], fill: 0.9, on });
     }
   }
+  viewer.box = V.preview && V.preview.part ? V.preview.part : null;
   viewer.layers = layers; viewer.zslice = V.mode === "slice" ? V.z : null; viewer.requestDraw();
 }
 viewer.onview = () => {
@@ -239,6 +245,17 @@ viewer.onview = () => {
   const cal = i.pixel_size ? ` · ${fmt(i.pixel_size)} ${i.unit}/px` : " · not calibrated";
   $("canvas").title = ""; $("image-select").title = `${i.width} × ${i.height} px · ${i.channels} channels · ${i.slices} slices${cal} · zoom ${Math.round(viewer.view.s * 100)} %`;
 };
+
+// For a large image the preview can be limited to what is visible (the part is fixed when the analysis starts).
+const LARGE = 6e6;  // pixels: from here on the choice "Visible part only" is offered
+function visiblePart() {
+  if (!V.info || $("part-wrap").hidden || !$("part").checked) return null;
+  const { s, tx, ty } = viewer.view, [w, h] = viewer.size();
+  let x0 = -tx / s, y0 = -ty / s, x1 = (w - tx) / s, y1 = (h - ty) / s;
+  const grow = (a, b) => { const d = Math.max(0, 1024 - (b - a)) / 2; return [a - d, b + d]; };  // zoomed in far: still enough image for the noise
+  [x0, x1] = grow(x0, x1); [y0, y1] = grow(y0, y1);
+  return [Math.floor(x0), Math.floor(y0), Math.ceil(x1), Math.ceil(y1)];
+}
 
 // ---- preview: the analysis of the shown image with the current settings
 let previewBusy = false, previewAgain = false;
@@ -257,7 +274,7 @@ async function runPreview() {
     } catch { /* the answer of the analysis itself reports problems */ }
   }, 300);
   try {
-    const r = await (await api("/api/preview", { path: id, t, settings: S.settings })).json();
+    const r = await (await api("/api/preview", { path: id, t, settings: S.settings, box: visiblePart() })).json();
     const cand = await Promise.all(r.channels.map(async (ch) =>
       new Float32Array(await (await api(`/api/candidates?path=${encodeURIComponent(id)}&t=${t}&ch=${ch.channel}`)).arrayBuffer())));
     if (id === V.id && t === V.t) {
@@ -285,7 +302,7 @@ function countAbove(pts, thr) {  // heights are sorted from high to low
 function previewInfo() {
   const p = V.preview, box = $("preview-info");
   if (!p) { box.replaceChildren(V.id ? "Not analyzed yet. Check the settings, then press Analyze this image (A)." : ""); return; }
-  const lines = [el("div", {}, el("b", { textContent: `${p.cells} ${p.cells === 1 ? "cell" : "cells"}` }))];
+  const lines = [p.part ? el("div", { class: "sub", style: "margin-left:0", textContent: "Of the part inside the dashed frame only:" }) : null, el("div", {}, el("b", { textContent: `${p.cells} ${p.cells === 1 ? "cell" : "cells"}` }))];
   p.channels.forEach((ch, i) => {
     const live = ch.live !== undefined, n = live ? countAbove(V.cand[i], ch.live) : ch.foci;
     const thr = ch.height_unit === "× noise" ? `noise ${fmt(ch.noise)}, threshold ${fmt((ch.live ?? ch.threshold) * ch.noise)}`
@@ -300,7 +317,7 @@ function previewInfo() {
   if ((p.coloc || []).length) lines.push(el("div", { class: "sub", textContent: "Map (key O): white outline = colocalizing focus, white fill = where foci of two channels overlap." }));
   else if (p.channels.length > 1 && !S.settings.colocalization.enabled) lines.push(el("div", { class: "sub", textContent: "Colocalization is switched off (see the settings on the left)." }));
   for (const r of p.remarks) lines.push(el("div", { textContent: r }));
-  box.replaceChildren(...lines);
+  box.replaceChildren(...lines.filter(Boolean));
 }
 // the slider moves: the markers and the count follow at once, the outlines when the server has answered
 function liveThreshold(section, index, key, value) {
@@ -335,7 +352,7 @@ viewer.onclick = (x, y) => {
   if (!p || !p.table.cell) { showCell(null); return; }
   const k = p.binning / p.pixel_size; let best = -1, bestD = Infinity;
   p.table.cell.forEach((_, i) => {
-    const d = Math.hypot(p.table.x[i] * k + p.border - x, p.table.y[i] * k + p.border - y);
+    const d = Math.hypot(p.table.x[i] * k + p.border + p.offset[0] - x, p.table.y[i] * k + p.border + p.offset[1] - y);
     if (d < bestD && d < 1.2 * Math.sqrt(p.table.area[i] / Math.PI) * k) { best = i; bestD = d; }
   });
   if (best < 0) { showCell(null); return; }
@@ -493,9 +510,10 @@ window.FA = { viewer, V, S };  // for looking at the state from the browser cons
 initResults({
   openCell: async (id, frame, x, y, width) => {  // from a clicked point on the Results page
     showPage("analyze");
-    if (V.id !== id) await openImage(id, true); else if (!V.preview) runPreview();
+    if (V.id !== id) await openImage(id);
     if (frame) setT(frame - 1);
     if (x !== undefined) viewer.centerOn(x, y, width);
+    if (!V.preview) runPreview();  // after centring: of a large image only the part around the cell is analyzed
   },
 });
 (async () => {

@@ -102,8 +102,9 @@ class App:
         try:
             self.settings = config.load(home() / "last_settings.toml")
         except (OSError, ValueError, TypeError):
-            if not models.default_python():  # no networks installed: start with the method that needs none
-                self.settings.segmentation.method = "threshold"
+            # the default method is the best one that is installed
+            if "stardist-env" not in models.default_python("stardist"):
+                self.settings.segmentation.method = "cellpose" if models.default_python() else "threshold"
         try:
             saved = json.loads((home() / "last_experiment.json").read_text(encoding="utf-8"))
             if isinstance(saved, list):
@@ -272,18 +273,30 @@ class App:
         return self._crop(im.plane(t, c, z, level), q)
 
     # ---- analysis of the image in the viewer
-    def frame(self, image_id: str, t: int, only_candidates: bool = False) -> pipeline.FrameResult:
+    def frame(self, image_id: str, t: int, only_candidates: bool = False, box: list | None = None) -> pipeline.FrameResult:
+        """Analyze frame t of an image; `box` (x0, y0, x1, y1 in pixels) limits it to a part, for the preview."""
         im = self.image(image_id)
         if not 0 <= t < im.info.frames:
             raise ApiError("outside the image")
         with self.lock:
             settings = self.settings
+        data, key, offset = im.data[t], f"{image_id}|{t}", (0, 0)
+        if box:
+            try:
+                x0, y0, x1, y1 = (int(v) for v in box)
+            except (TypeError, ValueError) as e:
+                raise ApiError("the part to analyze must be four numbers") from e
+            x0, y0, x1, y1 = max(0, x0), max(0, y0), min(im.info.width, x1), min(im.info.height, y1)
+            if x1 - x0 < 32 or y1 - y0 < 32:
+                raise ApiError("the visible part of the image is too small to analyze")
+            if (x0, y0, x1, y1) != (0, 0, im.info.width, im.info.height):
+                data, key, offset = data[:, :, y0:y1, x0:x1], f"{key}|{x0},{y0},{x1},{y1}", (x0, y0)
         try:
             with self.compute_lock:
-                r = pipeline.analyze_frame(self.cache, f"{image_id}|{t}", im.data[t], im.info, settings,
-                                           only_candidates)
+                r = pipeline.analyze_frame(self.cache, key, data, im.info, settings, only_candidates)
         except ValueError as e:
             raise ApiError("stopped" if self.cache.cancelled else str(e)) from e
+        r.offset = offset
         if not only_candidates:
             with self.lock:
                 self.last[(image_id, t)] = r
@@ -316,7 +329,7 @@ class App:
         if "settings" in body:
             self.set_settings(body["settings"])
         self.cache.cancelled = False
-        r = self.frame(body.get("path", ""), int(body.get("t", 0)))
+        r = self.frame(body.get("path", ""), int(body.get("t", 0)), box=body.get("box"))
         coloc = []
         for a in r.channels:  # per pair of channels: how many foci of a lie on a focus of b
             for b in r.channels:
@@ -329,7 +342,9 @@ class App:
                                   "with": int(rows[col].fillna(0).astype(float).sum()), "chance": chance})
         return {"key": r.key, "cells": int(r.labels.max()), "channels": [c.summary() for c in r.channels],
                 "remarks": r.remarks, "pixel_size": r.cal.pixel_size, "binning": r.binning, "border": r.border,
-                "table": _columns(r.cells), "coloc": coloc, "dimension": self.settings.foci_general.dimension}
+                "table": _columns(r.cells), "coloc": coloc, "dimension": self.settings.foci_general.dimension, "offset": list(r.offset),
+                "part": [r.offset[0], r.offset[1], r.labels.shape[2] * r.binning + 2 * r.border,
+                         r.labels.shape[1] * r.binning + 2 * r.border] if r.offset != (0, 0) or body.get("box") else None}
 
     def candidates(self, q: dict) -> bytes:
         """Per candidate: x, y, z (image pixels), height, cell, and 1 when it is a focus, 2 when that
@@ -340,7 +355,7 @@ class App:
             raise ApiError("no such foci channel")
         out = np.zeros((len(ch.height), 6), "<f4")
         off = r.border + (r.binning - 1) / 2
-        out[:, 0], out[:, 1] = ch.pos[:, 2] * r.binning + off, ch.pos[:, 1] * r.binning + off
+        out[:, 0], out[:, 1] = ch.pos[:, 2] * r.binning + off + r.offset[0], ch.pos[:, 1] * r.binning + off + r.offset[1]
         out[:, 2], out[:, 3], out[:, 4] = ch.pos[:, 0], ch.height, ch.cell
         kept = np.flatnonzero(ch.kept) if ch.kept.dtype == bool else ch.kept
         out[kept, 5] = 1
@@ -413,7 +428,8 @@ class App:
             if r.binning > 1:
                 small = np.repeat(np.repeat(small, r.binning, 0), r.binning, 1)
             plane = np.zeros((im.info.height, im.info.width), "<u2")
-            plane[r.border:r.border + small.shape[0], r.border:r.border + small.shape[1]] = (
+            oy, ox = r.offset[1] + r.border, r.offset[0] + r.border
+            plane[oy:oy + small.shape[0], ox:ox + small.shape[1]] = (
                 small if kind in ("value", "overlap") else _wrap16(small))
             with self.lock:
                 self._planes[key] = plane

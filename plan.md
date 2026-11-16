@@ -300,7 +300,8 @@ nuclear stain (`Hi-res 3D`). Default: Cellpose.
    opens, faster threshold segmentation (1.7 → 0.7 s); the whole 3D test image 4.5 → 2.8 s, as max
    projection 2.1 → 1.1 s. Measured and not done: filters on the GPU (the
    processor part is now 1 to 2 s per image, and sending the image to the model process costs about as much
-   as it would win). Still open: "analyze the current view only" for very large images.
+   as it would win). "Visible part only" for images from 6 megapixels: the preview analyzes what the viewer
+   shows (at least 1024 px wide), a dashed frame marks it.
 2. **Results page**: per-track graphs for time-lapse, export of the graph data, more flags.
 3. **Manual** with `/anthropic-skills:update-manual` (methods are already in the context help).
 4. Cellpose 4 (`cpsam`) through an existing environment (Settings page > own Python for cellpose):
