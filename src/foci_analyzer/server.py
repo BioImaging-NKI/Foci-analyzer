@@ -352,28 +352,69 @@ class App:
             out[:, 2] = -1  # found in a projection: shown in every slice
         return out.tobytes()
 
+    @staticmethod
+    def _overlay_labels(r: pipeline.FrameResult, kind: str, q: dict) -> np.ndarray:
+        """The label image (Z, Y, X) behind an overlay.
+
+        cells, foci (of channel `ch`); coloc: only the foci that colocalize with a focus of another channel;
+        overlap: 1 where foci of two channels lie on top of each other; value: the cells, numbered 1 to 255
+        by the measure `col` (lowest to highest), for the colour map.
+        """
+        if kind == "cells":
+            return r.labels
+        if kind == "foci":
+            ch = next((c for c in r.channels if str(c.channel) == q.get("ch")), None)
+            if ch is None:
+                raise ApiError("no such foci channel")
+            return ch.labels
+        if kind == "overlap":
+            n = sum((c.labels > 0).astype(np.uint8) for c in r.channels)
+            return (n >= 2).astype(np.uint16)
+        if kind == "coloc":
+            cols = [c for c in r.foci.columns if c.startswith("with_ch")]
+            out, offset = None, 0
+            for ch in r.channels:
+                rows = r.foci[r.foci["channel"] == ch.channel]
+                lut = np.zeros(int(ch.labels.max()) + 1, np.int32)
+                if cols and len(rows):
+                    ids = rows["focus"].to_numpy()[rows[cols].fillna(0).astype(float).to_numpy().any(axis=1)]
+                    ids = ids[ids < len(lut)]
+                    lut[ids] = ids + offset
+                offset += len(lut)
+                part = lut[ch.labels]
+                out = part if out is None else np.maximum(out, part)
+            if out is None:
+                raise ApiError("there are no foci channels")
+            return out
+        if kind == "value":
+            col = q.get("col", "")
+            if col not in r.cells or not len(r.cells):
+                raise ApiError("no such measure")
+            v = r.cells[col].to_numpy(dtype=float)
+            lo, hi = np.nanmin(v), np.nanmax(v)
+            code = np.where(np.isnan(v), 0, 1 + np.rint(254 * (v - lo) / (hi - lo if hi > lo else 1.0)))
+            lut = np.zeros(int(r.labels.max()) + 1, np.uint16)
+            lut[r.cells["cell"].to_numpy()] = np.nan_to_num(code).astype(np.uint16)
+            return lut[r.labels]
+        raise ApiError("no such overlay")
+
     def overlay(self, q: dict) -> tuple[bytes, int, int]:
         """A region of the label image of the cells or of the foci of one channel, in image pixels."""
         im = self.image(q.get("path", ""))
         t, z, level = self._plane_args(q, im.info)
         r = self.shown(q.get("path", ""), t)
         kind = q.get("kind", "cells")
-        key = (r.key, kind, q.get("ch"), z)
+        key = (r.key, kind, q.get("ch"), q.get("col"), z)
         with self.lock:
             plane = self._planes.get(key)
         if plane is None:
-            if kind == "cells":
-                lab = r.labels
-            else:
-                ch = next((c for c in r.channels if str(c.channel) == q.get("ch")), None)
-                if ch is None:
-                    raise ApiError("no such foci channel")
-                lab = ch.labels
+            lab = self._overlay_labels(r, kind, q)
             small = lab[0] if lab.shape[0] == 1 else (lab[z] if isinstance(z, int) else lab.max(0))
             if r.binning > 1:
                 small = np.repeat(np.repeat(small, r.binning, 0), r.binning, 1)
             plane = np.zeros((im.info.height, im.info.width), "<u2")
-            plane[r.border:r.border + small.shape[0], r.border:r.border + small.shape[1]] = _wrap16(small)
+            plane[r.border:r.border + small.shape[0], r.border:r.border + small.shape[1]] = (
+                small if kind in ("value", "overlap") else _wrap16(small))
             with self.lock:
                 self._planes[key] = plane
                 while len(self._planes) > 12:

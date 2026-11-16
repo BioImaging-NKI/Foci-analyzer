@@ -8,6 +8,7 @@ const SKIP = new Set(["cell", "frame", "focus", "channel", "x", "y", "z", "track
 const HELP = {
   table: "Per cell: one value per nucleus or cell (for example the number of foci). Per focus: one value per focus (for example its size).",
   measure: "What is shown. foci chN = number of foci of channel N in the cell; total and mean intensity are above the local background; fraction chA with chB = share of the A foci that colocalize with a B focus; pearson and manders are intensity-based colocalization inside the cell; height = peak of the focus in threshold units.",
+  coloc: "Per pair of foci channels: the share of the foci of one channel that colocalize with a focus of the other, per cell (boxes) with the mean per image (dots). Grey: the share expected when the foci of the other channel lay at random places in the same cell (the chance control). A share clearly above the grey box means real colocalization.",
   plot: "Points and box: every cell is a point, the box shows median and quartiles, the large dots are the means per image. Histogram: the distribution per condition. Scatter: two measures against each other. Over time: the mean per frame of a time-lapse.",
   unit: "What counts as one independent value in the test. Cells of one image are not independent of each other, so a test per cell easily gives very small p-values. Per image or per folder (one folder = one experiment) tests the means, which is the careful choice. Per cell uses Mann-Whitney, means use the Welch t-test; all pairwise p-values are Holm-corrected.",
 };
@@ -58,8 +59,10 @@ function render() {
   const t = table(), ms = measures(t);
   if (!ms.includes(C.measure)) C.measure = ms.find((m) => m.startsWith("foci_ch")) || ms[0];
   if (!ms.includes(C.x)) C.x = ms.find((m) => m === "area") || ms[0];
-  const timelapse = R.cells.frame.some((f) => f > 1);
+  const timelapse = R.cells.frame.some((f) => f > 1), coloc = C.table === "cells" && pairs().length > 0;
   if (C.plot === "time" && !timelapse) C.plot = "points";
+  if (C.plot === "coloc" && !coloc) C.plot = "points";
+  if (C.plot === "coloc" && !/^fraction_/.test(C.measure)) C.measure = pairs()[0][0];  // the table below then tests that share
   const select = (key, options, help) => {
     const s = el("select", { onchange: (e) => { C[key] = key === "channel" ? +e.target.value : e.target.value; changed(); } },
       options.map(([v, text]) => el("option", { value: v, textContent: text })));
@@ -73,7 +76,7 @@ function render() {
     field("Table", select("table", [["cells", "Per cell"], ...(R.foci ? [["foci", "Per focus"]] : [])], HELP.table)),
     C.table === "foci" && channels.length > 1 ? field("Channel", select("channel", [[0, "all"], ...channels.map((c) => [c, `channel ${c}`])], "")) : null,
     field("Measure", select("measure", ms.map((m) => [m, nice(m)]), HELP.measure)),
-    field("Graph", select("plot", [["points", "Points and box"], ["violin", "Violin"], ["histogram", "Histogram"], ["scatter", "Scatter"], ...(timelapse ? [["time", "Over time"]] : [])], HELP.plot)),
+    field("Graph", select("plot", [["points", "Points and box"], ["violin", "Violin"], ["histogram", "Histogram"], ["scatter", "Scatter"], ...(timelapse ? [["time", "Over time"]] : []), ...(coloc ? [["coloc", "Colocalization"]] : [])], C.plot === "coloc" ? HELP.coloc : HELP.plot)),
     C.plot === "scatter" ? field("Against", select("x", ms.map((m) => [m, nice(m)]), "The measure on the horizontal axis.")) : null,
     field("Test per", select("unit", [["cell", C.table === "foci" ? "focus" : "cell"], ["image", "image"], ["folder", "folder"]], HELP.unit)),
     el("label", { class: "small" }, el("input", { type: "checkbox", checked: C.log, onchange: (e) => { C.log = e.target.checked; changed(); } }), " logarithmic axis"),
@@ -88,6 +91,40 @@ function render() {
 }
 function changed() { store("fa.results", C); render(); }
 
+// the pairs of foci channels with a colocalization share per cell: [column, column of the chance control or null, name]
+function pairs() {
+  return Object.keys(R.cells).filter((k) => /^fraction_ch\d+_with_ch\d+$/.test(k)).map((k) => {
+    const [, a, b] = k.match(/^fraction_ch(\d+)_with_ch(\d+)$/), chance = `chance_ch${a}_with_ch${b}`;
+    return [k, chance in R.cells ? chance : null, `ch ${a} foci with a ch ${b} focus`];
+  });
+}
+function drawColoc(t, idx, conds, color, ink, grid, layout) {
+  const traces = [], names = pairs();
+  const perImage = (col, c) => {  // mean per image of the cells of condition c
+    const m = new Map();
+    for (const i of idx) if (t.condition[i] === c && typeof t[col][i] === "number") { const key = `${t.folder[i]}|${t.image[i]}`, a = m.get(key) || [0, 0, t.image[i]]; a[0] += t[col][i]; a[1]++; m.set(key, a); }
+    return [...m.values()];
+  };
+  conds.forEach((c) => {
+    const x = [], y = [], cx = [], cy = [], mx = [], my = [], mt = [];
+    for (const [col, chance, name] of names) {
+      for (const i of idx) if (t.condition[i] === c) {
+        if (typeof t[col][i] === "number") { x.push(name); y.push(t[col][i]); }
+        if (chance && typeof t[chance][i] === "number") { cx.push(name); cy.push(t[chance][i]); }
+      }
+      for (const m of perImage(col, c)) { mx.push(name); my.push(m[0] / m[1]); mt.push(`${m[2]} (mean of ${m[1]} cells)`); }
+    }
+    traces.push({ type: "box", x, y, name: c, legendgroup: c, offsetgroup: c, boxpoints: false, line: { color: color(c) }, hoverinfo: "y" });
+    if (cx.length) traces.push({ type: "box", x: cx, y: cy, name: `${c}: by chance`, legendgroup: c, offsetgroup: `${c} chance`, boxpoints: false,
+      line: { color: "#9aa0ad", width: 1.2 }, fillcolor: "rgba(154,160,173,.25)", hoverinfo: "y" });
+    traces.push({ type: "box", x: mx, y: my, text: mt, name: `${c}: images`, legendgroup: c, offsetgroup: c, showlegend: false, boxpoints: "all", pointpos: 0, jitter: 0.5,
+      line: { color: "rgba(0,0,0,0)" }, fillcolor: "rgba(0,0,0,0)", marker: { color: color(c), size: 9, line: { color: ink, width: 1.2 } }, hovertemplate: "%{text}<br>%{y:.3g}<extra></extra>" });
+  });
+  Object.assign(layout, { boxmode: "group", showlegend: true, legend: { orientation: "h", y: -0.18 } });
+  layout.yaxis = { gridcolor: grid, zeroline: false, range: [-0.02, 1.02], title: { text: "share of the foci that colocalize" } };
+  return traces;
+}
+
 // ---- the graph
 function draw() {
   const t = table(), idx = rows(t), conds = conditions().filter((c) => !C.off.includes(c)), all = conditions();
@@ -101,7 +138,8 @@ function draw() {
     margin: { l: 60, r: 20, t: 20, b: 50 }, showlegend: false, hovermode: "closest",
     xaxis: { gridcolor: grid, zeroline: false }, yaxis: { gridcolor: grid, zeroline: false, title: { text: nice(C.measure) }, type: C.log ? "log" : "linear" },
   };
-  if (C.plot === "points" || C.plot === "violin") {
+  if (C.plot === "coloc") traces.push(...drawColoc(t, idx, conds, color, ink, grid, layout));
+  else if (C.plot === "points" || C.plot === "violin") {
     conds.forEach((c, k) => {
       const ii = by.get(c), vals = ii.map((i) => y[i]);
       if (C.plot === "violin") traces.push({ type: "violin", x0: k, y: vals, name: c, line: { color: color(c) }, box: { visible: true }, meanline: { visible: true }, points: false, hoverinfo: "y" });

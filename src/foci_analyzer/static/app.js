@@ -182,7 +182,7 @@ async function openImage(id, analyze = false) {
     $("z").max = info.slices - 1; $("z").value = V.z; $("t").max = info.frames - 1; $("t").value = 0;
     $("viewer-empty").hidden = true; showCell(null);
     viewer.setImage(info.width, info.height); viewer.pixelSize = info.pixel_size; viewer.unit = info.unit;
-    renderChannels(); syncMode(); syncLayers(); viewer.fit(); status("");
+    renderCellColor(); renderChannels(); syncMode(); syncLayers(); viewer.fit(); status("");
     previewInfo();
     if (analyze) runPreview();  // otherwise the user first checks the settings and presses Analyze this image
   } catch (e) { status(e.message, true); }
@@ -190,7 +190,7 @@ async function openImage(id, analyze = false) {
 function closeImage() {
   V.load++; Object.assign(V, { id: "", info: null, preview: null, cand: [], ch: [], slots: {} });
   viewer.setImage(0, 0); $("viewer-empty").hidden = false; $("image-select").value = "";
-  renderChannels(); syncMode(); syncLayers(); previewInfo(); showCell(null);
+  renderCellColor(); renderChannels(); syncMode(); syncLayers(); previewInfo(); showCell(null);
 }
 // The tiles shown before in this place stay until the new ones are there, so nothing flickers.
 function slot(name, key) {
@@ -209,7 +209,12 @@ function syncLayers() {
   });
   viewer.markers = [];
   if (V.preview) {
-    const k = V.preview.key; let key = `l|cells|${z}|${k}`;
+    const k = V.preview.key, by = $("cell-color").value; let key;
+    if (by) {  // under the outlines: every cell filled with the colour of one of its numbers
+      key = `v|${by}|${z}|${k}`;
+      layers.push({ type: "value", key, prevKey: slot("value", key), url: region(`/api/overlay?kind=value&col=${encodeURIComponent(by)}`), alpha: 0.6, on: true });
+    }
+    key = `l|cells|${z}|${k}`;
     layers.push({ type: "labels", key, prevKey: slot("cells", key), url: region("/api/overlay?kind=cells"),
       color: [1, 1, 1, 0.85], fill: 0, on: $("show-cells").checked });
     V.preview.channels.forEach((ch, i) => {
@@ -219,6 +224,13 @@ function syncLayers() {
         color: [...col, 1], fill: 0.35, on: $("show-foci").checked && shown });
       viewer.markers.push({ pts: V.cand[i], color: hex(col), threshold: ch.live ?? ch.threshold, on: $("show-markers").checked && shown });
     });
+    if ((V.preview.coloc || []).length) {  // the colocalization map, on top
+      const on = $("show-coloc").checked;
+      key = `l|coloc|${z}|${k}`;
+      layers.push({ type: "labels", key, prevKey: slot("coloc", key), url: region("/api/overlay?kind=coloc"), color: [1, 1, 1, 1], fill: 0.12, on });
+      key = `l|overlap|${z}|${k}`;
+      layers.push({ type: "labels", key, prevKey: slot("overlap", key), url: region("/api/overlay?kind=overlap"), color: [1, 1, 1, 1], fill: 0.9, on });
+    }
   }
   viewer.layers = layers; viewer.zslice = V.mode === "slice" ? V.z : null; viewer.requestDraw();
 }
@@ -253,7 +265,7 @@ async function runPreview() {
       // foci found on a projection: show that projection (once, so a later choice of the user stays)
       if (V.info.slices > 1 && r.dimension !== "3D" && r.dimension !== V.lastDim) V.mode = DET[r.dimension] ? "det" : "mip";
       V.lastDim = r.dimension;
-      syncMode(); syncLayers(); previewInfo();
+      renderCellColor(); syncMode(); syncLayers(); previewInfo();
       const secs = (performance.now() - start) / 1000;
       status(`Ready · ${r.cells} ${r.cells === 1 ? "cell" : "cells"}, ${r.channels.map((c) => `${c.foci} foci in channel ${c.channel}`).join(", ")}`
         + ` · analyzed in ${secs < 10 ? secs.toFixed(1) : Math.round(secs)} s`);
@@ -285,7 +297,7 @@ function previewInfo() {
   for (const c of p.coloc || []) lines.push(el("div", {}, `Channel ${c.a} foci on a channel ${c.b} focus: `,
     el("b", { textContent: `${c.with} of ${c.n} (${Math.round(100 * c.with / c.n)} %)` }),
     c.chance !== null ? el("div", { class: "sub", textContent: `by chance about ${Math.round(100 * c.chance)} %` }) : null));
-  if ((p.coloc || []).length) lines.push(el("div", { class: "sub", textContent: "A white ring marks a colocalizing focus." }));
+  if ((p.coloc || []).length) lines.push(el("div", { class: "sub", textContent: "Map (key O): white outline = colocalizing focus, white fill = where foci of two channels overlap." }));
   else if (p.channels.length > 1 && !S.settings.colocalization.enabled) lines.push(el("div", { class: "sub", textContent: "Colocalization is switched off (see the settings on the left)." }));
   for (const r of p.remarks) lines.push(el("div", { textContent: r }));
   box.replaceChildren(...lines);
@@ -299,6 +311,22 @@ function liveThreshold(section, index, key, value) {
     viewer.requestDraw(); previewInfo();
   }
 }
+// the choice "Colour cells by" and its legend, from the numbers of the analyzed image
+function renderCellColor() {
+  const p = V.preview, sel = $("cell-color"), keep = sel.value;
+  const names = p && p.table.cell ? Object.keys(p.table).filter((n) => !["cell", "x", "y"].includes(n) && p.table[n].some((v) => typeof v === "number")) : [];
+  $("cell-color-wrap").hidden = !names.length; $("coloc-wrap").hidden = !(p && (p.coloc || []).length);
+  sel.replaceChildren(el("option", { value: "", textContent: "nothing" }), ...names.map((n) => el("option", { value: n, textContent: n.replaceAll("_", " ") })));
+  sel.value = names.includes(keep) ? keep : "";
+  cellLegend();
+}
+function cellLegend() {
+  const by = $("cell-color").value, v = by && V.preview ? V.preview.table[by].filter((x) => typeof x === "number") : [];
+  $("cell-legend").hidden = !v.length;
+  if (v.length) { $("legend-lo").textContent = fmt(Math.min(...v)); $("legend-hi").textContent = fmt(Math.max(...v)); }
+}
+$("cell-color").onchange = () => { cellLegend(); syncLayers(); };
+
 function showCell(rows) {
   $("cell-info").replaceChildren(rows ? el("table", {}, rows) : V.preview ? "Click a cell in the image for its numbers." : "");
 }
@@ -340,7 +368,7 @@ function setT(t) {
   if (!V.info) return;
   t = Math.min(V.info.frames - 1, Math.max(0, t)); if (t === V.t) return;
   const had = !!V.preview;
-  V.t = t; $("t").value = t; V.preview = null; V.cand = []; syncMode(); syncLayers(); previewInfo(); showCell(null);
+  V.t = t; $("t").value = t; V.preview = null; V.cand = []; renderCellColor(); syncMode(); syncLayers(); previewInfo(); showCell(null);
   if (had && $("live").checked) runPreview();
 }
 $("mode").addEventListener("click", (e) => { if (e.target.dataset.mode) setMode(e.target.dataset.mode); });
@@ -349,7 +377,7 @@ $("t").addEventListener("change", (e) => setT(+e.target.value));
 $("fit").onclick = () => viewer.fit();
 $("image-select").onchange = (e) => openImage(e.target.value);
 $("analyze-now").onclick = () => runPreview();
-for (const id of ["show-cells", "show-foci", "show-markers"]) $(id).onchange = syncLayers;
+for (const id of ["show-cells", "show-foci", "show-markers", "show-coloc"]) $(id).onchange = syncLayers;
 $("live").checked = store("fa.live") !== false;
 $("live").onchange = (e) => store("fa.live", e.target.checked);
 
@@ -392,7 +420,7 @@ document.addEventListener("keydown", (e) => {
   const frames = V.info && V.info.frames > 1;
   if (k >= "1" && k <= "9" && V.ch[+k - 1]) { V.ch[+k - 1].on = !V.ch[+k - 1].on; renderChannels(); syncLayers(); }
   else if (k === "c") toggle("show-cells"); else if (k === "f") toggle("show-foci"); else if (k === "m") toggle("show-markers");
-  else if (k === "l") toggle("live"); else if (k === "p") nextMode(); else if (k === "a") runPreview();
+  else if (k === "o") toggle("show-coloc"); else if (k === "l") toggle("live"); else if (k === "p") nextMode(); else if (k === "a") runPreview();
   else if (k === "," || (k === "[" && !frames)) stepZ(-1); else if (k === "." || (k === "]" && !frames)) stepZ(1);
   else if (k === "[") setT(V.t - 1); else if (k === "]") setT(V.t + 1); else if (k === "0") viewer.fit();
   else return;

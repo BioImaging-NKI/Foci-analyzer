@@ -85,12 +85,18 @@
       <div id="channels"></div>
     </div>
     <div class="section">
-      <h3>Overlays <span class="help" data-help="Cells: outlines of the nuclei or cells. Foci: the detected foci, lightly filled, per foci channel. Markers: a dot on every focus; the dots follow the threshold slider at once, the outlines when the analysis has been repeated. A white ring marks a focus that colocalizes with a focus of another channel."></span></h3>
+      <h3>Overlays <span class="help" data-help="Cells: outlines of the nuclei or cells. Foci: the detected foci, lightly filled, per foci channel. Markers: a dot on every focus; the dots follow the threshold slider at once, the outlines when the analysis has been repeated. A white ring marks a focus that colocalizes with a focus of another channel. Colocalization: the map of where foci of two channels meet. Colour cells by: a colour per cell for one of its numbers, from dark blue (lowest) to yellow (highest)."></span></h3>
       <div id="overlays">
         <label><input type="checkbox" id="show-cells" checked> Cells <kbd>C</kbd></label>
         <label><input type="checkbox" id="show-foci" checked> Foci <kbd>F</kbd></label>
         <div id="foci-toggles"></div>
         <label><input type="checkbox" id="show-markers" checked> Markers <kbd>M</kbd></label>
+        <label id="coloc-wrap" hidden title="The colocalization map: foci that colocalize with a focus of another channel get a white outline, and the places where foci of two channels lie on top of each other are filled white (key O)"><input type="checkbox" id="show-coloc" checked> Colocalization <kbd>O</kbd></label>
+        <div id="cell-color-wrap" hidden>
+          <label for="cell-color" title="Fill every cell with a colour for one of its numbers, for example the number of foci or the share of colocalizing foci">Colour cells by</label>
+          <select id="cell-color"></select>
+          <div id="cell-legend" hidden><span id="legend-lo"></span><span class="ramp"></span><span id="legend-hi"></span></div>
+        </div>
       </div>
     </div>
     <div class="section">

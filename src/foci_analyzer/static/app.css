@@ -120,6 +120,10 @@ details.advanced > summary { cursor: pointer; color: var(--muted); font-size: 12
 #overlays label { display: block; margin: 3px 0; }
 #foci-toggles label { margin-left: 22px; }
 #foci-toggles:empty { display: none; }
+#cell-color-wrap { margin-top: 6px; }
+#cell-color { width: 100%; margin-top: 3px; }
+#cell-legend { display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+#cell-legend .ramp { flex: 1; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #3b1a8c, #219e8c, #fce824); }
 #image-select { max-width: 260px; }
 .toggles { display: flex; gap: 10px; }
 .toggles label { white-space: nowrap; }

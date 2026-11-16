@@ -133,9 +133,9 @@ class ColocalizationSettings:
                       choices=["overlap", "centroid distance"])
     min_overlap: int = opt(1, "Smallest overlap", advanced=True, min=1, unit="voxels", when={"method": ["overlap"]})
     max_distance: float = opt(0.3, "Largest distance", advanced=True, min=0, step=0.05, unit="µm", when={"method": ["centroid distance"]})
-    chance_repeats: int = opt(0, "Chance control repeats", "The colocalization expected by chance: the foci of "
+    chance_repeats: int = opt(10, "Chance control repeats", "The colocalization expected by chance: the foci of "
                               "the second channel are placed at random positions in the cell this many times "
-                              "(0 = off).", advanced=True, min=0)
+                              "(0 = off). The Results page shows it in grey next to the measured colocalization.", advanced=True, min=0)
 
 
 @dataclass

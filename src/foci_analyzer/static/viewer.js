@@ -26,6 +26,18 @@ void main() {
   o = edge ? color : vec4(color.rgb, color.a * fill);  // the inside lightly filled, the outline solid
 }`;
 
+// cells coloured by a measure: values 1..255 through a colour map (dark blue, teal, yellow)
+const FS_VALUE = `#version 300 es
+precision highp float; precision highp usampler2D;
+uniform usampler2D tex; uniform float alpha; in vec2 uv; out vec4 o;
+void main() {
+  uint v = texture(tex, uv).r;
+  if (v == 0u) discard;
+  float t = float(v - 1u) / 254.0;
+  vec3 a = vec3(0.23, 0.10, 0.55), b = vec3(0.13, 0.62, 0.55), c = vec3(0.99, 0.91, 0.14);
+  o = vec4(t < 0.5 ? mix(a, b, t * 2.0) : mix(b, c, t * 2.0 - 1.0), alpha);
+}`;
+
 function program(gl, fs) {
   const p = gl.createProgram();
   for (const [type, src] of [[gl.VERTEX_SHADER, VS], [gl.FRAGMENT_SHADER, fs]]) {
@@ -51,7 +63,7 @@ export class Viewer {
     this.tiles = new Map(); this.queue = []; this.busy = 0; this.wanted = new Set(); this.frame = 0; this.dirty = false;
     const gl = this.gl = canvas.getContext("webgl2", { alpha: false, antialias: false });
     if (!gl) throw new Error("this browser has no WebGL2");
-    this.pImage = program(gl, FS_IMAGE); this.pLabels = program(gl, FS_LABELS);
+    this.pImage = program(gl, FS_IMAGE); this.pLabels = program(gl, FS_LABELS); this.pValue = program(gl, FS_VALUE);
     const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
@@ -165,9 +177,10 @@ export class Viewer {
       const y1 = Math.min(Math.ceil(lh / TILE) - 1, Math.floor((ch - ty) / s / f / TILE));
       for (const layer of this.layers) {
         if (!layer.on) continue;
-        const image = layer.type === "image", pr = image ? this.pImage : this.pLabels;
+        const image = layer.type === "image", value = layer.type === "value", pr = image ? this.pImage : value ? this.pValue : this.pLabels;
         gl.useProgram(pr.p); gl.uniform1i(pr.u.tex, 0);
         if (image) { gl.blendFunc(gl.ONE, gl.ONE); gl.uniform2f(pr.u.range, layer.lo, layer.hi); gl.uniform3fv(pr.u.color, layer.color); }
+        else if (value) { gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.uniform1f(pr.u.alpha, layer.alpha ?? 0.6); }
         else { gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.uniform4fv(pr.u.color, layer.color); gl.uniform1f(pr.u.fill, layer.fill || 0); }
         this._tile(layer, layer.key, this.maxLevel, 0, 0);  // the coarsest level is always kept as a stand-in
         for (let ty_ = y0; ty_ <= y1; ty_++) for (let tx_ = x0; tx_ <= x1; tx_++) {
@@ -185,7 +198,7 @@ export class Viewer {
           const ix = tx_ * TILE * f, iy = ty_ * TILE * f, iw = Math.min(tw * f, this.W - ix), ih = Math.min(th * f, this.H - iy);
           gl.uniform4f(pr.u.rect, (tx + ix * s) / cw * 2 - 1, 1 - (ty + iy * s) / ch * 2, iw * s / cw * 2, -ih * s / ch * 2);
           gl.uniform4f(pr.u.uvr, ...uv);
-          if (!image) { const px = Math.min(1.5 / (texel * s * dpr), 1); /* a thin line inside the edge pixel when zoomed in */ gl.uniform2f(pr.u.d, px / t.w, px / t.h); }
+          if (!image && !value) { const px = Math.min(1.5 / (texel * s * dpr), 1); /* a thin line inside the edge pixel when zoomed in */ gl.uniform2f(pr.u.d, px / t.w, px / t.h); }
           gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, t.tex); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         }
       }

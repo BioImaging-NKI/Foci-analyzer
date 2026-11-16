@@ -302,8 +302,8 @@ def _tables(data, base, labels, n, cal, channels: list[ChannelResult], s: Settin
                 ins = np.bincount(cell_of, weights=w * (q.labels[m] > 0), minlength=n + 1)[1:n + 1]
                 cells[f"manders_ch{p.channel}_in_ch{q.channel}"] = np.where(tot > 0, ins / np.maximum(tot, 1e-12), np.nan)
             if co.chance_repeats > 0:
-                cells[f"chance_ch{a.channel}_with_ch{b.channel}"] = _chance(
-                    cm, cal, ta, tb, xyz_a, co, n, rng)
+                cells[f"chance_ch{a.channel}_with_ch{b.channel}"] = _chance(cm, cal, ta, tb, xyz_a, co, n, rng)
+                cells[f"chance_ch{b.channel}_with_ch{a.channel}"] = _chance(cm, cal, tb, ta, xyz_b, co, n, rng)
     cells["check"] = ["; ".join(f) for f in flags]
     foci = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
     return cells, foci
