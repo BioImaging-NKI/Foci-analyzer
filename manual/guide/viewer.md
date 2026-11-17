@@ -12,8 +12,9 @@ resolution that the zoom needs.
   are detected on another projection (extended depth of focus or sum), a third button shows that one.
 - **Z** slider (++comma++ and ++period++): the slice. **T** slider (++bracket-left++ and ++bracket-right++):
   the time frame of a time-lapse; in an image without frames these keys step through the slices.
-- The image list above the viewer chooses the image; a ✓ marks images in the results folder (green: with
-  the current settings).
+- The image list above the viewer chooses the image. A ✓ marks analyzed images: green, in the results
+  folder with the current settings; blue, analyzed in the viewer with the current settings; grey, analyzed
+  with other settings.
 
 All keys: [Keys](../reference/keys.md).
 
@@ -76,5 +77,5 @@ The **Save** section writes into the results folder:
 - **Whole image**: the shown slice or projection at full resolution, with the channels and overlays as
   shown, as an RGB TIFF (folder `pictures`).
 - **For Fiji**: the whole image (all channels, slices and frames) as a TIFF that opens in Fiji with the
-  outlines of the cells and foci as overlay (folder `images`). These files are not compressed: Fiji drops
-  the overlay of a compressed TIFF.
+  outlines of the cells and foci as overlay (folder `images`). It is saved in a `.zip`, about four times
+  smaller; Fiji opens the `.zip` directly.

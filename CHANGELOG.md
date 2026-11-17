@@ -63,6 +63,14 @@ First working version. There are no earlier results to compare with.
 - Settings page: install a network with one click; use the graphics card or not; images at a time.
 - Experiment page: stays open after opening images, updates the image list by itself, ✓ for analyzed images
   (also in the image list of the Analyze page). The status bar keeps its progress bar in one place.
+- StarDist: when its nuclei come out smaller than 16 or larger than 120 pixels, the image is tried at four
+  other scales and the result with nuclei closest to 40 pixels is kept (an uncalibrated high-resolution
+  image gave 532 fragments, now 3 nuclei); *Expected diameter* now also enlarges. Results of the test
+  images do not change. The Data Science Bowl 2018 model is no longer offered.
+- Images for Fiji are saved as `.zip` (one uncompressed TIFF inside; Fiji opens it with the overlay), about
+  a quarter of the size.
+- Fixed: the dashed line at the distance outside cells was drawn around one group of cells only.
+- Images analyzed in the viewer get a blue ✓; the progress bar sits left in the status bar.
 - Fixed: an own Cellpose 4 environment given for Cellpose was reported as not installed, and its models
   greyed out. The automatic Cellpose model works with Cellpose 3 and 4.
 - Windows: `Foci Analyzer.exe` in the installation folder, with the logo as icon (also for the shortcuts);

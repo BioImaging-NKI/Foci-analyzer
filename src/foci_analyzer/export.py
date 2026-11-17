@@ -243,7 +243,9 @@ def write_imagej(path: Path, data: np.ndarray, info, frames: dict[int, FrameResu
     """The image (T, C, Z, Y, X) as an ImageJ hyperstack TIFF with the outlines of the analysis as overlay
     (only for the frames in `frames`) and the channel colours. Returns the number of outlines.
 
-    Not compressed: ImageJ and Fiji drop the overlay of a compressed TIFF (tested with Fiji, 2026-11-17).
+    The TIFF itself is not compressed: ImageJ and Fiji drop the overlay of a compressed TIFF. With a `.zip`
+    path it goes into a zip file (deflate) instead, which Fiji opens directly with the overlay, at about a
+    quarter of the size (both tested with Fiji, 2026-11-17).
     """
     T, Z = data.shape[0], data.shape[2]
     rois = []
@@ -269,5 +271,13 @@ def write_imagej(path: Path, data: np.ndarray, info, frames: dict[int, FrameResu
     px = info.pixel_size or 1.0
     tmp = path.with_suffix(".tmp.tif")
     tifffile.imwrite(tmp, stack, imagej=True, resolution=(1 / px, 1 / px), metadata=meta)
-    tmp.replace(path)
+    if path.suffix.lower() == ".zip":  # one TIFF in a zip: Fiji opens it as if it were the TIFF itself
+        import zipfile
+        tmpzip = path.with_suffix(".tmp.zip")
+        with zipfile.ZipFile(tmpzip, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
+            z.write(tmp, path.with_suffix(".tif").name)
+        tmp.unlink()
+        tmpzip.replace(path)
+    else:
+        tmp.replace(path)
     return len(rois)

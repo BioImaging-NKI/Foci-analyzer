@@ -27,7 +27,7 @@ export function status(text, error = false, progress, cancellable = false) {
   const s = $("status"), busy = progress !== undefined;
   s.textContent = text || (busy ? "Working…" : "Ready"); s.title = s.textContent;
   s.classList.toggle("error", error); s.classList.toggle("busy", busy && !error);
-  $("busy").hidden = !busy; $("cancel").hidden = !(busy && cancellable); $("busy").classList.toggle("unknown", progress === -1);
+  $("busy").classList.toggle("idle", !busy);  /* always there, so the text never moves */ $("cancel").hidden = !(busy && cancellable); $("busy").classList.toggle("unknown", progress === -1);
   if (busy && progress >= 0) $("busy-bar").style.width = `${Math.round(100 * Math.min(1, progress))}%`;
   else $("busy-bar").style.width = "";
 }

@@ -177,7 +177,11 @@ def test_batch_writes_tables(tmp_path):
     batch.run(images, settings(), str(tmp_path / "out"), results, progress, threading.Lock(), labels=True, save_images=True)
     assert not progress.errors and progress.done == 2
     assert (tmp_path / "out" / "cells.tsv").is_file() and not (tmp_path / "out" / "cells.csv").exists()
-    with tifffile.TiffFile(tmp_path / "out" / "images" / "cond_one.tif") as tf:  # for Fiji: the image + outlines
+    import zipfile
+    with zipfile.ZipFile(tmp_path / "out" / "images" / "cond_one.zip") as z:  # for Fiji: one TIFF in a zip
+        assert z.namelist() == ["cond_one.tif"]
+        z.extractall(tmp_path / "unzipped")
+    with tifffile.TiffFile(tmp_path / "unzipped" / "cond_one.tif") as tf:  # the image + outlines
         assert tf.series[0].shape == (5, 3, 128, 160) and len(tf.imagej_metadata["Overlays"]) >= 2 + 18
         assert tf.pages[0].compression == 1  # Fiji drops the overlay of a compressed file
     from foci_analyzer import export  # the store the viewer reads back gives the same result

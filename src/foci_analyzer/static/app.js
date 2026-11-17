@@ -58,17 +58,24 @@ function renderImages() {
   for (const im of S.images) {
     const m = analyzedMark(im.id);
     sel.append(el("option", { value: im.id, textContent: `${m ? "✓ " : ""}${im.condition} · ${im.name}`, title: analyzedTitle(im.id),
-      style: m === "done" ? "color:#2e9e5b" : m === "old" ? "color:#888" : "" }));
+      style: { done: "color:#2e9e5b", viewed: "color:#2f7fc8", old: "color:#888", "": "" }[m] }));
   }
   if (V.id && !S.images.some((im) => im.id === V.id)) closeImage();  // it was removed from the experiment
   sel.value = V.id;
   $("output").value = S.output || "";
 }
-// in the results folder after Analyze all images: with the current settings ("done") or with others ("old")
-function analyzedMark(id) { return S.analyzed.ids.includes(id) ? (S.analyzed.current ? "done" : "old") : ""; }
+// green: in the results folder with the current settings (Analyze all images); blue: analyzed in the viewer
+// with the current settings (Analyze this image); grey: analyzed, but with other settings
+const viewed = {};  // image id: the settings it was analyzed with in the viewer (this session)
+function analyzedMark(id) {
+  if (S.analyzed.ids.includes(id) && S.analyzed.current) return "done";
+  if (viewed[id] && viewed[id] === JSON.stringify(S.settings)) return "viewed";
+  return S.analyzed.ids.includes(id) || viewed[id] ? "old" : "";
+}
 function analyzedTitle(id) {
-  const m = analyzedMark(id);
-  return m === "done" ? "Analyzed by Analyze all images with the current settings" : m === "old" ? "Analyzed by Analyze all images, with other settings" : "";
+  return { done: "In the results folder, analyzed with the current settings (Analyze all images)",
+    viewed: "Analyzed in the viewer with the current settings (not in the results folder)",
+    old: "Analyzed with other settings than the current ones", "": "" }[analyzedMark(id)];
 }
 async function refreshAnalyzed() {
   try { S.analyzed = await (await api("/api/analyzed")).json(); renderImages(); } catch { /* not important */ }
@@ -130,7 +137,8 @@ function modelControl(f, group, id) {
   const sel = el("select", { id, onchange: (e) => {
     if (e.target.value === OWN) { own.hidden = false; path.focus(); } else { own.hidden = true; save(e.target.value); renderSettings(); } } },
   list.map((m) => el("option", { value: m.name, disabled: !installed(m.network) && m.name !== v,
-    textContent: m.label + (installed(m.network) ? "" : m.network === "cellpose3" && installed("cellpose") ? " · needs Cellpose 3" : " · not installed (Settings page)") })),
+    textContent: m.label + (installed(m.network) ? (m.name === "cpsam_v2" && S.gpu && S.gpu.cellpose4 === false ? " · slow without a graphics card" : "")
+      : m.network === "cellpose3" && installed("cellpose") ? " · needs Cellpose 3" : " · not installed (Settings page)") })),
   el("option", { value: OWN, textContent: "Own model…" }));
   sel.value = known ? v : OWN;
   return el("div", { class: "field" }, el("label", { htmlFor: id, textContent: f.label }), helpIcon(f.help, S.catalog.docs[net]),
@@ -396,6 +404,7 @@ async function runPreview() {
     const r = await (await api("/api/preview", { path: id, t, settings: S.settings, box: visiblePart() })).json();
     const cand = await Promise.all(r.channels.map(async (ch) =>
       new Float32Array(await (await api(`/api/candidates?path=${encodeURIComponent(id)}&t=${t}&ch=${ch.channel}`)).arrayBuffer())));
+    viewed[id] = JSON.stringify(S.settings);
     if (id === V.id && t === V.t) {
       V.preview = r; V.cand = cand;
       // foci found on a projection: show that projection (once, so a later choice of the user stays)
@@ -693,7 +702,7 @@ async function loadProgram(change) {
   try {
     const p = await (await api("/api/program", change)).json();
     const inputs = {};
-    S.installed = p.installed; renderSettings();
+    S.installed = p.installed; S.gpu = p.gpu_ready; renderSettings();
     $("opt-gpu").checked = p.gpu !== false; $("opt-workers").value = p.workers || 0;
     const version = (n) => n.version ? n.version : !p.can_install ? "not installed"
       : el("button", { textContent: p.install.running && p.install.network === n.name ? "Installing…" : "Install", disabled: p.install.running,

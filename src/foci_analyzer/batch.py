@@ -99,7 +99,7 @@ def analyze_image(entry: ImageEntry, s: config.Settings, compute_lock: threading
                 rr.foci = foci_rows[t]
             colours = export.default_colours(info.channels, s.image.nuclei_channel, s.image.cell_channel,
                                              [f.channel for f in s.foci])
-            export.write_imagej(Path(folder) / "images" / f"{base}.tif", data, info, dict(enumerate(results)), colours)
+            export.write_imagej(Path(folder) / "images" / f"{base}.zip", data, info, dict(enumerate(results)), colours)
     meta = {"unit": info.unit, "pixel_size": r.cal.pixel_size, "frames": info.frames, "slices": info.slices,
             "frame_interval": info.frame_interval, "remark": remark}
     return cells, foci, meta

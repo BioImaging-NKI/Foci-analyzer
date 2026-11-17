@@ -12,6 +12,7 @@ import importlib.util
 import json
 import math
 import os
+import platform
 import subprocess
 import sys
 import tempfile
@@ -35,13 +36,12 @@ DOCS = {"stardist": "https://github.com/stardist/stardist#pretrained-models-for-
         "instanseg": "https://github.com/instanseg/instanseg",
         "spotiflow": "https://weigertlab.org/spotiflow/pretrained.html"}
 CATALOG = {
-    "stardist": [("", "Versatile fluorescent nuclei (2D_versatile_fluo)", "stardist"),
-                 ("2D_paper_dsb2018", "Nuclei of the Data Science Bowl 2018", "stardist")],
+    "stardist": [("", "Versatile fluorescent nuclei (2D_versatile_fluo)", "stardist")],
     "cellpose": [("", "Automatic: nuclei or cyto3 (Cellpose 3), cpsam (Cellpose 4)", "cellpose"),
                  ("nuclei", "Nuclei (Cellpose 3)", "cellpose3"),
                  ("cyto3", "Cells, general (Cellpose 3)", "cellpose3"),
                  ("tissuenet_cp3", "Tissue, cells and nuclei (Cellpose 3)", "cellpose3"),
-                 ("cpsam_v2", "CellposeSAM v2: any cell or nucleus (Cellpose 4, slow without GPU)", "cellpose4"),
+                 ("cpsam_v2", "CellposeSAM v2: any cell or nucleus (Cellpose 4)", "cellpose4"),
                  ("cpdino-vitb", "CellposeDINO ViT-B (Cellpose 4; needs the dinov3 package, see the help)", "cellpose4")],
     "instanseg": [("", "Fluorescent nuclei and cells (fluorescence_nuclei_and_cells)", "instanseg"),
                   ("brightfield_nuclei", "Nuclei in brightfield (H&E, DAB)", "instanseg")],
@@ -74,7 +74,7 @@ def _versions_in(py: str) -> dict[str, str]:
     if key in _asked:
         return _asked[key]
     found: dict[str, str] = {}
-    names = sorted(set(DISTS.values()))
+    names = sorted(set(DISTS.values()) | {"torch"})
     for root in {Path(py).parent, Path(py).parent.parent}:
         for site in [root / "Lib" / "site-packages", *root.glob("lib/python3*/site-packages")]:
             for name in names:
@@ -99,6 +99,18 @@ def _major(version: str | None) -> int:
         return int(str(version).split(".")[0])
     except ValueError:
         return 0
+
+
+def gpu_ready() -> dict[str, bool]:
+    """Per network whether it will run on the graphics card: a CUDA build of PyTorch (or a Mac with Apple
+    Silicon) and the graphics card switched on (Settings page). StarDist uses TensorFlow: on the processor on
+    Windows and macOS."""
+    mac = sys.platform == "darwin" and platform.machine() == "arm64"
+    out = {}
+    for op in NETWORKS:
+        torch = _versions_in(python_for(op)).get("torch", "") if python_for(op) else ""
+        out[op] = USE_GPU and op != "stardist" and bool(torch) and ("+cu" in torch or mac)
+    return out
 
 
 def installed() -> dict[str, str | None]:
@@ -259,8 +271,42 @@ def versions(python: str = "") -> dict:
     return worker(python=python).call("ping")[1]
 
 
+STARDIST_SIZE = 40.0  # px: the nucleus diameter StarDist is given when it has to be rescaled
+STARDIST_RANGE = (16, 120)  # px: nuclei in this range are left at their scale (76 px tested fine, 180 px not)
+
+
+def _scaled(net: str, method: str, img: np.ndarray, second, params: dict, f: float) -> np.ndarray:
+    """Labels of the network for the image scaled by `f` (below 1: smaller), back at the size of `img`."""
+    if abs(f - 1) < 0.05:
+        out, _ = worker(net).call(method, {"img": np.ascontiguousarray(img), "second": second}, params)
+        return out["labels"]
+    zoom = (1, f, f)
+    small = ndi.zoom(img.astype(np.float32), zoom, order=1)
+    small2 = ndi.zoom(second.astype(np.float32), zoom, order=1) if second is not None else None
+    p = {**params, "diameter": params["diameter"] * f, "anisotropy": params["anisotropy"] * f,
+         "pixel_size": params["pixel_size"] / f if params.get("pixel_size") else None}
+    out, _ = worker(net).call(method, {"img": small, "second": small2}, p)
+    lab = out["labels"]
+    back = [np.minimum((np.arange(n) * f).astype(np.int64), lab.shape[i + 1] - 1) for i, n in enumerate(img.shape[1:])]
+    return lab[:, back[0][:, None], back[1][None, :]]
+
+
+def typical_diameter(labels: np.ndarray) -> float:
+    """The median diameter (px, of a circle with the same area) of the objects, leaving out small debris."""
+    area = np.bincount(labels.ravel())[1:]
+    area = area[area > 0]
+    if not area.size:
+        return 0.0
+    area = area[area >= 0.25 * np.percentile(area, 90)]
+    return float(2 * np.sqrt(np.median(area) / np.pi))
+
+
 def segment(img: np.ndarray, second: np.ndarray | None, cal, seg) -> np.ndarray:
-    """Labels (Z, Y, X) of `img` from the chosen network; `second` is the nuclei channel next to a cell channel."""
+    """Labels (Z, Y, X) of `img` from the chosen network; `second` is the nuclei channel next to a cell channel.
+
+    Images sampled finer than NETWORK_PIXEL are made smaller for the network. StarDist is moreover rescaled
+    so that nuclei are about STARDIST_SIZE pixels: to the Expected diameter when that is set; otherwise, when
+    its nuclei come out outside STARDIST_RANGE, the best of four other scales is kept."""
     d = seg.diameter / cal.pixel_size if seg.diameter > 0 else 0
     params = {"model": seg.model, "diameter": d, "prob": seg.probability, "pixel_size": cal.pixel_size if cal.unit == "µm" else None,
               "nuclei": second is None, "anisotropy": cal.z_spacing / cal.pixel_size}
@@ -268,18 +314,32 @@ def segment(img: np.ndarray, second: np.ndarray | None, cal, seg) -> np.ndarray:
         p = min(max(seg.probability, 1e-3), 1 - 1e-3)
         params["cellprob"] = -math.log(p / (1 - p))  # 0.5 is the Cellpose default of 0; lower finds more
     f = cal.pixel_size / NETWORK_PIXEL if cal.unit == "µm" else 1.0
+    f = f if f < 0.8 else 1.0  # only finer images are made smaller
     net = network_of(seg.method, seg.model)
-    if f < 0.8:  # finer than the networks need: give them a smaller image and bring the labels back
-        zoom = (1, f, f)
-        small = ndi.zoom(img.astype(np.float32), zoom, order=1)
-        small2 = ndi.zoom(second.astype(np.float32), zoom, order=1) if second is not None else None
-        params.update(diameter=d * f, pixel_size=cal.pixel_size / f, anisotropy=params["anisotropy"] * f)
-        out, _ = worker(net).call(seg.method, {"img": small, "second": small2}, params)
-        lab = out["labels"]
-        back = [np.minimum((np.arange(n) * f).astype(np.int64), lab.shape[i + 1] - 1) for i, n in enumerate(img.shape[1:])]
-        return lab[:, back[0][:, None], back[1][None, :]]
-    out, _ = worker(net).call(seg.method, {"img": np.ascontiguousarray(img), "second": second}, params)
-    return out["labels"]
+    if seg.method != "stardist":
+        return _scaled(net, seg.method, img, second, params, f)
+    params["diameter"] = 0  # StarDist is rescaled here, not in the model process
+    limit = 8000 / max(img.shape[1:])  # never larger than 8000 px
+    if d > 0:
+        return _scaled(net, seg.method, img, second, params, min(STARDIST_SIZE / d, limit))
+    lab = _scaled(net, seg.method, img, second, params, f)
+    seen = typical_diameter(lab) * f  # in pixels of the image the network saw
+
+    def score(size):  # in the range first, then closest to STARDIST_SIZE
+        return abs(size - STARDIST_SIZE) + (0 if STARDIST_RANGE[0] <= size <= STARDIST_RANGE[1] else 1e6)
+
+    if STARDIST_RANGE[0] <= seen <= STARDIST_RANGE[1]:
+        return lab
+    # Too small can also mean too large: nuclei far larger than StarDist knows come out as small fragments.
+    # So other scales are tried both ways, and the one with nuclei closest to STARDIST_SIZE pixels is kept.
+    best = (score(seen), lab)
+    for k in (0.25, 0.5, 2.0, 4.0):
+        g = min(f * k, limit)
+        if g * min(img.shape[1:]) < 64 or abs(g - f) < 0.05 * f:
+            continue
+        trial = _scaled(net, seg.method, img, second, params, g)
+        best = min(best, (score(typical_diameter(trial) * g), trial), key=lambda b: b[0])
+    return best[1]
 
 
 def spots(raw: np.ndarray, cal, fc) -> tuple[np.ndarray, np.ndarray]:

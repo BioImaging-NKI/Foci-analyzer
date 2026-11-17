@@ -69,7 +69,10 @@ class SegmentationSettings:
                      "Cellpose 3 and Cellpose 4 models run in environments of their own; models of a network that is "
                      "not installed are greyed out (install it on the Settings page).", catalog=True,
                      when={"method": ["cellpose", "instanseg", "stardist"]})
-    diameter: float = opt(0.0, "Expected diameter", "For Cellpose: the typical diameter. 0 = automatic.",
+    diameter: float = opt(0.0, "Expected diameter", "The typical diameter of the nuclei or cells. 0 = automatic: Cellpose "
+                          "estimates it; StarDist is given the image at 0.25 µm per pixel and, when the nuclei then "
+                          "come out smaller than 16 or larger than 120 pixels, at the scale where they are closest "
+                          "to 40 pixels. Set it when the automatic choice is off.",
                           advanced=True, min=0, unit="µm", when={"method": ["cellpose", "instanseg", "stardist"]})
     probability: float = opt(0.5, "Probability threshold", "Lower finds more and larger objects.",
                              advanced=True, min=0, max=1, step=0.05, when={"method": ["cellpose", "instanseg", "stardist"]})

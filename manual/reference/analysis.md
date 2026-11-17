@@ -16,7 +16,10 @@ The nuclei channel, or the cell channel when one is set, is segmented:
 - **StarDist**, **Cellpose**, **InstanSeg**: neural networks, each in a Python environment of its own (see
   [The Settings page](../guide/settings-page.md)). Images sampled finer than 0.25 µm per pixel are made
   smaller for the network, and the outlines are scaled back. With a cell channel, Cellpose and InstanSeg
-  also get the nuclei channel.
+  also get the nuclei channel. StarDist works best on nuclei of a few tens of pixels: when its nuclei come
+  out smaller than 16 or larger than 120 pixels, the image is also tried at ¼, ½, 2 and 4 times that size, and
+  the result with nuclei closest to 40 pixels is kept (a scale far too large gives small fragments, so it
+  is never chosen). With *Expected diameter* set, the image is scaled so nuclei are 40 pixels at once.
 - **threshold**: the image is smoothed, Otsu's threshold (times the *Threshold* factor) separates
   objects from background, holes are filled, and touching objects are split by a watershed on the distance
   map.

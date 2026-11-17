@@ -11,7 +11,6 @@ More about these models: <https://github.com/stardist/stardist#pretrained-models
 | Name | In the list | Runs in |
 |---|---|---|
 | `(default)` | Versatile fluorescent nuclei (2D_versatile_fluo) | StarDist |
-| `2D_paper_dsb2018` | Nuclei of the Data Science Bowl 2018 | StarDist |
 
 ## Cellpose
 
@@ -23,7 +22,7 @@ More about these models: <https://cellpose.readthedocs.io/en/latest/models.html>
 | `nuclei` | Nuclei (Cellpose 3) | cellpose3 |
 | `cyto3` | Cells, general (Cellpose 3) | cellpose3 |
 | `tissuenet_cp3` | Tissue, cells and nuclei (Cellpose 3) | cellpose3 |
-| `cpsam_v2` | CellposeSAM v2: any cell or nucleus (Cellpose 4, slow without GPU) | Cellpose 4 |
+| `cpsam_v2` | CellposeSAM v2: any cell or nucleus (Cellpose 4) | Cellpose 4 |
 | `cpdino-vitb` | CellposeDINO ViT-B (Cellpose 4; needs the dinov3 package, see the help) | Cellpose 4 |
 
 ## InstanSeg

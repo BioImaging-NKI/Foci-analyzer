@@ -68,5 +68,5 @@ After a run, opening an image shows its stored result at once, as long as the se
 
 ## The status bar
 
-The bar at the bottom says what Foci Analyzer is doing, with a progress bar on the right during longer
-steps, and **Cancel** to stop the analysis.
+The bar at the bottom says what Foci Analyzer is doing, with a progress bar on its left that fills during
+longer steps, and **Cancel** to stop the analysis.

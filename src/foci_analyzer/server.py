@@ -182,7 +182,7 @@ class App:
                          "device": info.get("device"), "gpu": info.get("gpu"), "gpu_memory": info.get("gpu_memory"),
                          "error": error})
         return {"version": __version__, "app_python": sys.version.split()[0], "home": str(home()),
-                "default_python": models.default_python(), **self.program, "networks": rows, "installed": models.installed(),
+                "default_python": models.default_python(), **self.program, "networks": rows, "installed": models.installed(), "gpu_ready": models.gpu_ready(),
                 "can_install": bool(self._installer()), "install": self.install}
 
     # ---- installing a network from the Settings page (installer/install.py --networks-only)
@@ -304,7 +304,7 @@ class App:
 
     def state(self) -> dict:
         return {"version": __version__, "schema": config.schema(), "settings": config.to_dict(self.settings),
-                "models": models.available(), "catalog": models.catalog(), "installed": models.installed(), "batch": self.progress.to_dict(),
+                "models": models.available(), "catalog": models.catalog(), "installed": models.installed(), "gpu": models.gpu_ready(), "batch": self.progress.to_dict(),
                 **self.experiment_state()}
 
     # ---- images
@@ -598,8 +598,9 @@ class App:
         if out is None:
             lab = self._overlay_labels(r, kind, q)
             small = lab[0] if lab.shape[0] == 1 else (lab[z] if isinstance(z, int) else lab.max(0))
-            if kind == "reach":
-                small = (small > 0).astype(np.int32)
+            if kind == "reach":  # one outline around every group of touching grown cells
+                from scipy import ndimage as ndi
+                small = ndi.label(small > 0)[0]
             if len(np.unique(small)) > 40001:
                 raise ApiError("too many objects for smooth outlines", 413)
             parts, shift = [], np.array([r.offset[0] + r.border, r.offset[1] + r.border], np.float32)
@@ -768,7 +769,7 @@ class App:
         if ranges and len(ranges) == im.info.channels and im.scale != 1.0:
             ranges = [[v / im.scale for v in lohi] for lohi in ranges]
         e = self.entry(image_id)
-        path = self.output_folder("images") / f"{export.safe_name(f'{e.condition}_{e.name}')}.tif"
+        path = self.output_folder("images") / f"{export.safe_name(f'{e.condition}_{e.name}')}.zip"
         n = export.write_imagej(path, im.data, im.info, frames, colours, ranges if ranges and len(ranges) == im.info.channels else None)
         return {"path": str(path), "outlines": n, "frames": len(frames), "of": im.info.frames}
 

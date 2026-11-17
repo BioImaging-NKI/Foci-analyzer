@@ -46,7 +46,8 @@ reproduce the Fiji results. Design, state per milestone and open items: `plan.md
   `App.last` (they never start an analysis). `StageCache.now` feeds the status bar, `.cancelled` stops it.
 - `export.py`: the store the viewer reads back after a batch run (`.viewer/*.npz` in the results folder:
   labels and candidates per frame), label TIFFs, RGB rendering, ImageJ TIFFs with outline overlays (roifile).
-  Overlay TIFFs must stay uncompressed and their ROIs must have no `group` and no label options: Fiji drops
+  Overlay TIFFs must stay uncompressed (they are zipped instead: Fiji opens a .zip with one TIFF, overlay
+  intact) and their ROIs must have no `group` and no label options: Fiji drops
   the overlay of a compressed TIFF, colours ROIs by group, and draws numbers otherwise (checked with Fiji).
   Fiji can be asked from here: `C:/Fiji/fiji-windows-x64.exe --headless --run script.py` (Jython; write
   results to a file, the console stays empty; Flatten does not work headless).

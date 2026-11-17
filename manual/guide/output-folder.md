@@ -13,7 +13,7 @@ leaves half a table.
 | `run.json` | when the run was made, with which version, the images and any errors |
 | `removed_cells.tsv` | the cells removed by hand in the viewer, as clicked points (image, frame, x, y, z in pixels; z = −1 for a click in a projection) |
 | `labels/` | with **Also save label images**: per image `<condition>_<image>_cells.tif` and `<condition>_<image>_foci_ch<N>.tif` (T, Z, Y, X, 16-bit) |
-| `images/` | with **Also save images with overlays (Fiji)**, or **For Fiji**: the image as an ImageJ TIFF with the outlines as overlay |
+| `images/` | with **Also save images with overlays (Fiji)**, or **For Fiji**: the image as an ImageJ TIFF with the outlines as overlay, in a `.zip` that Fiji opens directly |
 | `pictures/` | **View** (PNG) and **Whole image** (RGB TIFF) from the Save section of the viewer |
 | `graph_<measure>.tsv` | **Save graph data** on the Results page |
 | `.viewer/` | the outlines and foci of the last run, so the viewer can show an image without analyzing it again; can be deleted |
@@ -32,5 +32,6 @@ frame, as in `foci.tsv`. They open in Fiji and napari.
 
 Each image becomes a hyperstack with all its channels, slices and frames, the channel colours and contrast,
 and the outlines as an overlay: cells in white, foci in the colour of their channel, each on its own slice
-and frame (cells found in 2D are shown in every slice). The files are not compressed, because Fiji drops the
-overlay of a compressed TIFF.
+and frame (cells found in 2D are shown in every slice). Each is a `.zip` holding one TIFF: open the `.zip`
+in Fiji directly (drag it onto Fiji, or *File → Open*). Zipped, the file is about four times smaller; a
+compressed TIFF would be small too, but Fiji drops the overlay of a compressed TIFF.
