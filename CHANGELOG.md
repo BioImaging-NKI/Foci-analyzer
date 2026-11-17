@@ -103,3 +103,5 @@ First working version. There are no earlier results to compare with.
   with Cellpose 4.
 - Your own network environments may be conda environments: their library folders are put on PATH as
   `conda activate` would. Results do not change.
+- Setup: a Python or environment left half-removed (an uninstall while the program ran) is removed and made
+  again instead of failing; the folder choice is always shown.

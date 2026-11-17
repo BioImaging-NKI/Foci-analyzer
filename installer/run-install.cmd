@@ -11,6 +11,8 @@ set "UV_CACHE_DIR=%TARGET%\cache"
 set "UV_NO_PROGRESS=1"
 set "PYTHONIOENCODING=utf-8"
 title Foci Analyzer: installing
+rem a Python that is only partly there (an uninstall while the program ran) is removed: uv would take it as installed
+if exist "%TARGET%\python" for /d %%P in ("%TARGET%\python\cpython-*") do if not exist "%%P\Lib\os.py" rmdir /s /q "%%P"
 set "HIDDEN="
 echo %* | find "--progress" >nul && set "HIDDEN=1"
 if defined HIDDEN goto hidden

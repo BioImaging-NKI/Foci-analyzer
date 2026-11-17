@@ -163,9 +163,24 @@ def python_of(env: Path) -> Path:
 
 
 def venv(uv: str, path: Path, python: str, env: dict) -> None:
-    """An environment, unless it is there already (its python.exe may be in use by a running program)."""
+    """An environment, unless it is there already (its python.exe may be in use by a running program). One that
+    is only partly there (an uninstall while the program ran) is removed and made again."""
+    if path.exists() and not healthy(path):
+        say(f"Removing the incomplete environment {path}")
+        shutil.rmtree(path, ignore_errors=True)
     if not python_of(path).is_file():
         run(uv, "venv", str(path), "--python", python, "--no-project", env=env)
+
+
+def healthy(path: Path) -> bool:
+    """Whether this environment's Python starts."""
+    if not (python_of(path).is_file() and (path / "pyvenv.cfg").is_file()):
+        return False
+    try:
+        return subprocess.run([str(python_of(path)), "-c", "import os, json"], check=False, capture_output=True,
+                              timeout=60).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
 
 
 def nvidia() -> bool:
@@ -399,6 +414,9 @@ def main(argv: list[str] | None = None) -> None:
     say(f"Foci Analyzer: installing in {target} ({platform.system()} {platform.machine()})")
     if not args.networks_only:
         next_step("The program", "Python and the program")
+        if (target / ".venv").exists() and not healthy(target / ".venv"):
+            say("Removing the incomplete program environment")
+            shutil.rmtree(target / ".venv", ignore_errors=True)
         run(args.uv, "sync", "--project", str(SOURCE), "--no-dev", "--frozen", "--no-editable", "--python", "3.12",
             env={**env, "UV_PROJECT_ENVIRONMENT": str(target / ".venv")})
     index = [] if MAC else ["--index-url", "https://download.pytorch.org/whl/" + ("cu124" if gpu else "cpu"),

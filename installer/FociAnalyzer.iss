@@ -21,6 +21,7 @@ AppPublisher=Netherlands Cancer Institute - BioImaging Facility
 AppPublisherURL=https://github.com/BioImaging-NKI
 DefaultDirName={localappdata}\FociAnalyzer
 DisableProgramGroupPage=yes
+DisableDirPage=no
 PrivilegesRequired=lowest
 OutputDir=build
 OutputBaseFilename=FociAnalyzer-Setup-{#AppVersion}
