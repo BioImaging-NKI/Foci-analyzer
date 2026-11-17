@@ -55,6 +55,8 @@ reproduce the Fiji results. Design, state per milestone and open items: `plan.md
   every result (viewer and batch) so the tables leave them out.
 - `batch.py`: all images (parallel processes without networks), tables to the results folder.
   `tracking.py`: overlap linking, or Trackastra. `stats.py`: tests with Holm correction.
+- `cli.py` takes the port and opens the browser on a starting page before the slow imports, then hands the
+  server to the app (`LocalServer`: no SO_REUSEADDR on Windows, else two programs share a port).
 - `server.py`: standard-library server on 127.0.0.1; `/api/*` needs the token written into the page and a
   local Host header; only images of the experiment can be read.
 - `static/`: `app.js` (pages, form, preview, batch), `viewer.js` (WebGL2 tile viewer), `results.js`
@@ -64,7 +66,8 @@ reproduce the Fiji results. Design, state per milestone and open items: `plan.md
   is what the Install buttons of the Settings page run), `branded_launcher` copies uv's
   `foci-analyzer-window.exe` to `Foci Analyzer.exe` with the logo (the data uv appends after the program part
   is kept), `FociAnalyzer.iss`
-  + `build-windows.ps1` (setup.exe; Inno Setup 6 is installed per user here), `run-install.cmd`, `check.py`
+  + `build-windows.ps1` (setup.exe; Inno Setup 6 is installed per user here; the wizard shows the progress
+  that `install.py --progress FILE` writes), `run-install.cmd`, `check.py`
   (every installed network on a made-up image). `install.sh` (macOS, Linux) and `install.bat` (developers)
   call `install.py`. Network versions are pinned in `install.py`; change them only after testing them together.
 - `.github/workflows/build.yml`: tests on three systems per push; installers only by hand or for a tag (the

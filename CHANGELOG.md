@@ -90,3 +90,10 @@ First working version. There are no earlier results to compare with.
 - Status bar at the bottom: what the program is doing, step and progress bar, and when it is ready.
   Shortcut keys are shown next to their buttons; `[` and `]` step through slices when there is no time-lapse.
   Results do not change.
+- Windows setup: the size of every network and the total for the choice; the page for your own
+  environments only lists the networks left unticked (and is skipped when all are ticked); the installation's
+  messages, step and progress bar are shown in the setup window (no console window); the Foci Analyzer logo
+  in the wizard. Results do not change.
+- Starting: the browser opens at once with a starting page, which turns into the window when the program is
+  ready. On Windows a second Foci Analyzer (for example an installed one next to a development one) could
+  take the same port, so the two answered at random; now the second start shows the first window.

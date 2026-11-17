@@ -341,6 +341,13 @@ nuclear stain (`Hi-res 3D`). Default: Cellpose.
 
 ---
 
+### State on 2026-11-17, late evening
+
+Setup (Inno Setup): sizes per network with a total, own environments only for unticked networks, progress
+shown in the wizard (install.py `--progress FILE`, read by a SetTimer callback while Exec waits; the console
+runs hidden), logo images (`installer/wizard-*.bmp`). Starting page in the browser before the packages load
+(`cli.py`); `LocalServer` without SO_REUSEADDR on Windows, so two programs no longer share port 8770.
+
 ### State on 2026-11-17, evening
 
 Done after the morning list: foci size below a pixel no longer fails (IndexError in the LoG filter); the

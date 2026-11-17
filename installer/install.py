@@ -17,6 +17,7 @@ import argparse
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -37,10 +38,105 @@ STARDIST = ["stardist==0.9.2", "csbdeep==0.8.2", "numpy<2", "scikit-image"]
 IMPORTS = {"stardist": "stardist", "cellpose": "cellpose", "cellpose4": "cellpose", "instanseg": "instanseg", "spotiflow": "spotiflow",
            "trackastra": "trackastra"}
 LOG: Path | None = None
+# disk space in GB once installed (measured on Windows; the setup shows the same numbers)
+SIZE_PROGRAM = 0.5
+SIZE_TORCH = {"gpu": 4.4, "cpu": 1.0}
+SIZE = {"cellpose": 0.1, "instanseg": 0.3, "spotiflow": 0.2, "trackastra": 0.2, "stardist": 1.6, "cellpose4": 0.1}
+
+
+class Progress:
+    """For the Windows setup (--progress FILE): how far the installation is, the current step and the messages,
+    in a small text file that the setup window reads every half second. Line 1: per mille done; line 2: the
+    step; line 3: the number of messages so far; then the last messages.
+
+    Steps count by their size. Within a step uv tells what it downloads ("Downloading torch (2.4GiB)", then
+    "Downloaded torch" when done, as run() writes it); a download in progress is estimated from the time it takes."""
+
+    SPEED = 8e6  # bytes per second assumed for a download in progress, until one finished
+
+    def __init__(self, path: Path | None):
+        self.path, self.lines, self.count = path, [], 0
+        self.weights, self.step, self.status = [], -1, "Starting"
+        self.files: dict[str, float] = {}  # file being downloaded -> bytes
+        self.done_bytes = self.total_bytes = 0.0
+        self.since, self.speed = time.time(), self.SPEED
+        self.final = False
+        if path:
+            import threading
+            threading.Thread(target=self._tick, daemon=True).start()
+
+    def plan(self, weights: list[float]) -> None:
+        self.weights = [max(w, 0.01) for w in weights]
+
+    def next(self, status: str) -> None:
+        self.step += 1
+        self.status = f"Step {self.step + 1} of {len(self.weights)}: {status}"
+        self.files.clear()
+        self.done_bytes = self.total_bytes = 0.0
+        self.since = time.time()
+        self.write()
+
+    def line(self, text: str) -> None:
+        self.lines.append(text)
+        self.count += 1
+        del self.lines[:-300]
+        m = re.match(r"Downloading (\S+) \(([\d.]+)\s*([KMG])iB\)", text)
+        if m:
+            size = float(m[2]) * {"K": 2**10, "M": 2**20, "G": 2**30}[m[3]]
+            self.files[m[1]] = size
+            self.total_bytes += size
+            self.since = time.time()
+        m = re.match(r"\s+Downloaded (\S+)$", text)
+        if m and m[1] in self.files:
+            size = self.files.pop(m[1])
+            self.done_bytes += size
+            seconds = time.time() - self.since
+            if size > 50e6 and seconds > 2:
+                self.speed = max(self.speed, size / seconds)
+
+    def permille(self) -> int:
+        if self.final:
+            return 1000
+        if not self.weights or self.step < 0:
+            return 0
+        part = 0.0
+        if self.total_bytes:
+            busy = sum(self.files.values())
+            guess = min(0.95 * busy, (time.time() - self.since) * self.speed)
+            part = 0.85 * (self.done_bytes + guess) / self.total_bytes
+        if not self.files and self.total_bytes and self.done_bytes >= self.total_bytes:
+            part = 0.9  # downloaded; installing
+        total = sum(self.weights)
+        return int(1000 * (sum(self.weights[:self.step]) + part * self.weights[self.step]) / total)
+
+    def write(self) -> None:
+        if not self.path:
+            return
+        text = "\n".join([str(self.permille()), self.status, str(self.count), *self.lines]) + "\n"
+        tmp = self.path.with_suffix(".tmp")
+        try:
+            tmp.write_text(text, encoding="ascii", errors="replace")
+            os.replace(tmp, self.path)
+        except OSError:
+            pass  # the setup is reading it: next time
+
+    def done(self) -> None:
+        self.final, self.status = True, "Ready"
+        self.write()
+
+    def _tick(self) -> None:
+        while True:
+            time.sleep(0.5)
+            self.write()
+
+
+PROGRESS = Progress(None)
 
 
 def say(text: str) -> None:
     print(text, flush=True)
+    for line in text.strip("\n").splitlines() or [""]:
+        PROGRESS.line(line)
     if LOG:
         with LOG.open("a", encoding="utf-8") as f:
             f.write(f"{time.strftime('%H:%M:%S')} {text}\n")
@@ -51,9 +147,14 @@ def run(uv: str, *args: str, env: dict | None = None) -> None:
     if LOG:
         with LOG.open("a", encoding="utf-8") as f:
             f.write("$ " + " ".join(cmd) + "\n")
-    r = subprocess.run(cmd, check=False, env={**os.environ, **(env or {})})
-    if r.returncode:
-        raise SystemExit(f"\nThis step failed (exit code {r.returncode}): {' '.join(cmd)}\n"
+    # uv's messages go through say(): to the console, the log and the setup window
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env={**os.environ, **(env or {})},
+                         text=True, encoding="utf-8", errors="replace", bufsize=1)
+    for line in p.stdout:
+        line = re.sub(r"\x1b\[[0-9;]*m", "", line.rstrip())
+        say(re.sub(r"^(\s+)Downloading (\S+)$", r"\1Downloaded \2", line))  # uv's "done" line reads oddly
+    if p.wait():
+        raise SystemExit(f"\nThis step failed (exit code {p.returncode}): {' '.join(cmd)}\n"
                          "The messages above say why; an internet connection is needed.")
 
 
@@ -223,7 +324,7 @@ def shortcuts(target: Path, desktop: bool, menu: bool = True) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    global LOG
+    global LOG, PROGRESS
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--target", required=True, help="the folder to install in")
     p.add_argument("--uv", default=os.environ.get("UV") or shutil.which("uv") or "uv", help="the uv to use")
@@ -236,6 +337,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--networks-only", action="store_true", help="only install the networks (the program is there already)")
     p.add_argument("--shortcut", action="store_true", help="add the program to the start menu / Applications")
     p.add_argument("--desktop", action="store_true", help="also put a shortcut on the desktop (Windows)")
+    p.add_argument("--progress", help="a file in which the Windows setup follows the installation")
     args = p.parse_args(argv)
     if args.networks is None:
         if sys.stdin.isatty():
@@ -246,6 +348,7 @@ def main(argv: list[str] | None = None) -> None:
     target = Path(args.target).resolve()
     target.mkdir(parents=True, exist_ok=True)
     LOG = target / "install.log"
+    PROGRESS = Progress(Path(args.progress) if args.progress else None)
     own = {}
     for item in args.own:
         name, _, path = item.partition("=")
@@ -260,28 +363,36 @@ def main(argv: list[str] | None = None) -> None:
     # (The cache costs little extra disk space: uv links the files from it into the environments.)
     env = {"UV_PYTHON_INSTALL_DIR": str(target / "python"), "UV_CACHE_DIR": str(target / "cache"),
            "UV_PYTHON_PREFERENCE": "only-managed"}
-    steps = (0 if args.networks_only else 2) + bool(wanted & set(TORCH_NETWORKS)) + ("cellpose4" in wanted) + ("stardist" in wanted) + bool(own)
-    step = 0
+    gpu = nvidia() if args.device == "auto" else args.device == "gpu"
+    torch_size = SIZE_TORCH["gpu" if gpu else "cpu"]
+    torch_nets = sorted(wanted & set(TORCH_NETWORKS))
+    weights = ([] if args.networks_only else [SIZE_PROGRAM]) + (
+        [torch_size + sum(SIZE[n] for n in torch_nets)] if torch_nets else []) + (
+        [torch_size + SIZE["cellpose4"]] if "cellpose4" in wanted else []) + (
+        [SIZE["stardist"]] if "stardist" in wanted else []) + ([0.01] if own else []) + (
+        [] if args.networks_only else [0.01])
+    PROGRESS.plan(weights)
+    steps, step = len(weights), 0
 
-    def next_step(text):
+    def next_step(text, short):
         nonlocal step
         step += 1
+        PROGRESS.next(short)
         say(f"\n[{step}/{steps}] {text}")
 
     say(f"Foci Analyzer: installing in {target} ({platform.system()} {platform.machine()})")
     if not args.networks_only:
-        next_step("The program")
+        next_step("The program", "Python and the program")
         run(args.uv, "sync", "--project", str(SOURCE), "--no-dev", "--frozen", "--no-editable", "--python", "3.12",
             env={**env, "UV_PROJECT_ENVIRONMENT": str(target / ".venv")})
-    gpu = nvidia() if args.device == "auto" else args.device == "gpu"
     index = [] if MAC else ["--index-url", "https://download.pytorch.org/whl/" + ("cu124" if gpu else "cpu"),
                             "--extra-index-url", "https://pypi.org/simple", "--index-strategy", "unsafe-best-match"]
 
-    torch_nets = sorted(wanted & set(TORCH_NETWORKS))
     if torch_nets:
         where = ("the Apple graphics chip (MPS) where it can" if MAC else
                  "the NVIDIA graphics card" if gpu else "the processor (no NVIDIA graphics card found)")
-        next_step(f"PyTorch networks ({', '.join(torch_nets)}), running on {where}; this takes a while")
+        next_step(f"PyTorch networks ({', '.join(torch_nets)}), running on {where}; this takes a while",
+                  "PyTorch and " + ", ".join(n.capitalize() for n in torch_nets))
         menv = target / "models-env"
         venv(args.uv, menv, "3.12", env)
         run(args.uv, "pip", "install", "--python", str(python_of(menv)), *TORCH, *index, env=env)
@@ -289,21 +400,21 @@ def main(argv: list[str] | None = None) -> None:
             *[pkg for n in torch_nets for pkg in PACKAGES[n]], *index, env=env)
 
     if "cellpose4" in wanted:
-        next_step("Cellpose 4 (its own environment); this takes a while")
+        next_step("Cellpose 4 (its own environment); this takes a while", "Cellpose 4 (with its own PyTorch)")
         cenv = target / "cellpose4-env"
         venv(args.uv, cenv, "3.12", env)
         run(args.uv, "pip", "install", "--python", str(python_of(cenv)), *TORCH, *CELLPOSE4, *index, env=env)
 
     if "stardist" in wanted:
         gpu_tf = not WINDOWS and not MAC and nvidia() and args.device != "cpu"
-        next_step("StarDist (TensorFlow" + (", NVIDIA graphics card)" if gpu_tf else ", processor)"))
+        next_step("StarDist (TensorFlow" + (", NVIDIA graphics card)" if gpu_tf else ", processor)"), "StarDist (TensorFlow)")
         senv = target / "stardist-env"
         venv(args.uv, senv, "3.11", env)
         tf = "tensorflow[and-cuda]==2.15.1" if gpu_tf else "tensorflow==2.15.1"
         run(args.uv, "pip", "install", "--python", str(python_of(senv)), tf, *STARDIST, env=env)
 
     if own:
-        next_step("Your own environments")
+        next_step("Your own environments", "Your own environments")
         home = Path(args.home)
         home.mkdir(parents=True, exist_ok=True)
         pj = home / "program.json"
@@ -320,13 +431,22 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.networks_only:
         say("\nReady.")
+        PROGRESS.done()
         return
-    next_step("Shortcuts")
+    next_step("Shortcuts", "Shortcuts")
     shortcuts(target, args.desktop, menu=args.shortcut)  # on Windows always "Foci Analyzer.exe" with the logo
     exe = target / "Foci Analyzer.exe" if WINDOWS else python_of(target / ".venv").parent / "foci-analyzer"
     say(f"\nReady. Start Foci Analyzer {'from the start menu' if args.shortcut and WINDOWS else 'from Applications' if args.shortcut and MAC else 'from the applications menu' if args.shortcut else 'with'}"
         f"{'' if args.shortcut else ' ' + str(exe)}; it opens in the browser.")
+    PROGRESS.done()
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SystemExit as e:
+        if e.code not in (0, None):
+            say(str(e.code))
+            PROGRESS.status = "The installation did not finish: " + str(e.code).strip().splitlines()[0]
+            PROGRESS.write()
+        raise

@@ -943,6 +943,6 @@ def make_server(port: int = 8770, app: App | None = None, warm: bool = False) ->
     app = app or App()
     app.warm = warm
     app.warm_up()
-    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(app))
-    server.daemon_threads = True
-    return server, app
+    from .cli import LocalServer
+
+    return LocalServer(("127.0.0.1", port), make_handler(app)), app
