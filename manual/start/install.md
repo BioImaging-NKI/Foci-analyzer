@@ -19,7 +19,8 @@ Mac, or else the processor.
    its `python.exe` on the next page: that network is then not installed again.
 5. The setup downloads Python and the networks; this takes 5 to 20 minutes.
 
-Start Foci Analyzer from the start menu. It opens in your web browser.
+Start Foci Analyzer from the start menu, or with `Foci Analyzer.exe` in the installation folder
+(`%LOCALAPPDATA%\FociAnalyzer`). It opens in your web browser.
 
 Silent installation, for example for several computers:
 `FociAnalyzer-Setup.exe /SILENT /NETWORKS=stardist,spotiflow`

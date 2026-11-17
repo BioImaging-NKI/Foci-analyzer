@@ -41,15 +41,15 @@ Source: "build\payload\*"; DestDir: "{app}\program"; Flags: ignoreversion recurs
 Source: "build\uv.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
 
 [Icons]
-Name: "{userprograms}\Foci Analyzer"; Filename: "{app}\.venv\Scripts\foci-analyzer-window.exe"; WorkingDir: "{app}"; IconFilename: "{app}\program\installer\FociAnalyzer.ico"; Comment: "Foci in nuclei and cells"
-Name: "{userdesktop}\Foci Analyzer"; Filename: "{app}\.venv\Scripts\foci-analyzer-window.exe"; WorkingDir: "{app}"; IconFilename: "{app}\program\installer\FociAnalyzer.ico"; Tasks: desktopicon
+Name: "{userprograms}\Foci Analyzer"; Filename: "{app}\Foci Analyzer.exe"; WorkingDir: "{app}"; IconFilename: "{app}\program\installer\FociAnalyzer.ico"; Comment: "Foci in nuclei and cells"
+Name: "{userdesktop}\Foci Analyzer"; Filename: "{app}\Foci Analyzer.exe"; WorkingDir: "{app}"; IconFilename: "{app}\program\installer\FociAnalyzer.ico"; Tasks: desktopicon
 
 [UninstallDelete]
 ; the environments, Python, the download cache and the log were made by install.py, not copied by the setup
 Type: filesandordirs; Name: "{app}"
 
 [Run]
-Filename: "{app}\.venv\Scripts\foci-analyzer-window.exe"; Description: "Start Foci Analyzer"; Flags: postinstall nowait skipifsilent unchecked
+Filename: "{app}\Foci Analyzer.exe"; Description: "Start Foci Analyzer"; Flags: postinstall nowait skipifsilent unchecked
 
 [Code]
 const

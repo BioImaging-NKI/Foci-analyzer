@@ -112,13 +112,75 @@ def ask(args) -> None:
                 args.own.append(f"{n}={p}")
 
 
-def shortcuts(target: Path, desktop: bool) -> None:
+def _pe_end(data: bytes) -> int:
+    """Where the program part of an .exe ends (what follows is appended data, such as uv's start script)."""
+    import struct
+    pe = struct.unpack_from("<I", data, 0x3C)[0]
+    sections, opt_size = struct.unpack_from("<H", data, pe + 6)[0], struct.unpack_from("<H", data, pe + 20)[0]
+    table = pe + 24 + opt_size
+    end = max(struct.unpack_from("<II", data, table + 40 * i + 16)[1] + struct.unpack_from("<II", data, table + 40 * i + 16)[0]
+              for i in range(sections))
+    return end
+
+
+def branded_launcher(src: Path, dst: Path, ico: Path) -> bool:
+    """A copy of uv's launcher `src` with the icon of `ico` (Windows). uv's launcher finds its Python and script
+    in data appended after the program part, so that part is set aside while the icon is replaced, and appended
+    again. Returns False (and leaves a plain copy) when the icon cannot be set."""
+    import ctypes
+    import struct
+    data = src.read_bytes()
+    end = _pe_end(data)
+    dst.write_bytes(data)
+    if not ico.is_file() or end >= len(data):
+        return False
+    try:
+        icon = ico.read_bytes()
+        _, kind, count = struct.unpack_from("<HHH", icon, 0)
+        if kind != 1:
+            return False
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.BeginUpdateResourceW.restype = ctypes.c_void_p
+        k32.BeginUpdateResourceW.argtypes = [ctypes.c_wchar_p, ctypes.c_bool]
+        k32.UpdateResourceW.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ushort,
+                                        ctypes.c_char_p, ctypes.c_uint]
+        k32.EndUpdateResourceW.argtypes = [ctypes.c_void_p, ctypes.c_bool]
+        dst.write_bytes(data[:end])  # the program part only; the rest is appended again below
+        h = k32.BeginUpdateResourceW(str(dst), False)
+        if not h:
+            raise OSError(ctypes.get_last_error())
+        group = struct.pack("<HHH", 0, 1, count)
+        for i in range(count):
+            w, hh, colours, res, planes, bits, size, offset = struct.unpack_from("<BBBBHHII", icon, 6 + 16 * i)
+            k32.UpdateResourceW(h, 3, 100 + i, 0, icon[offset:offset + size], size)  # RT_ICON
+            group += struct.pack("<BBBBHHIH", w, hh, colours, res, planes, bits, size, 100 + i)
+        for name in (1, 101):  # the group icon that Windows shows: the first one, by number
+            k32.UpdateResourceW(h, 14, name, 0, group, len(group))  # RT_GROUP_ICON
+        if not k32.EndUpdateResourceW(h, False):
+            raise OSError(ctypes.get_last_error())
+        with dst.open("ab") as f:
+            f.write(data[end:])
+        return True
+    except (OSError, ValueError, AttributeError, struct.error) as e:
+        say(f"  (the program icon could not be set: {e})")
+        dst.write_bytes(data)
+        return False
+
+
+def shortcuts(target: Path, desktop: bool, menu: bool = True) -> None:
     exe = python_of(target / ".venv").parent / ("foci-analyzer-window.exe" if WINDOWS else "foci-analyzer-window")
     icons = target / "icons"  # kept with the program: the folder the installer ran from may be removed later
     icons.mkdir(exist_ok=True)
     for name in ("FociAnalyzer.ico", "FociAnalyzer.icns", "logo-512.png"):
         if (HERE / name).is_file():
             shutil.copy2(HERE / name, icons / name)
+    if WINDOWS and exe.is_file():  # "Foci Analyzer.exe" in the program folder, with the logo as its icon
+        launcher = target / "Foci Analyzer.exe"
+        if branded_launcher(exe, launcher, icons / "FociAnalyzer.ico"):
+            say(f"Made {launcher}")
+        exe = launcher
+    if not menu:
+        return
     if WINDOWS:
         places = ["[Environment]::GetFolderPath('Programs')"] + (["[Environment]::GetFolderPath('Desktop')"] if desktop else [])
         for place in places:
@@ -144,11 +206,19 @@ def shortcuts(target: Path, desktop: bool) -> None:
             "<key>CFBundlePackageType</key><string>APPL</string></dict></plist>\n", encoding="utf-8")
         say(f"Made {app.parent}")
     else:
-        apps = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "applications"
+        share = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+        apps = share / "applications"
         apps.mkdir(parents=True, exist_ok=True)
+        icon = str(icons / "logo-512.png")
+        if (icons / "logo-512.png").is_file():  # in the icon theme too, where every desktop looks for it
+            themed = share / "icons" / "hicolor" / "512x512" / "apps"
+            themed.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(icons / "logo-512.png", themed / "foci-analyzer.png")
+            icon = "foci-analyzer"
         (apps / "foci-analyzer.desktop").write_text(
             "[Desktop Entry]\nType=Application\nName=Foci Analyzer\nComment=Foci in nuclei and cells\n"
-            f'Exec="{exe}"\nIcon={icons / "logo-512.png"}\nTerminal=false\nCategories=Science;Education;\n', encoding="utf-8")
+            f'Exec="{exe}"\nIcon={icon}\nTerminal=false\nCategories=Science;Education;\n'
+            "StartupWMClass=Foci Analyzer\n", encoding="utf-8")
         say(f"Made {apps / 'foci-analyzer.desktop'}")
 
 
@@ -252,9 +322,8 @@ def main(argv: list[str] | None = None) -> None:
         say("\nReady.")
         return
     next_step("Shortcuts")
-    if args.shortcut:
-        shortcuts(target, args.desktop)
-    exe = python_of(target / ".venv").parent / ("foci-analyzer-window.exe" if WINDOWS else "foci-analyzer")
+    shortcuts(target, args.desktop, menu=args.shortcut)  # on Windows always "Foci Analyzer.exe" with the logo
+    exe = target / "Foci Analyzer.exe" if WINDOWS else python_of(target / ".venv").parent / "foci-analyzer"
     say(f"\nReady. Start Foci Analyzer {'from the start menu' if args.shortcut and WINDOWS else 'from Applications' if args.shortcut and MAC else 'from the applications menu' if args.shortcut else 'with'}"
         f"{'' if args.shortcut else ' ' + str(exe)}; it opens in the browser.")
 

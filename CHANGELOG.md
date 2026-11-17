@@ -63,6 +63,10 @@ First working version. There are no earlier results to compare with.
 - Settings page: install a network with one click; use the graphics card or not; images at a time.
 - Experiment page: stays open after opening images, updates the image list by itself, ✓ for analyzed images
   (also in the image list of the Analyze page). The status bar keeps its progress bar in one place.
+- Fixed: an own Cellpose 4 environment given for Cellpose was reported as not installed, and its models
+  greyed out. The automatic Cellpose model works with Cellpose 3 and 4.
+- Windows: `Foci Analyzer.exe` in the installation folder, with the logo as icon (also for the shortcuts);
+  Linux: the icon is also put in the icon theme.
 - **Files named** matches with or without the extension (`*.tif` found nothing before).
 - A user manual (`manual/`, not online yet).
 - Logo in the window, the browser tab, the setup and the shortcuts.

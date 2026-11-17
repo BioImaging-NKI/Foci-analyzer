@@ -27,8 +27,9 @@ _workers: dict[str, Worker] = {}
 _pythons: dict[str, str] = {}  # chosen on the Settings page: "all" and, per network, another Python
 USE_GPU = True  # the Settings page can make the networks run on the processor
 NETWORKS = ("cellpose", "cellpose4", "stardist", "instanseg", "spotiflow", "trackastra")
-# The pretrained models offered in the window, per network: (name, description, network that runs it).
-# Cellpose 3 and 4 need environments of their own; the empty name is the default of the method.
+# The pretrained models offered in the window, per network: (name, description, what it needs). The empty
+# name is the default of the method. Cellpose: "cellpose" runs on any version (Cellpose 4 then uses cpsam),
+# "cellpose3" needs Cellpose 3, "cellpose4" Cellpose 4; they cannot be installed in one environment.
 DOCS = {"stardist": "https://github.com/stardist/stardist#pretrained-models-for-2d",
         "cellpose": "https://cellpose.readthedocs.io/en/latest/models.html",
         "instanseg": "https://github.com/instanseg/instanseg",
@@ -36,10 +37,10 @@ DOCS = {"stardist": "https://github.com/stardist/stardist#pretrained-models-for-
 CATALOG = {
     "stardist": [("", "Versatile fluorescent nuclei (2D_versatile_fluo)", "stardist"),
                  ("2D_paper_dsb2018", "Nuclei of the Data Science Bowl 2018", "stardist")],
-    "cellpose": [("", "Automatic: nuclei, or cyto3 with a cell channel (Cellpose 3)", "cellpose"),
-                 ("nuclei", "Nuclei (Cellpose 3)", "cellpose"),
-                 ("cyto3", "Cells, general (Cellpose 3)", "cellpose"),
-                 ("tissuenet_cp3", "Tissue, cells and nuclei (Cellpose 3)", "cellpose"),
+    "cellpose": [("", "Automatic: nuclei or cyto3 (Cellpose 3), cpsam (Cellpose 4)", "cellpose"),
+                 ("nuclei", "Nuclei (Cellpose 3)", "cellpose3"),
+                 ("cyto3", "Cells, general (Cellpose 3)", "cellpose3"),
+                 ("tissuenet_cp3", "Tissue, cells and nuclei (Cellpose 3)", "cellpose3"),
                  ("cpsam_v2", "CellposeSAM v2: any cell or nucleus (Cellpose 4, slow without GPU)", "cellpose4"),
                  ("cpdino-vitb", "CellposeDINO ViT-B (Cellpose 4; needs the dinov3 package, see the help)", "cellpose4")],
     "instanseg": [("", "Fluorescent nuclei and cells (fluorescence_nuclei_and_cells)", "instanseg"),
@@ -57,26 +58,59 @@ def network_of(method: str, model: str) -> str:
     """The network (environment) that runs this model: Cellpose 4 models need the Cellpose 4 environment."""
     for name, _, net in CATALOG.get(method, []):
         if name == model:
-            return net
+            return "cellpose" if net == "cellpose3" else net
     return method
 
 
+DISTS = {"cellpose": "cellpose", "cellpose4": "cellpose", "stardist": "stardist", "instanseg": "instanseg-torch",
+         "spotiflow": "spotiflow", "trackastra": "trackastra"}
+_asked: dict[tuple, dict] = {}
+
+
+def _versions_in(py: str) -> dict[str, str]:
+    """The versions of the network packages in the environment of this Python: from its package folders (fast),
+    else by asking that Python (any layout; without importing the networks, so well under a second)."""
+    key = (py, Path(py).stat().st_mtime if Path(py).is_file() else 0)
+    if key in _asked:
+        return _asked[key]
+    found: dict[str, str] = {}
+    names = sorted(set(DISTS.values()))
+    for root in {Path(py).parent, Path(py).parent.parent}:
+        for site in [root / "Lib" / "site-packages", *root.glob("lib/python3*/site-packages")]:
+            for name in names:
+                prefix = name.replace("-", "_")
+                for d in site.glob(f"{prefix}-*.dist-info"):
+                    found[name] = d.name[len(prefix) + 1:-len(".dist-info")]
+    if not found and Path(py).is_file():
+        code = (f"import importlib.metadata as m, json\nout = {{}}\nfor n in {names!r}:\n    try: out[n] = m.version(n)\n"
+                "    except Exception: pass\nprint(json.dumps(out))")
+        try:
+            r = subprocess.run([py, "-c", code], check=False, capture_output=True, text=True, timeout=30,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            found = json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0 and r.stdout.strip() else {}
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            found = {}
+    _asked[key] = found
+    return found
+
+
+def _major(version: str | None) -> int:
+    try:
+        return int(str(version).split(".")[0])
+    except ValueError:
+        return 0
+
+
 def installed() -> dict[str, str | None]:
-    """Per network the version in the environment that would run it, or None; from the package folders, so
-    without starting that Python (which takes seconds)."""
-    dist = {"cellpose": "cellpose", "cellpose4": "cellpose", "stardist": "stardist", "instanseg": "instanseg_torch",
-            "spotiflow": "spotiflow", "trackastra": "trackastra"}
+    """Per network the version in the environment that would run it, or None. "cellpose" is any Cellpose (the
+    automatic model), "cellpose3" Cellpose 3 (its named models), "cellpose4" Cellpose 4 (its models)."""
     out: dict[str, str | None] = {}
     for op in NETWORKS:
-        py, version = python_for(op), None
-        if py and Path(py).is_file():
-            for root in {Path(py).parent, Path(py).parent.parent}:
-                for site in [root / "Lib" / "site-packages", *root.glob("lib/python3*/site-packages")]:
-                    for d in site.glob(f"{dist[op]}-*.dist-info"):
-                        version = d.name[len(dist[op]) + 1:-len(".dist-info")]
-        if version and op.startswith("cellpose") and (version.split(".")[0] >= "4") != (op == "cellpose4"):
-            version = None  # Cellpose 3 models need Cellpose 3, the Cellpose 4 models Cellpose 4
-        out[op] = version
+        py = python_for(op)
+        out[op] = _versions_in(py).get(DISTS[op]) if py else None
+    if _major(out["cellpose4"]) < 4:
+        out["cellpose4"] = None
+    out["cellpose3"] = out["cellpose"] if out["cellpose"] and _major(out["cellpose"]) < 4 else None
     return out
 
 
@@ -99,6 +133,10 @@ def python_for(op: str = "") -> str:
         own = default_python(op)
         if f"{op}-env" in own:
             return own
+    if op == "cellpose4" and not _pythons.get(op):  # the Cellpose of the user may be Cellpose 4 already
+        py = python_for("cellpose")
+        if py and _major(_versions_in(py).get("cellpose")) >= 4:
+            return py
     return _pythons.get(op) or _pythons.get("all") or default_python(op)
 _lock = threading.Lock()
 

@@ -174,11 +174,10 @@ class App:
             info = asked[py]
             version = info.get({"instanseg": "instanseg-torch", "cellpose4": "cellpose"}.get(op, op))
             error = info.get("error")
-            if version and op.startswith("cellpose") and (int(version.split(".")[0]) >= 4) != (op == "cellpose4"):
-                error = (f"this environment has Cellpose {version}; " + (
-                    "the Cellpose 4 models need Cellpose 4" if op == "cellpose4" else
-                    "the Cellpose 3 models (nuclei, cyto3, tissuenet_cp3) need Cellpose 3"))
-                version = None
+            if version and op == "cellpose4" and int(version.split(".")[0]) < 4:
+                error, version = f"this environment has Cellpose {version}; the Cellpose 4 models need Cellpose 4", None
+            elif version and op == "cellpose" and int(version.split(".")[0]) >= 4:
+                version += " (Cellpose 4: automatic uses cpsam; nuclei, cyto3 and tissuenet_cp3 need Cellpose 3)"
             rows.append({"name": op, "label": LABELS.get(op, op), "python": py, "version": version, "torch": info.get("torch"),
                          "device": info.get("device"), "gpu": info.get("gpu"), "gpu_memory": info.get("gpu_memory"),
                          "error": error})

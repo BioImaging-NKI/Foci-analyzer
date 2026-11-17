@@ -130,7 +130,7 @@ function modelControl(f, group, id) {
   const sel = el("select", { id, onchange: (e) => {
     if (e.target.value === OWN) { own.hidden = false; path.focus(); } else { own.hidden = true; save(e.target.value); renderSettings(); } } },
   list.map((m) => el("option", { value: m.name, disabled: !installed(m.network) && m.name !== v,
-    textContent: m.label + (installed(m.network) ? "" : " · not installed (Settings page)") })),
+    textContent: m.label + (installed(m.network) ? "" : m.network === "cellpose3" && installed("cellpose") ? " · needs Cellpose 3" : " · not installed (Settings page)") })),
   el("option", { value: OWN, textContent: "Own model…" }));
   sel.value = known ? v : OWN;
   return el("div", { class: "field" }, el("label", { htmlFor: id, textContent: f.label }), helpIcon(f.help, S.catalog.docs[net]),

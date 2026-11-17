@@ -20,7 +20,9 @@ which Python environment runs it. Opening the page asks the networks themselves,
   Foci Analyzer.
 
 Cellpose 3 and Cellpose 4 are separate rows, because they cannot be installed in the same environment: the
-models *nuclei*, *cyto3* and *tissuenet_cp3* need Cellpose 3, *cpsam_v2* and *cpdino-vitb* Cellpose 4.
+models *nuclei*, *cyto3* and *tissuenet_cp3* need Cellpose 3, *cpsam_v2* and *cpdino-vitb* Cellpose 4. The
+automatic choice works with either. An environment of your own with Cellpose 4, given for Cellpose 3, is
+used for the Cellpose 4 models as well when there is no Cellpose 4 environment of Foci Analyzer.
 
 ## Program
 

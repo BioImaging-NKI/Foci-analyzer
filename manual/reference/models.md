@@ -19,10 +19,10 @@ More about these models: <https://cellpose.readthedocs.io/en/latest/models.html>
 
 | Name | In the list | Runs in |
 |---|---|---|
-| `(default)` | Automatic: nuclei, or cyto3 with a cell channel (Cellpose 3) | Cellpose 3 |
-| `nuclei` | Nuclei (Cellpose 3) | Cellpose 3 |
-| `cyto3` | Cells, general (Cellpose 3) | Cellpose 3 |
-| `tissuenet_cp3` | Tissue, cells and nuclei (Cellpose 3) | Cellpose 3 |
+| `(default)` | Automatic: nuclei or cyto3 (Cellpose 3), cpsam (Cellpose 4) | Cellpose 3 |
+| `nuclei` | Nuclei (Cellpose 3) | cellpose3 |
+| `cyto3` | Cells, general (Cellpose 3) | cellpose3 |
+| `tissuenet_cp3` | Tissue, cells and nuclei (Cellpose 3) | cellpose3 |
 | `cpsam_v2` | CellposeSAM v2: any cell or nucleus (Cellpose 4, slow without GPU) | Cellpose 4 |
 | `cpdino-vitb` | CellposeDINO ViT-B (Cellpose 4; needs the dinov3 package, see the help) | Cellpose 4 |
 
