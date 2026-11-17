@@ -328,10 +328,28 @@ nuclear stain (`Hi-res 3D`). Default: Cellpose.
 7. Tested on all test sets with every method (2026-11-16): StarDist found nuclei everywhere and is the
    default; Cellpose failed on `1-channel` (0 cells) and `Hi-res 3D` first image (1 cell); threshold fails on
    the dense organoid (1 cell). Not tested: real time-lapse data.
-8. Not built: foci tracking, the manual. Cellpose 4 (`cpsam`) was tested through the existing environment
-   `C:/PythonProjects/Cellpose4/.venv` (works; about 28 s per 1024² image on the Quadro RTX 3000).
+8. Not built: foci tracking, the manual. Cellpose 4 has its own environment `cellpose4-env` (cellpose
+   4.2.1.1, installer option `cellpose4`); `cpsam_v2` works (2026-11-17: 21 nuclei on `3-channel/Foci_02`,
+   49 s with the download). `cpdino-vitb` needs Meta's `dinov3` package, which is only on GitHub
+   (`pip install git+https://github.com/facebookresearch/dinov3`); not in the installer: the user decides.
+9. Removed cells (2026-11-17): `removed_cells.tsv` in the results folder holds clicked points (image id,
+   frame, x, y, z; z = -1 in a projection); `curation.apply` drops the cell under each point from the tables
+   (labels stay). Points survive other segmentation settings; moving the results folder loses them.
 
 ---
+
+### State on 2026-11-17, evening
+
+Done after the morning list: foci size below a pixel no longer fails (IndexError in the LoG filter); the
+Experiment page stays put after opening images and updates its list by itself; ✓ marks for images in the
+results folder (green: current settings); the run box says it writes to the results folder; the status bar
+has a fixed progress bar that only moves forward; smooth outlines (marching squares, `/api/contours`), cell
+numbers, colour cells by label, a range slider for the colour scale, the selected cell in yellow, removed
+cells in red, a grey line at the distance outside cells; removing cells by hand (key X); model dropdowns per
+network with links in the help, own model with Browse; Cellpose 4 environment; threshold segmentation
+slider (× Otsu); foci no longer grow outside their cell (results change a little: extents are clipped at the
+cell edge in 2D as well); 3D cells force 3D foci detection (projections greyed out); Settings page: Install
+buttons per network (install.py `--networks-only`), GPU on/off, images at a time.
 
 ### State on 2026-11-17 (for continuing elsewhere)
 

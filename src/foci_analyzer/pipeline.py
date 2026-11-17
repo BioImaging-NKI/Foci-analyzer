@@ -8,7 +8,7 @@ repeats the extents and measurements only.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from itertools import combinations
 from pathlib import Path
 
@@ -57,6 +57,7 @@ class FrameResult:
     foci: pd.DataFrame
     remarks: list[str]
     offset: tuple[int, int] = (0, 0)  # x, y of the analyzed part in the image (preview of the visible part only)
+    removed: list[int] = field(default_factory=list)  # cells removed by hand: not in the tables (curation.py)
 
 
 def _prepare(data: np.ndarray, info: ImageInfo, s: Settings):
@@ -104,7 +105,7 @@ def _segment(data: np.ndarray, cal: an.Calibration, s: Settings, name: str) -> n
     if seg.dimension == "2D" and img.shape[0] > 1:
         img = img.max(0)[None]
     if seg.method == "threshold":
-        labels = an.segment_threshold(img, cal, seg.min_diameter)
+        labels = an.segment_threshold(img, cal, seg.min_diameter, seg.threshold_factor)
     elif seg.method == "labels from file":
         labels = _read_labels(seg.labels_folder, name, img.shape)
     else:
@@ -125,6 +126,10 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
     remarks: list[str] = []
     if info.slices > 1 and info.z_spacing is None and info.unit == "µm":
         remarks.append("no Z spacing in the file: taken equal to the pixel size")
+    if s.segmentation.dimension == "3D" and info.slices > 1 and s.foci_general.dimension != "3D":
+        # cells in 3D and foci on a projection do not fit together: a projected focus has no slice to be in
+        s = replace(s, foci_general=replace(s.foci_general, dimension="3D"))
+        remarks.append("the cells are segmented in 3D, so the foci are detected in 3D as well")
     steps = 2 + 3 * len(s.foci) + (0 if only_candidates else 2)
     k_prep, (data, cal, border) = cache.run("prepare", asdict(s.image) | {"k": "p"}, (image_key,),
                                             lambda: _prepare(data, info, s), "Preparing the image", (1, steps))

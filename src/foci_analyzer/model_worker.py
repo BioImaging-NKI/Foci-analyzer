@@ -70,6 +70,8 @@ def cellpose(arrays, p):
     major = int((_version("cellpose") or "3").split(".")[0])
     gpu = _device() != "cpu"
     img, second = arrays["img"], arrays.get("second")
+    if p.get("model") in ("cpsam_v2", "cpdino-vitb") and major < 4:
+        raise ValueError(f"the model {p['model']} needs Cellpose 4; this environment has Cellpose {_version('cellpose')}")
     name = p.get("model") or ("cpsam" if major >= 4 else ("nuclei" if second is None and p.get("nuclei") else "cyto3"))
     auto = major < 4 and not p.get("diameter") and name in ("nuclei", "cyto3", "cyto2", "cyto")
     key = ("cellpose", name, auto)
@@ -89,8 +91,9 @@ def cellpose(arrays, p):
     if second is not None:
         s = second if three_d else second[0]
         x = np.stack([x, s], axis=1 if three_d else 0)  # Z, C, Y, X or C, Y, X
+        kw["channel_axis"] = 1 if three_d else 0
         if major < 4:
-            kw.update(channels=[1, 2], channel_axis=1 if three_d else 0)
+            kw["channels"] = [1, 2]
     elif major < 4:
         kw.update(channels=[0, 0])
     if three_d and img.shape[0] >= 20:

@@ -1,5 +1,7 @@
 """Tests of the analysis on a made-up image with known nuclei and foci."""
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -216,9 +218,22 @@ def test_preview_overlays_parts_and_cancel(tmp_path, monkeypatch):
         plane = np.frombuffer(raw, "<u2").reshape(h, w)
         assert (w, h) == (160, 128) and plane.any(), kind
         if kind == "value":  # the cell with 6 foci is the top of the colour scale, the one with 3 the bottom
-            assert set(np.unique(plane)) == {0, 1, 255}
+            assert set(np.unique(plane)) == {0, 1, 65535}
     cand = np.frombuffer(app.candidates({"path": image, "ch": "2"}), "<f4").reshape(-1, 6)
     assert (cand[:, 5] == 2).sum() == 9  # every focus colocalizes
+    # smooth outlines: one polygon per cell, [label, n, x1, y1, ...]
+    poly = np.frombuffer(app.contours({"path": image, "kind": "cells", "z": "mip"}), "<f4")
+    labels, k = [], 0
+    while k < len(poly):
+        labels.append(int(poly[k])); k += 2 + 2 * int(poly[k + 1])
+    assert labels == [1, 2]
+    # a cell removed by hand leaves the tables with its foci, is remembered in the results folder, and comes back
+    _, y, x = (np.argwhere(app.shown(image, 0).labels == 1).mean(0) + 0.5).astype(int)
+    q = app.toggle_cell({"path": image, "x": x, "y": y, "z": -1})
+    assert q["toggled"] == "removed" and q["cells"] == 1 and q["removed"] == [1] and sum(c["foci"] for c in q["channels"]) < 18
+    assert (Path(app.results_folder()) / "removed_cells.tsv").is_file()
+    assert app.preview({"path": image, "settings": s})["removed"] == [1]  # analyzed again: still removed
+    assert app.toggle_cell({"path": image, "x": x, "y": y, "z": -1})["cells"] == 2
     # only the left half: one nucleus, and everything is placed where it is in the whole image
     part = app.preview({"path": image, "settings": s, "box": [0, 0, 80, 128]})
     assert part["cells"] == 1 and part["offset"] == [0, 0] and part["part"][2:] == [80, 128]

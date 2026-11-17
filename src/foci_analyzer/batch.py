@@ -17,10 +17,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import __version__, config, export, pipeline, tracking
+from . import __version__, config, curation, export, pipeline, tracking
 from .experiment import ImageEntry
 from .io import read_image
 from .stages import StageCache
+
+WORKERS = 0  # images analyzed at the same time; 0 = chosen from the number of processors (Settings page)
 
 
 @dataclass
@@ -57,12 +59,14 @@ def analyze_image(entry: ImageEntry, s: config.Settings, compute_lock: threading
     cells, foci, cell_labels, frames, results = [], [], [], [], []
     ch = s.image.cell_channel or s.image.nuclei_channel
     remark = ""
+    removed = curation.load(folder)  # cells removed by hand in the viewer
     for t in range(info.frames):
         if compute_lock:
             with compute_lock:
                 r = pipeline.analyze_frame(cache, f"{entry.path}|{t}", data[t], info, s)
         else:
             r = pipeline.analyze_frame(cache, f"{entry.path}|{t}", data[t], info, s)
+        r = curation.apply(r, curation.points(removed, entry.id, t))
         for df, out in ((r.cells, cells), (r.foci, foci)):
             df = df.copy()
             df.insert(0, "frame", t + 1)
@@ -141,7 +145,7 @@ def run(images: list[ImageEntry], s: config.Settings, folder: str, results: Resu
         # process (and its GPU) is used by one image at a time while the other images read and do their foci.
         networks = s.segmentation.method in ("cellpose", "stardist", "instanseg") or any(
             f.method == "spotiflow" for f in s.foci)
-        workers = min(len(images), 3 if networks else min(max(1, (os.cpu_count() or 2) // 2), 6))
+        workers = min(len(images), WORKERS or (3 if networks else min(max(1, (os.cpu_count() or 2) // 2), 6)))
         done: dict[int, tuple] = {}
 
         def finished(i, entry, get):

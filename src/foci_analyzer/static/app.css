@@ -41,7 +41,7 @@ nav button.on { border-bottom-color: var(--accent); font-weight: 600; }
 #theme { margin-left: auto; }
 #statusbar { display: flex; align-items: center; gap: 12px; padding: 4px 16px; min-height: 28px; font-size: 13px;
   background: var(--panel); border-top: 1px solid var(--line); }
-#status { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#status { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
 #status.error { color: var(--danger); } #status.busy { color: var(--text); }
 #cancel { font-size: 12.5px; padding: 1px 10px; order: 3; }
 #busy { flex: 0 0 220px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
@@ -125,7 +125,13 @@ details.advanced > summary { cursor: pointer; color: var(--muted); font-size: 12
 #foci-toggles:empty { display: none; }
 #cell-color-wrap { margin-top: 6px; }
 #cell-color { width: 100%; margin-top: 3px; }
-#cell-legend { display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+#cell-legend .legend-row { display: flex; align-items: center; gap: 6px; }
+#cell-legend .dual { margin-top: 2px; }
+#cell-actions { margin-top: 8px; }
+.run-title { flex-basis: 100%; font-weight: 600; font-size: 12.5px; }
+#program-log { max-height: 180px; overflow: auto; font-size: 12px; background: var(--line); padding: 6px 8px; border-radius: 6px; white-space: pre-wrap; }
+#images td.done { color: var(--ok, #2e9e5b); font-weight: 700; } #images td.old { color: var(--muted); }
+#cell-legend { margin-top: 5px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 #cell-legend .ramp { flex: 1; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #3b1a8c, #219e8c, #fce824); }
 #image-select { max-width: 260px; }
 .toggles { display: flex; gap: 10px; }

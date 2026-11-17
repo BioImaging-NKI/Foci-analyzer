@@ -44,10 +44,16 @@ export function fmt(v) {
 export function pvalue(p) { return p === null || p === undefined ? "–" : p < 0.0001 ? "< 0.0001" : String(+p.toPrecision(2)); }
 
 // ---- context help: any element with class "help" and a data-help text
-export function helpIcon(text) { return text ? el("span", { class: "help", tabIndex: 0, role: "button", "aria-label": "Help", help: text }) : el("span"); }
+export function helpIcon(text, link) {
+  if (!text) return el("span");
+  const h = el("span", { class: "help", tabIndex: 0, role: "button", "aria-label": "Help", help: text });
+  if (link) h.dataset.link = link;
+  return h;
+}
 const pop = $("help-pop");
 function showHelp(target) {
   pop.textContent = target.dataset.help; pop.hidden = false;
+  if (target.dataset.link) pop.append(" ", el("a", { href: target.dataset.link, target: "_blank", rel: "noopener", textContent: "More about these models ↗" }));
   const r = target.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
   pop.style.left = `${clamp(r.left, 8, window.innerWidth - w - 8)}px`;
   pop.style.top = `${r.bottom + h + 12 > window.innerHeight ? Math.max(8, r.top - h - 6) : r.bottom + 6}px`;

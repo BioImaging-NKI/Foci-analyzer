@@ -42,7 +42,10 @@ def test_settings_validation():
 def test_schema_has_every_setting_and_hides_most():
     for sec in config.schema():
         assert sec["fields"] and all(f["label"] for f in sec["fields"])
-        assert sum(not f["advanced"] for f in sec["fields"]) <= 5, sec["key"]
+        methods = next((f["choices"] for f in sec["fields"] if f["key"] == "method"), [None])
+        for m in methods:  # what is shown at the same time: at most five settings outside Advanced
+            shown = [f for f in sec["fields"] if not f["advanced"] and (not f["when"] or m in f["when"].get("method", [m]))]
+            assert len(shown) <= 5, (sec["key"], m)
 
 
 # ---------------------------------------------------------------- reading

@@ -53,28 +53,29 @@ Filename: "{app}\.venv\Scripts\foci-analyzer-window.exe"; Description: "Start Fo
 
 [Code]
 const
-  NetCount = 5;
+  NetCount = 6;
 var
   NetPage: TInputOptionWizardPage;
   OwnPage: TInputFileWizardPage;
-  Names: array[0..4] of String;
+  Names: array[0..5] of String;
 
 procedure InitializeWizard;
 var
   i: Integer;
 begin
-  Names[0] := 'stardist'; Names[1] := 'cellpose'; Names[2] := 'instanseg'; Names[3] := 'spotiflow'; Names[4] := 'trackastra';
+  Names[0] := 'stardist'; Names[1] := 'cellpose'; Names[2] := 'instanseg'; Names[3] := 'spotiflow'; Names[4] := 'trackastra'; Names[5] := 'cellpose4';
   NetPage := CreateInputOptionPage(wpSelectTasks, 'Neural networks',
     'Which networks should be installed?',
     'Foci Analyzer works without them (threshold segmentation, watershed foci), but they find nuclei and foci ' +
-    'better. They need about 7 GB together and run on an NVIDIA graphics card when there is one. ' +
+    'better. They need about 7 GB together (Cellpose 4: 3 GB more) and run on an NVIDIA graphics card when there is one. ' +
     'You can run this setup again later to add them.', False, False);
   NetPage.Add('StarDist: nuclei, fast and robust (recommended)');
   NetPage.Add('Cellpose: nuclei or whole cells, also in 3D');
   NetPage.Add('InstanSeg: nuclei or whole cells, fast; also made for tissue');
   NetPage.Add('Spotiflow: foci detection by a network');
   NetPage.Add('Trackastra: tracking of cells in time-lapses');
-  for i := 0 to NetCount - 1 do
+  NetPage.Add('Cellpose 4: the newest Cellpose models (CellposeSAM); slow without a graphics card');
+  for i := 0 to NetCount - 2 do
     NetPage.Values[i] := True;
 
   OwnPage := CreateInputFilePage(NetPage.ID, 'Your own environments (optional)',

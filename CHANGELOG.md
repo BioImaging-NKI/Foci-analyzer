@@ -48,6 +48,21 @@ First working version. There are no earlier results to compare with.
 - Installers: `FociAnalyzer-Setup.exe` for Windows (choose the networks, or use your own environments) and
   `install.sh` for macOS and Linux. On Apple Silicon the PyTorch networks use the graphics chip.
   `installer/check.py` checks an installation. Results do not change.
+- Foci no longer extend outside their cell (or outside the distance outside cells); in 3D this removed foci
+  pixels above and below the cells. **Results change a little**: foci at a cell edge are a bit smaller.
+- Cells segmented in 3D: foci are detected in 3D too (projections are greyed out); before, a projection
+  could put foci where no cell is in that slice.
+- A foci size smaller than a pixel no longer stops the analysis (IndexError).
+- Smooth outlines, cell numbers, colour cells by label, an adjustable range for the colour scale, the
+  selected cell highlighted, the distance outside cells as a grey line.
+- Cells can be removed from the analysis by hand (key X); remembered in `removed_cells.tsv` in the results
+  folder as points, so they stay out after a new analysis.
+- Models chosen from a list per network (Cellpose 3: nuclei, cyto3, tissuenet_cp3; Cellpose 4: cpsam_v2,
+  cpdino-vitb; StarDist; InstanSeg; Spotiflow) or a model of your own. Cellpose 4 has its own environment.
+- Threshold segmentation: a slider for the threshold (× Otsu).
+- Settings page: install a network with one click; use the graphics card or not; images at a time.
+- Experiment page: stays open after opening images, updates the image list by itself, ✓ for analyzed images
+  (also in the image list of the Analyze page). The status bar keeps its progress bar in one place.
 - Logo in the window, the browser tab, the setup and the shortcuts.
 - Colocalization map: a white line with a black edge, and overlap hatched black and white, visible on any colour.
 - After `Analyze all images` the viewer shows the stored result of an image at once (same settings), also

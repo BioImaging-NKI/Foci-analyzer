@@ -31,17 +31,50 @@ void main() {
   o = edge ? color : vec4(color.rgb, color.a * fill);  // the inside lightly filled, the outline solid
 }`;
 
-// cells coloured by a measure: values 1..255 through a colour map (dark blue, teal, yellow)
+// cells coloured by a measure: values 1..65535 through a colour map (dark blue, teal, yellow), stretched
+// between `vrange` (0..1 of the values); or, with `cat`, every label its own colour (neighbours differ)
 const FS_VALUE = `#version 300 es
 precision highp float; precision highp usampler2D;
-uniform usampler2D tex; uniform float alpha; in vec2 uv; out vec4 o;
+uniform usampler2D tex; uniform float alpha; uniform vec2 vrange; uniform float cat; in vec2 uv; out vec4 o;
+vec3 hsv(float h, float s, float v) { vec3 k = clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0); return v * mix(vec3(1.0), k, s); }
 void main() {
   uint v = texture(tex, uv).r;
   if (v == 0u) discard;
-  float t = float(v - 1u) / 254.0;
+  if (cat > 0.0) {
+    float f = float(v);
+    o = vec4(hsv(fract(f * 0.618034), 0.55 + 0.4 * fract(f * 0.37), 0.75 + 0.25 * fract(f * 0.71)), alpha);
+    return;
+  }
+  float t = clamp((float(v - 1u) / 65534.0 - vrange.x) / max(vrange.y - vrange.x, 1e-6), 0.0, 1.0);
   vec3 a = vec3(0.23, 0.10, 0.55), b = vec3(0.13, 0.62, 0.55), c = vec3(0.99, 0.91, 0.14);
   o = vec4(t < 0.5 ? mix(a, b, t * 2.0) : mix(b, c, t * 2.0 - 1.0), alpha);
 }`;
+
+// outlines as polygons from the server (/api/contours): float32 [label, n, x1, y1, ..., xn, yn] per object
+export function parsePolys(buffer) {
+  const f = new Float32Array(buffer), out = [];
+  for (let k = 0; k + 1 < f.length;) {
+    const id = f[k], n = f[k + 1], pts = f.subarray(k + 2, k + 2 + 2 * n);
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, sx = 0, sy = 0;
+    for (let i = 0; i < pts.length; i += 2) {
+      const x = pts[i], y = pts[i + 1];
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; sx += x; sy += y;
+    }
+    out.push({ id, pts, bb: [x0, y0, x1, y1], cx: sx / n, cy: sy / n });
+    k += 2 + 2 * n;
+  }
+  return out;
+}
+// whether (x, y) lies inside a polygon (even-odd rule)
+export function inside(poly, x, y) {
+  const p = poly.pts, n = p.length / 2; let c = false;
+  if (x < poly.bb[0] || x > poly.bb[2] || y < poly.bb[1] || y > poly.bb[3]) return false;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = p[2 * i], yi = p[2 * i + 1], xj = p[2 * j], yj = p[2 * j + 1];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
+  }
+  return c;
+}
 
 function program(gl, fs) {
   const p = gl.createProgram();
@@ -63,7 +96,7 @@ export class Viewer {
   constructor(canvas, top, fetchTile) {
     this.canvas = canvas; this.top = top; this.fetchTile = fetchTile;
     this.W = 0; this.H = 0; this.view = { s: 1, tx: 0, ty: 0 };
-    this.layers = []; this.markers = []; this.zslice = null; this.box = null; this.pixelSize = null; this.unit = "µm";
+    this.layers = []; this.markers = []; this.shapes = []; this.numbers = null; this.zslice = null; this.box = null; this.pixelSize = null; this.unit = "µm";
     this.onclick = null; this.onview = null;
     this.tiles = new Map(); this.queue = []; this.busy = 0; this.wanted = new Set(); this.frame = 0; this.dirty = false;
     const gl = this.gl = canvas.getContext("webgl2", { alpha: false, antialias: false });
@@ -185,7 +218,10 @@ export class Viewer {
         const image = layer.type === "image", value = layer.type === "value", pr = image ? this.pImage : value ? this.pValue : this.pLabels;
         gl.useProgram(pr.p); gl.uniform1i(pr.u.tex, 0);
         if (image) { gl.blendFunc(gl.ONE, gl.ONE); gl.uniform2f(pr.u.range, layer.lo, layer.hi); gl.uniform3fv(pr.u.color, layer.color); }
-        else if (value) { gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.uniform1f(pr.u.alpha, layer.alpha ?? 0.6); }
+        else if (value) {
+          gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.uniform1f(pr.u.alpha, layer.alpha ?? 0.6);
+          gl.uniform2fv(pr.u.vrange, layer.range || [0, 1]); gl.uniform1f(pr.u.cat, layer.cat ? 1 : 0);
+        }
         else { gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.uniform4fv(pr.u.color, layer.color); gl.uniform1f(pr.u.fill, layer.fill || 0); gl.uniform1f(pr.u.hatch, (layer.hatch || 0) * dpr); }
         this._tile(layer, layer.key, this.maxLevel, 0, 0);  // the coarsest level is always kept as a stand-in
         for (let ty_ = y0; ty_ <= y1; ty_++) for (let tx_ = x0; tx_ <= x1; tx_++) {
@@ -223,8 +259,47 @@ export class Viewer {
   _top(dpr, cw, ch) {
     const ctx = this.top.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, cw, ch);
     if (!this.W) return;
+    const { s, tx, ty } = this.view;
+    // outlines as polygons (smooth outlines, the selected and the removed cells, the distance outside cells)
+    const vx0 = -tx / s, vy0 = -ty / s, vx1 = (cw - tx) / s, vy1 = (ch - ty) / s;
+    const trace = (path, poly) => {
+      const p = poly.pts;
+      path.moveTo(tx + p[0] * s, ty + p[1] * s);
+      for (let i = 2; i < p.length; i += 2) path.lineTo(tx + p[i] * s, ty + p[i + 1] * s);
+      path.closePath();
+    };
+    ctx.lineJoin = "round";
+    for (const sh of this.shapes) {
+      if (!sh.on || !sh.polys) continue;
+      const path = new Path2D(); let any = false;
+      for (const poly of sh.polys) {
+        const b = poly.bb;
+        if (b[2] < vx0 || b[0] > vx1 || b[3] < vy0 || b[1] > vy1 || (sh.only && !sh.only.has(poly.id))) continue;
+        trace(path, poly); any = true;
+      }
+      if (!any) continue;
+      if (sh.fill) { ctx.fillStyle = sh.fill; ctx.fill(path, "evenodd"); }
+      ctx.setLineDash(sh.dash || []);
+      if (sh.halo) { ctx.strokeStyle = "#000"; ctx.lineWidth = sh.width + sh.halo; ctx.stroke(path); }
+      ctx.strokeStyle = sh.stroke; ctx.lineWidth = sh.width; ctx.stroke(path);
+    }
+    ctx.setLineDash([]);
+    // the number of every cell that is large enough on the screen
+    const nb = this.numbers;
+    if (nb && nb.on && nb.polys) {
+      ctx.font = "600 12px system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.85)";
+      for (const poly of nb.polys) {
+        const b = poly.bb;
+        if (b[2] < vx0 || b[0] > vx1 || b[3] < vy0 || b[1] > vy1 || Math.min(b[2] - b[0], b[3] - b[1]) * s < 16) continue;
+        const x = tx + poly.cx * s, y = ty + poly.cy * s, text = String(poly.id);
+        ctx.fillStyle = nb.removed && nb.removed.has(poly.id) ? "#ff6b6b" : "#fff";
+        ctx.strokeText(text, x, y); ctx.fillText(text, x, y);
+      }
+      ctx.textAlign = "start"; ctx.textBaseline = "alphabetic";
+    }
     // dots that shrink a little when zoomed out, so they do not cover the image
-    const { s, tx, ty } = this.view, r = Math.max(1, Math.min(2.6, 1.3 * Math.sqrt(s)));
+    const r = Math.max(1, Math.min(2.6, 1.3 * Math.sqrt(s)));
     for (const m of this.markers) {
       if (!m.on || !m.pts) continue;
       ctx.fillStyle = m.color; ctx.beginPath(); const rings = new Path2D();

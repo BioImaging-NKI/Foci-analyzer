@@ -5,7 +5,8 @@ Run by the installers (setup.exe on Windows, install.sh on macOS and Linux, inst
 It needs only the standard library and uv. Without --networks and with a terminal it asks its questions.
 
 Everything goes into one folder (--target): the program environment (.venv), the network environments
-(models-env: PyTorch networks; stardist-env: StarDist, which needs TensorFlow), the Python versions and the
+(models-env: PyTorch networks; cellpose4-env: Cellpose 4, which cannot live next to Cellpose 3; stardist-env:
+StarDist, which needs TensorFlow), the Python versions and the
 download cache. Removing that folder removes the program. The program finds the network environments next
 to its own; environments of the user are written to program.json in the user's Foci Analyzer folder.
 """
@@ -24,15 +25,16 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SOURCE = HERE.parent  # the program: pyproject.toml, uv.lock, src
-NETWORKS = ("stardist", "cellpose", "instanseg", "spotiflow", "trackastra")
+NETWORKS = ("stardist", "cellpose", "cellpose4", "instanseg", "spotiflow", "trackastra")
 TORCH_NETWORKS = ("cellpose", "instanseg", "spotiflow", "trackastra")
 WINDOWS, MAC = sys.platform == "win32", sys.platform == "darwin"
 # versions tested together (plan.md, section 9); a newer TensorFlow is a hundred times slower on Windows
 TORCH = ["torch==2.6.0", "torchvision==0.21.0"]
 PACKAGES = {"cellpose": ["cellpose==3.1.1.3"], "instanseg": ["instanseg-torch==0.1.2"],
             "spotiflow": ["spotiflow==0.6.5", "csbdeep"], "trackastra": ["trackastra==0.5.6"]}
+CELLPOSE4 = ["cellpose==4.2.1.1"]  # its own environment: Cellpose 3 and 4 cannot be installed together
 STARDIST = ["stardist==0.9.2", "csbdeep==0.8.2", "numpy<2", "scikit-image"]
-IMPORTS = {"stardist": "stardist", "cellpose": "cellpose", "instanseg": "instanseg", "spotiflow": "spotiflow",
+IMPORTS = {"stardist": "stardist", "cellpose": "cellpose", "cellpose4": "cellpose", "instanseg": "instanseg", "spotiflow": "spotiflow",
            "trackastra": "trackastra"}
 LOG: Path | None = None
 
@@ -59,6 +61,12 @@ def python_of(env: Path) -> Path:
     return env / ("Scripts/python.exe" if WINDOWS else "bin/python")
 
 
+def venv(uv: str, path: Path, python: str, env: dict) -> None:
+    """An environment, unless it is there already (its python.exe may be in use by a running program)."""
+    if not python_of(path).is_file():
+        run(uv, "venv", str(path), "--python", python, "--no-project", env=env)
+
+
 def nvidia() -> bool:
     if MAC:
         return False
@@ -73,7 +81,7 @@ def check_python(path: str, network: str) -> str:
     if not Path(path).is_file():
         return f"not found: {path}"
     mod = IMPORTS[network]
-    dist = "instanseg-torch" if network == "instanseg" else network
+    dist = "instanseg-torch" if network == "instanseg" else mod
     code = f"import importlib.metadata as m, importlib; importlib.import_module('{mod}'); print(m.version('{dist}'))"
     try:
         r = subprocess.run([path, "-c", code], check=False, capture_output=True, text=True, timeout=300)
@@ -87,8 +95,9 @@ def ask(args) -> None:
     """The questions, in a terminal, when the installer did not get them as options."""
     print("\nNeural networks (each can be left out; the program works without them, more slowly or with a")
     print("simpler method):")
-    print("  StarDist (nuclei; recommended), Cellpose (nuclei or cells, 2D and 3D), InstanSeg (nuclei or cells),")
-    print("  Spotiflow (foci), Trackastra (tracking of cells in time-lapses). Together about 7 GB.")
+    print("  StarDist (nuclei; recommended), Cellpose 3 (nuclei or cells, 2D and 3D), Cellpose 4 (the newest")
+    print("  Cellpose models, slower), InstanSeg (nuclei or cells), Spotiflow (foci), Trackastra (tracking of cells")
+    print("  in time-lapses). Together about 10 GB.")
     a = input("Install all of them? [Y/n/choose] ").strip().lower()
     if a in ("", "y", "yes"):
         args.networks = ",".join(NETWORKS)
@@ -154,6 +163,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--device", choices=["auto", "gpu", "cpu"], default="auto", help="PyTorch for the NVIDIA card or the processor")
     p.add_argument("--home", default=os.environ.get("FOCI_ANALYZER_HOME") or str(Path.home() / ".foci_analyzer"),
                    help="the user's Foci Analyzer folder (for program.json)")
+    p.add_argument("--networks-only", action="store_true", help="only install the networks (the program is there already)")
     p.add_argument("--shortcut", action="store_true", help="add the program to the start menu / Applications")
     p.add_argument("--desktop", action="store_true", help="also put a shortcut on the desktop (Windows)")
     args = p.parse_args(argv)
@@ -180,7 +190,7 @@ def main(argv: list[str] | None = None) -> None:
     # (The cache costs little extra disk space: uv links the files from it into the environments.)
     env = {"UV_PYTHON_INSTALL_DIR": str(target / "python"), "UV_CACHE_DIR": str(target / "cache"),
            "UV_PYTHON_PREFERENCE": "only-managed"}
-    steps = 1 + bool(wanted & set(TORCH_NETWORKS)) + ("stardist" in wanted) + bool(own) + 1
+    steps = (0 if args.networks_only else 2) + bool(wanted & set(TORCH_NETWORKS)) + ("cellpose4" in wanted) + ("stardist" in wanted) + bool(own)
     step = 0
 
     def next_step(text):
@@ -189,29 +199,36 @@ def main(argv: list[str] | None = None) -> None:
         say(f"\n[{step}/{steps}] {text}")
 
     say(f"Foci Analyzer: installing in {target} ({platform.system()} {platform.machine()})")
-    next_step("The program")
-    run(args.uv, "sync", "--project", str(SOURCE), "--no-dev", "--frozen", "--no-editable", "--python", "3.12",
-        env={**env, "UV_PROJECT_ENVIRONMENT": str(target / ".venv")})
+    if not args.networks_only:
+        next_step("The program")
+        run(args.uv, "sync", "--project", str(SOURCE), "--no-dev", "--frozen", "--no-editable", "--python", "3.12",
+            env={**env, "UV_PROJECT_ENVIRONMENT": str(target / ".venv")})
+    gpu = nvidia() if args.device == "auto" else args.device == "gpu"
+    index = [] if MAC else ["--index-url", "https://download.pytorch.org/whl/" + ("cu124" if gpu else "cpu"),
+                            "--extra-index-url", "https://pypi.org/simple", "--index-strategy", "unsafe-best-match"]
 
     torch_nets = sorted(wanted & set(TORCH_NETWORKS))
     if torch_nets:
-        gpu = nvidia() if args.device == "auto" else args.device == "gpu"
         where = ("the Apple graphics chip (MPS) where it can" if MAC else
                  "the NVIDIA graphics card" if gpu else "the processor (no NVIDIA graphics card found)")
         next_step(f"PyTorch networks ({', '.join(torch_nets)}), running on {where}; this takes a while")
         menv = target / "models-env"
-        run(args.uv, "venv", str(menv), "--python", "3.12", "--allow-existing", "--no-project", env=env)
-        index = [] if MAC else ["--index-url", "https://download.pytorch.org/whl/" + ("cu124" if gpu else "cpu"),
-                                "--extra-index-url", "https://pypi.org/simple", "--index-strategy", "unsafe-best-match"]
+        venv(args.uv, menv, "3.12", env)
         run(args.uv, "pip", "install", "--python", str(python_of(menv)), *TORCH, *index, env=env)
         run(args.uv, "pip", "install", "--python", str(python_of(menv)), *TORCH,
             *[pkg for n in torch_nets for pkg in PACKAGES[n]], *index, env=env)
+
+    if "cellpose4" in wanted:
+        next_step("Cellpose 4 (its own environment); this takes a while")
+        cenv = target / "cellpose4-env"
+        venv(args.uv, cenv, "3.12", env)
+        run(args.uv, "pip", "install", "--python", str(python_of(cenv)), *TORCH, *CELLPOSE4, *index, env=env)
 
     if "stardist" in wanted:
         gpu_tf = not WINDOWS and not MAC and nvidia() and args.device != "cpu"
         next_step("StarDist (TensorFlow" + (", NVIDIA graphics card)" if gpu_tf else ", processor)"))
         senv = target / "stardist-env"
-        run(args.uv, "venv", str(senv), "--python", "3.11", "--allow-existing", "--no-project", env=env)
+        venv(args.uv, senv, "3.11", env)
         tf = "tensorflow[and-cuda]==2.15.1" if gpu_tf else "tensorflow==2.15.1"
         run(args.uv, "pip", "install", "--python", str(python_of(senv)), tf, *STARDIST, env=env)
 
@@ -231,6 +248,9 @@ def main(argv: list[str] | None = None) -> None:
             program["pythons"][name] = path
         pj.write_text(json.dumps(program, indent=1), encoding="utf-8")
 
+    if args.networks_only:
+        say("\nReady.")
+        return
     next_step("Shortcuts")
     if args.shortcut:
         shortcuts(target, args.desktop)

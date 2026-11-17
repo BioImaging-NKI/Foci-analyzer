@@ -60,13 +60,13 @@ def match_z(labels: np.ndarray, slices: int) -> np.ndarray:
 
 
 # ---------------------------------------------------------------- nuclei / cells
-def segment_threshold(img: np.ndarray, cal: Calibration, min_diameter: float) -> np.ndarray:
-    """Otsu threshold on the smoothed image; touching objects are split on the distance map."""
+def segment_threshold(img: np.ndarray, cal: Calibration, min_diameter: float, factor: float = 1.0) -> np.ndarray:
+    """Otsu threshold (times `factor`) on the smoothed image; touching objects are split on the distance map."""
     px = cal.pixel_size
     zf = cal.z_spacing / px if img.shape[0] > 1 else 1.0
     s = max(1.0, 0.3 / px) if cal.unit == "µm" else 1.5
     sm = ndi.gaussian_filter(img.astype(np.float32), (s / zf if img.shape[0] > 1 else 0, s, s))
-    mask = sm > filters.threshold_otsu(sm[:, ::2, ::2])
+    mask = sm > factor * filters.threshold_otsu(sm[:, ::2, ::2])
     mask = np.stack([ndi.binary_fill_holes(m) for m in mask])
     dist = ndi.distance_transform_edt(mask, sampling=(zf, 1, 1)).astype(np.float32)
     r = max(3.0, 0.5 * min_diameter / px)
@@ -167,7 +167,8 @@ def sigma_px(size: float, cal: Calibration, slices: int, z_elongation: float) ->
     """The Gaussian sigma of a focus with this diameter (its FWHM), per axis in pixels."""
     s = size / FWHM
     sz = s * z_elongation / cal.z_spacing if slices > 1 else 0.0
-    return (sz, s / cal.pixel_size, s / cal.pixel_size)
+    sxy = max(s / cal.pixel_size, 0.5)  # a focus is never smaller than a pixel in the image
+    return (sz, sxy, sxy)
 
 
 def _atrous(img: np.ndarray, levels: int, in_z: bool) -> list[np.ndarray]:
@@ -205,7 +206,7 @@ def spot_filter(img: np.ndarray, sigma: tuple[float, float, float], method: str)
             return lambda: sigma[axis] ** 2 * ndi.gaussian_filter(img, sigma, order=order)
 
         # a thinner axis has no second derivative worth using
-        parts = together(*(second(axis) for axis, s in enumerate(sigma) if s >= 0.3))
+        parts = together(*(second(axis) for axis, s in enumerate(sigma) if s >= 0.3 or axis > 0))
         out = -parts[0]
         for part in parts[1:]:
             out -= part
@@ -279,8 +280,9 @@ def foci_extents(S: np.ndarray, pos: np.ndarray, accept: np.ndarray, cells: np.n
                  level: float, half: bool, min_size: int, max_size: int):
     """Label image of the foci grown from the accepted candidates, and which candidates remain.
 
-    Seeded watershed on S. A focus ends at half of its own peak (`half`) and never below `level`, and does
-    not continue into another cell. Foci outside the size limits are removed.
+    Seeded watershed on S. A focus ends at half of its own peak (`half`) and never below `level`, and stays
+    inside its own cell (`cellmap`: the cells grown by the distance outside cells). Foci outside the size
+    limits are removed.
     """
     keep = np.flatnonzero(accept)
     labels = np.zeros(S.shape, np.int32)
@@ -300,7 +302,7 @@ def foci_extents(S: np.ndarray, pos: np.ndarray, accept: np.ndarray, cells: np.n
     if half:
         ok &= S[m] >= 0.5 * height[li - 1]
     cm = cellmap[m]
-    ok &= (cm == cells[keep][li - 1]) | (cm == 0)
+    ok &= cm == cells[keep][li - 1]
     lab[m] = np.where(ok, li, 0)
     lab[seed] = ids  # the peak itself always belongs to the focus
     count = np.bincount(lab.ravel(), minlength=keep.size + 1)[1:]

@@ -16,13 +16,15 @@ import tomli_w
 
 def opt(default: Any, label: str, help: str = "", *, advanced: bool = False, choices: list[str] | None = None,
         min: float | None = None, max: float | None = None, step: float | None = None, unit: str = "",
-        slider: bool = False, when: dict | None = None):
+        slider: bool = False, when: dict | None = None, catalog: bool = False):
     """A setting with what the window needs to show it. `help` is the context help (the ? in the form).
 
-    `when` names settings of the same group and the values for which this one is shown.
+    `when` names settings of the same group and the values for which this one is shown. `catalog`: a model
+    name, chosen from the pretrained models of the network (models.CATALOG) or a model of your own.
     """
     meta = {"label": label, "help": help, "advanced": advanced, "choices": choices, "min": min, "max": max,
-            "step": step, "unit": unit, "slider": slider, "when": when}
+            "step": step, "unit": unit, "slider": slider, "when": when,
+            "catalog": catalog}
     return field(default=default, metadata=meta)
 
 
@@ -63,11 +65,18 @@ class SegmentationSettings:
                               "0 = no limit.", min=0, unit="µm")
     exclude_on_edges: bool = opt(True, "Remove objects on the image edge", "A nucleus that is cut by the image "
                                  "edge has an incomplete foci count.", advanced=True)
-    model: str = opt("", "Model", "Model name or path; empty = the default of the method.", advanced=True, when={"method": ["cellpose", "instanseg", "stardist"]})
+    model: str = opt("", "Model", "The pretrained model of the network, or a model of your own (the last choice). "
+                     "Cellpose 3 and Cellpose 4 models run in environments of their own; models of a network that is "
+                     "not installed are greyed out (install it on the Settings page).", catalog=True,
+                     when={"method": ["cellpose", "instanseg", "stardist"]})
     diameter: float = opt(0.0, "Expected diameter", "For Cellpose: the typical diameter. 0 = automatic.",
                           advanced=True, min=0, unit="µm", when={"method": ["cellpose", "instanseg", "stardist"]})
     probability: float = opt(0.5, "Probability threshold", "Lower finds more and larger objects.",
                              advanced=True, min=0, max=1, step=0.05, when={"method": ["cellpose", "instanseg", "stardist"]})
+    threshold_factor: float = opt(1.0, "Threshold", "For 'threshold': the Otsu threshold of the image times this "
+                                  "factor. Higher makes the objects smaller and splits more of them; lower makes "
+                                  "them larger.", advanced=True, min=0.2, max=3, step=0.05, unit="× Otsu",
+                                  slider=True, when={"method": ["threshold"]})
     labels_folder: str = opt("", "Labels folder", "For 'labels from file': a folder with label images (TIFF) "
                              "that have the same name as the images.", when={"method": ["labels from file"]})
 
@@ -124,8 +133,9 @@ class FociChannelSettings:
     fixed_threshold: float = opt(0.0, "Fixed threshold", "For 'fixed value': the threshold in units of the "
                                  "filtered image. The viewer shows the value that the current image uses.",
                                  advanced=True, min=0, when={"method": ["watershed"], "threshold_scope": ["fixed value"]})
-    spotiflow_model: str = opt("general", "Spotiflow model", "Name of a pretrained model or a path.",
-                               advanced=True, when={"method": ["spotiflow"]})
+    spotiflow_model: str = opt("general", "Spotiflow model", "The pretrained Spotiflow model, or a model of your "
+                               "own (the last choice: its folder). 3D models need a stack and 'Detect foci in' 3D.",
+                               catalog=True, when={"method": ["spotiflow"]})
 
 
 @dataclass

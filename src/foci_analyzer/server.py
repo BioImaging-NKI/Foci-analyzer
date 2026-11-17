@@ -9,7 +9,9 @@ from __future__ import annotations
 import json
 import mimetypes
 import os
+import re
 import secrets
+import shutil
 import subprocess
 import sys
 import threading
@@ -22,7 +24,8 @@ from pathlib import Path
 
 import numpy as np
 
-from . import __version__, batch, config, experiment, export, models, pipeline, stats
+from . import __version__, batch, config, curation, experiment, export, models, pipeline, stats
+from . import analysis as an
 from .imagestore import ImageStore
 from .stages import StageCache
 
@@ -63,10 +66,8 @@ def _wrap16(labels: np.ndarray) -> np.ndarray:
     return np.where(labels > 0, (labels - 1) % 65535 + 1, 0).astype("<u2")
 
 
-def _columns(df) -> dict:
-    """A table as {column: values} for JSON (NaN becomes null)."""
-    d = json.loads(df.to_json(orient="split", index=False))
-    return {c: [row[j] for row in d["data"]] for j, c in enumerate(d["columns"])}
+LABELS = {"cellpose": "Cellpose 3", "cellpose4": "Cellpose 4", "stardist": "StarDist", "instanseg": "InstanSeg",
+          "spotiflow": "Spotiflow", "trackastra": "Trackastra"}
 
 
 def _columns(df) -> dict:
@@ -93,19 +94,25 @@ class App:
         self.progress = batch.Progress()
         self._planes: OrderedDict[tuple, np.ndarray] = OrderedDict()
         self.last: OrderedDict[tuple, pipeline.FrameResult] = OrderedDict()  # what the viewer shows, per image and frame
-        self.program = {"python": "", "pythons": {}}  # of this computer, not of an analysis
+        self.program = {"python": "", "pythons": {}, "gpu": True, "workers": 0}  # of this computer, not of an analysis
         self.warm = False  # start the networks ahead of their first use (the window does, tests do not)
         self._warming: set[str] = set()
+        self._curated: dict[tuple, tuple] = {}  # per image and frame: (raw result, removal version, curated result)
+        self._removed: tuple[str, object] | None = None  # (results folder, table of removed cells)
+        self.removed_version = 0
+        self._contours: OrderedDict[tuple, bytes] = OrderedDict()
+        self.install = {"network": "", "running": False, "lines": [], "ok": None}
         self._load()
 
     # ---- state on disk
     def _load(self) -> None:
         try:
             saved = json.loads((home() / "program.json").read_text(encoding="utf-8"))
-            self.program = {"python": str(saved.get("python", "")), "pythons": dict(saved.get("pythons", {}))}
-        except (OSError, ValueError, AttributeError):
+            self.program = {"python": str(saved.get("python", "")), "pythons": dict(saved.get("pythons", {})),
+                            "gpu": bool(saved.get("gpu", True)), "workers": int(saved.get("workers", 0) or 0)}
+        except (OSError, ValueError, AttributeError, TypeError):
             pass
-        models.set_pythons(self.program["python"], self.program["pythons"])
+        self._apply_program()
         try:
             self.settings = config.load(home() / "last_settings.toml")
         except (OSError, ValueError, TypeError):
@@ -136,7 +143,8 @@ class App:
     def warm_up(self) -> None:
         """Start the model process and import the networks in use, so their first use does not wait for it."""
         s = self.settings
-        ops = ({s.segmentation.method} & {"cellpose", "stardist", "instanseg"}) | (
+        seg = s.segmentation
+        ops = ({models.network_of(seg.method, seg.model)} & {"cellpose", "cellpose4", "stardist", "instanseg"}) | (
             {"spotiflow"} if any(f.method == "spotiflow" for f in s.foci) else set())
         ops -= self._warming
         if not self.warm or not ops:
@@ -146,7 +154,7 @@ class App:
         def go():
             for op in ops:
                 try:
-                    models.worker(op).call("warm", params={"ops": [op]})
+                    models.worker(op).call("warm", params={"ops": ["cellpose" if op == "cellpose4" else op]})
                 except ValueError:
                     pass
 
@@ -164,23 +172,91 @@ class App:
                 except ValueError as e:
                     asked[py] = {"error": str(e)}
             info = asked[py]
-            version = info.get("instanseg-torch" if op == "instanseg" else op)
-            rows.append({"name": op, "python": py, "version": version, "torch": info.get("torch"),
+            version = info.get({"instanseg": "instanseg-torch", "cellpose4": "cellpose"}.get(op, op))
+            error = info.get("error")
+            if version and op.startswith("cellpose") and (int(version.split(".")[0]) >= 4) != (op == "cellpose4"):
+                error = (f"this environment has Cellpose {version}; " + (
+                    "the Cellpose 4 models need Cellpose 4" if op == "cellpose4" else
+                    "the Cellpose 3 models (nuclei, cyto3, tissuenet_cp3) need Cellpose 3"))
+                version = None
+            rows.append({"name": op, "label": LABELS.get(op, op), "python": py, "version": version, "torch": info.get("torch"),
                          "device": info.get("device"), "gpu": info.get("gpu"), "gpu_memory": info.get("gpu_memory"),
-                         "error": info.get("error")})
+                         "error": error})
         return {"version": __version__, "app_python": sys.version.split()[0], "home": str(home()),
-                "default_python": models.default_python(), **self.program, "networks": rows}
+                "default_python": models.default_python(), **self.program, "networks": rows, "installed": models.installed(),
+                "can_install": bool(self._installer()), "install": self.install}
+
+    # ---- installing a network from the Settings page (installer/install.py --networks-only)
+    @staticmethod
+    def _installer() -> tuple[str, str, str] | None:
+        """(uv, install.py, the program folder) when networks can be installed from the window."""
+        target = Path(sys.prefix).parent  # the folder that holds .venv, models-env, ...
+        exe = "uv.exe" if sys.platform == "win32" else "uv"
+        uv = next((str(p) for p in (target / "bin" / exe,) if p.is_file()), None) or shutil.which("uv")
+        script = next((p for p in (target / "program" / "installer" / "install.py",
+                                   Path(__file__).resolve().parents[2] / "installer" / "install.py") if p.is_file()), None)
+        return (uv, str(script), str(target)) if uv and script else None
+
+    def install_network(self, body: dict) -> dict:
+        net = str(body.get("network", ""))
+        if net not in models.NETWORKS:
+            raise ApiError("no such network")
+        if self.install["running"]:
+            raise ApiError(f"{self.install['network']} is being installed")
+        found = self._installer()
+        if not found:
+            raise ApiError("the installer is not on this computer: run the setup of Foci Analyzer again and choose the network")
+        uv, script, target = found
+        models.stop_all()  # Windows cannot replace files of a package that a running network has open
+        self.install = {"network": net, "running": True, "lines": [], "ok": None}
+        cmd = [uv, "run", "--no-project", "--python", "3.12", script, "--target", target, "--uv", uv,
+               "--networks", net, "--networks-only", "--device", "auto" if self.program.get("gpu", True) else "cpu"]
+
+        def go():
+            try:
+                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                                        errors="replace", env={**os.environ, "NO_COLOR": "1", "UV_NO_PROGRESS": "1"},
+                                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                for line in proc.stdout:
+                    line = re.sub(r"\x1b\[[0-9;]*m", "", line).rstrip()
+                    if line.strip():
+                        self.install["lines"] = (self.install["lines"] + [line])[-12:]
+                self.install["ok"] = proc.wait() == 0
+            except OSError as e:
+                self.install["lines"].append(str(e))
+                self.install["ok"] = False
+            if not self.install["ok"]:
+                self.install["lines"].append("If a file was in use: close other Foci Analyzer windows and try again.")
+            models.stop_all()  # the next use starts the network from its new environment
+            self._warming.clear()
+            self.install["running"] = False
+
+        threading.Thread(target=go, daemon=True).start()
+        return self.install
+
+    def _apply_program(self) -> None:
+        models.set_pythons(self.program["python"], self.program["pythons"])
+        if models.USE_GPU != self.program.get("gpu", True):
+            models.USE_GPU = self.program.get("gpu", True)
+            models.stop_all()
+        batch.WORKERS = int(self.program.get("workers", 0) or 0)
 
     def set_program(self, body: dict) -> dict:
         pythons = body.get("pythons") if isinstance(body.get("pythons"), dict) else {}
-        self.program = {"python": str(body.get("python", "")).strip().strip('"'),
-                        "pythons": {k: str(v).strip().strip('"') for k, v in pythons.items() if k in models.NETWORKS and str(v).strip()}}
+        try:
+            workers = max(0, min(32, int(body.get("workers", self.program.get("workers", 0)) or 0)))
+        except (TypeError, ValueError) as e:
+            raise ApiError("images at a time must be a number") from e
+        self.program = {"python": str(body.get("python", self.program["python"])).strip().strip('"'),
+                        "pythons": {k: str(v).strip().strip('"') for k, v in pythons.items() if k in models.NETWORKS and str(v).strip()}
+                        if "pythons" in body else self.program["pythons"],
+                        "gpu": bool(body.get("gpu", self.program.get("gpu", True))), "workers": workers}
         for path in [self.program["python"], *self.program["pythons"].values()]:
             if path and not Path(path).is_file():
                 raise ApiError(f"there is no such file: {path} (give the python of the environment: python.exe in its Scripts folder on Windows, bin/python elsewhere)")
         home().mkdir(parents=True, exist_ok=True)
         (home() / "program.json").write_text(json.dumps(self.program), encoding="utf-8")
-        models.set_pythons(self.program["python"], self.program["pythons"])
+        self._apply_program()
         self._warming.clear()
         return self.program_info()
 
@@ -219,11 +295,18 @@ class App:
 
     def experiment_state(self) -> dict:
         return {"conditions": self._conditions(), "images": [i.to_dict() for i in self.images],
-                "remarks": self.remarks, "output": self.output, "results_folder": self.results_folder()}
+                "remarks": self.remarks, "output": self.output, "results_folder": self.results_folder(),
+                "analyzed": self.analyzed()}
+
+    def analyzed(self) -> dict:
+        """The images of the last batch run, and whether it used the current settings."""
+        meta = self.results.meta or {}
+        return {"ids": list(meta.get("images", {})), "current": bool(meta) and meta.get("settings") == config.to_dict(self.settings)}
 
     def state(self) -> dict:
         return {"version": __version__, "schema": config.schema(), "settings": config.to_dict(self.settings),
-                "models": models.available(), "batch": self.progress.to_dict(), **self.experiment_state()}
+                "models": models.available(), "catalog": models.catalog(), "installed": models.installed(), "batch": self.progress.to_dict(),
+                **self.experiment_state()}
 
     # ---- images
     def entry(self, image_id: str) -> experiment.ImageEntry:
@@ -314,11 +397,52 @@ class App:
 
     def shown(self, image_id: str, t: int) -> pipeline.FrameResult:
         """The last finished analysis of this frame: overlays never start an analysis themselves."""
-        with self.lock:
-            r = self.last.get((image_id, t))
+        r = self.last_result(image_id, t)
         if r is None:
             raise ApiError("this image is not analyzed yet", 404)
         return r
+
+    def removed_table(self):
+        folder = self.results_folder()
+        if self._removed is None or self._removed[0] != folder:
+            self._removed = (folder, curation.load(folder))
+        return self._removed[1]
+
+    def last_result(self, image_id: str, t: int) -> pipeline.FrameResult | None:
+        """The last analysis of this frame without the cells removed by hand (in the tables), or None."""
+        with self.lock:
+            raw = self.last.get((image_id, t))
+            have = self._curated.get((image_id, t))
+        if raw is None:
+            return None
+        if have and have[0] is raw and have[1] == self.removed_version:
+            return have[2]
+        r = curation.apply(raw, curation.points(self.removed_table(), image_id, t))
+        with self.lock:
+            self._curated[(image_id, t)] = (raw, self.removed_version, r)
+        return r
+
+    def toggle_cell(self, body: dict) -> dict:
+        """Remove the clicked cell from the analysis, or put it back; kept in the results folder."""
+        image_id, t = body.get("path", ""), int(body.get("t", 0))
+        with self.lock:
+            raw = self.last.get((image_id, t))
+        if raw is None:
+            raise ApiError("this image is not analyzed yet", 404)
+        folder = self.results_folder()
+        if not folder:
+            raise ApiError("there is no results folder: add images on the Experiment page first")
+        try:
+            df, now = curation.toggle(self.removed_table(), raw, image_id, t, float(body["x"]), float(body["y"]),
+                                      int(body.get("z", -1)))
+        except (KeyError, TypeError, ValueError) as e:
+            raise ApiError(str(e)) from e
+        curation.save(folder, df)
+        self._removed = (folder, df)
+        self.removed_version += 1
+        out = self._payload(self.last_result(image_id, t), stored=False)
+        out["toggled"] = "removed" if now else "back"
+        return out
 
     def activity(self) -> dict:
         """What the analysis of the shown image is doing now (for the status bar)."""
@@ -342,9 +466,10 @@ class App:
         cells = c[(c["path"] == image_id) & (c["frame"] == t + 1)] if len(c) else c
         foci = f[(f["image"] == e.name) & (f["folder"] == e.folder) & (f["frame"] == t + 1)] if len(f) else f
         try:
-            return export.load_store(export.store_path(meta.get("folder", ""), image_id), t, cells, foci)
+            r = export.load_store(export.store_path(meta.get("folder", ""), image_id), t, cells, foci)
         except (OSError, ValueError, KeyError):
             return None
+        return curation.apply(r, curation.points(self.removed_table(), image_id, t))
 
     def preview(self, body: dict) -> dict:
         if "settings" in body:
@@ -361,7 +486,11 @@ class App:
                 while len(self.last) > 3:
                     self.last.popitem(last=False)
         else:
-            r = self.frame(image_id, t, box=body.get("box"))
+            self.frame(image_id, t, box=body.get("box"))
+        return self._payload(self.last_result(image_id, t), bool(body.get("stored")), bool(body.get("box")))
+
+    def _payload(self, r: pipeline.FrameResult, stored: bool, box: bool = False) -> dict:
+        """What the viewer needs to know about the analysis of a frame."""
         coloc = []
         for a in r.channels:  # per pair of channels: how many foci of a lie on a focus of b
             for b in r.channels:
@@ -372,12 +501,18 @@ class App:
                     chance = None if chance is None or chance.isna().all() else float(chance.mean())
                     coloc.append({"a": a.channel, "b": b.channel, "n": len(rows),
                                   "with": int(rows[col].fillna(0).astype(float).sum()), "chance": chance})
-        return {"key": r.key, "cells": int(r.labels.max()), "channels": [c.summary() for c in r.channels],
+        channels = [c.summary() for c in r.channels]
+        if r.removed and "channel" in r.foci:  # without the foci of the cells removed by hand
+            for c in channels:
+                c["foci"] = int((r.foci["channel"] == c["channel"]).sum())
+        cells = len(r.cells) if "cell" in r.cells else int(r.labels.max())
+        return {"key": r.key, "cells": cells, "channels": channels, "removed": r.removed,
+                "outside": self.settings.foci_general.outside_distance,
                 "remarks": r.remarks, "pixel_size": r.cal.pixel_size, "binning": r.binning, "border": r.border,
                 "table": _columns(r.cells), "coloc": coloc, "dimension": self.settings.foci_general.dimension, "offset": list(r.offset),
-                "stored": bool(body.get("stored")),
+                "stored": stored,
                 "part": [r.offset[0], r.offset[1], r.labels.shape[2] * r.binning + 2 * r.border,
-                         r.labels.shape[1] * r.binning + 2 * r.border] if r.offset != (0, 0) or body.get("box") else None}
+                         r.labels.shape[1] * r.binning + 2 * r.border] if r.offset != (0, 0) or box else None}
 
     def candidates(self, q: dict) -> bytes:
         """Per candidate: x, y, z (image pixels), height, cell, and 1 when it is a focus, 2 when that
@@ -405,8 +540,9 @@ class App:
         """The label image (Z, Y, X) behind an overlay.
 
         cells, foci (of channel `ch`); coloc: only the foci that colocalize with a focus of another channel;
-        overlap: 1 where foci of two channels lie on top of each other; value: the cells, numbered 1 to 255
-        by the measure `col` (lowest to highest), for the colour map.
+        overlap: 1 where foci of two channels lie on top of each other; value: the cells, numbered 1 to 65535
+        by the measure `col` (lowest to highest), for the colour map; reach: the cells grown by the distance
+        outside cells.
         """
         if kind == "cells":
             return r.labels
@@ -440,11 +576,43 @@ class App:
                 raise ApiError("no such measure")
             v = r.cells[col].to_numpy(dtype=float)
             lo, hi = np.nanmin(v), np.nanmax(v)
-            code = np.where(np.isnan(v), 0, 1 + np.rint(254 * (v - lo) / (hi - lo if hi > lo else 1.0)))
+            code = np.where(np.isnan(v), 0, 1 + np.rint(65534 * (v - lo) / (hi - lo if hi > lo else 1.0)))
             lut = np.zeros(int(r.labels.max()) + 1, np.uint16)
             lut[r.cells["cell"].to_numpy()] = np.nan_to_num(code).astype(np.uint16)
             return lut[r.labels]
+        if kind == "reach":
+            return an.expand(r.labels, r.cal, float(q.get("d", 0)))
         raise ApiError("no such overlay")
+
+    def contours(self, q: dict) -> bytes:
+        """The outlines of an overlay in one plane as polygons in image pixels, for smooth drawing: per object
+        float32 [label, n, x1, y1, ..., xn, yn]."""
+        im = self.image(q.get("path", ""))
+        t, z, _ = self._plane_args(q, im.info)
+        r = self.shown(q.get("path", ""), t)
+        kind = q.get("kind", "cells")
+        if kind == "reach":
+            q = {**q, "d": self.settings.foci_general.outside_distance}
+        key = (r.key, kind, q.get("ch"), q.get("d"), z)
+        with self.lock:
+            out = self._contours.get(key)
+        if out is None:
+            lab = self._overlay_labels(r, kind, q)
+            small = lab[0] if lab.shape[0] == 1 else (lab[z] if isinstance(z, int) else lab.max(0))
+            if kind == "reach":
+                small = (small > 0).astype(np.int32)
+            if len(np.unique(small)) > 40001:
+                raise ApiError("too many objects for smooth outlines", 413)
+            parts, shift = [], np.array([r.offset[0] + r.border, r.offset[1] + r.border], np.float32)
+            for i, pts in export._contours(small):
+                xy = ((pts + 0.5) * r.binning + shift).astype(np.float32)
+                parts += [np.array([i, len(xy)], np.float32), xy.ravel()]
+            out = np.concatenate(parts).astype("<f4").tobytes() if parts else b""
+            with self.lock:
+                self._contours[key] = out
+                while len(self._contours) > 24:
+                    self._contours.popitem(last=False)
+        return out
 
     def overlay(self, q: dict) -> tuple[bytes, int, int]:
         """A region of the label image of the cells or of the foci of one channel, in image pixels."""
@@ -554,8 +722,7 @@ class App:
             raise ApiError("the display settings do not match the image")
         planes = [im.plane(t, c, z, 0) for c in range(im.info.channels)]
         overlays = []
-        with self.lock:
-            r = self.last.get((image_id, t))
+        r = self.last_result(image_id, t)
         o = body.get("overlays") or {}
         if r is not None:
             zi = z if isinstance(z, int) else None
@@ -588,8 +755,7 @@ class App:
         for t in range(im.info.frames):
             r = self.stored(image_id, t)
             if r is None:
-                with self.lock:
-                    r = self.last.get((image_id, t))
+                r = self.last_result(image_id, t)
             if r is not None:
                 frames[t] = r
         if not frames:
@@ -718,6 +884,9 @@ def make_handler(app: App):
                 "/api/image/region": lambda: self._binary(app.region(q)),
                 "/api/overlay": lambda: self._binary(app.overlay(q)),
                 "/api/candidates": lambda: self._binary(app.candidates(q)),
+                "/api/contours": lambda: self._binary(app.contours(q)),
+                "/api/analyzed": lambda: self._json(app.analyzed()),
+                "/api/program/install": lambda: self._json(app.install),
                 "/api/program": lambda: self._json(app.program_info()),
                 "/api/activity": lambda: self._json(app.activity()),
                 "/api/batch": lambda: self._json(app.progress.to_dict()),
@@ -745,6 +914,8 @@ def make_handler(app: App):
                 "/api/preview": lambda: app.preview(body),
                 "/api/cancel": app.cancel,
                 "/api/program": lambda: app.set_program(body),
+                "/api/program/install": lambda: app.install_network(body),
+                "/api/cells/toggle": lambda: app.toggle_cell(body),
                 "/api/batch/start": lambda: app.start_batch(body),
                 "/api/batch/stop": stop,
                 "/api/stats": lambda: app.compare(body),

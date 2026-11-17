@@ -23,7 +23,7 @@
 
 <main id="page-experiment" class="page">
   <section class="card">
-    <h2>Images <span class="help" data-help="The quick way: choose images or a folder and go to Analyze. To compare groups, make one condition per group below instead."></span></h2>
+    <h2>Images <span class="help" data-help="The quick way: choose images or a folder; they appear in the list at the bottom. Click an image there to open it on the Analyze page. To compare groups, make one condition per group below instead."></span></h2>
     <div class="row">
       <button id="quick-files" class="primary">Open images…</button>
       <button id="quick-folder">Open a folder…</button>
@@ -35,7 +35,7 @@
     <div id="conditions"></div>
     <div class="row">
       <button id="add-condition">Add condition</button>
-      <button id="scan" class="primary">Find images</button>
+      <button id="scan" title="Look again in the folders of all conditions for images whose name matches 'Files named', for example after typing a folder or after adding files to a folder. The list is updated by itself when folders are added with the buttons.">Update the image list</button>
     </div>
     <div class="row" style="margin-top:10px">
       <label for="output">Results folder</label>
@@ -46,8 +46,8 @@
     <ul id="remarks"></ul>
   </section>
   <section class="card">
-    <h2>Images <span id="image-count" class="muted"></span></h2>
-    <table id="images"><thead><tr><th>Image</th><th>Condition</th><th>Folder</th></tr></thead><tbody></tbody></table>
+    <h2>Images <span id="image-count" class="muted"></span> <span class="help" data-help="Click an image to open it on the Analyze page. A green ✓ means that Analyze all images analyzed it with the current settings (its result is in the results folder); a grey ✓ that it was analyzed with other settings."></span></h2>
+    <table id="images"><thead><tr><th></th><th>Image</th><th>Condition</th><th>Folder</th></tr></thead><tbody></tbody></table>
   </section>
 </main>
 
@@ -59,9 +59,10 @@
     </div>
     <div id="settings"></div>
     <div class="section" id="run-box">
+      <div class="run-title">Results folder <span class="muted">· tables, then the Results page</span></div>
       <button id="run" class="primary">Analyze all images</button>
-      <button id="run-one">This image only</button>
-      <span class="help" data-help="Runs the analysis with the current settings on all images of the experiment and writes the tables to the results folder. Images are analyzed side by side when no neural network is used."></span>
+      <button id="run-one" title="Analyze only the image shown in the viewer, write its tables to the results folder and open the Results page">This image only</button>
+      <span class="help" data-help="Runs the analysis with the current settings and writes the tables to the results folder, then opens the Results page: for all images of the experiment, or only for the image in the viewer. Images are analyzed side by side when no neural network is used. 'Analyze this image (A)' above the viewer is different: it only shows the result in the viewer and writes nothing."></span>
       <label style="flex-basis:100%" title="Also write the outlines as label images (TIFF) to the folder 'labels' in the results folder: one file for the cells and one per foci channel, to look at in Fiji or napari. In a tracked time-lapse a cell keeps its number (its track) over time."><input type="checkbox" id="save-labels"> Also save label images</label>
       <label style="flex-basis:100%" title="Also write every image as an ImageJ / Fiji TIFF to the folder 'images' in the results folder, with the outlines of the cells and foci as overlay (white cells, foci in the colour of their channel). Not compressed: Fiji would drop the overlay of a compressed file."><input type="checkbox" id="save-images"> Also save images with overlays (Fiji)</label>
       <div id="progress" hidden><div id="progress-bar"></div></div>
@@ -93,17 +94,26 @@
       <div id="channels"></div>
     </div>
     <div class="section">
-      <h3>Overlays <span class="help" data-help="Cells: outlines of the nuclei or cells. Foci: the detected foci, lightly filled, per foci channel. Markers: a dot on every focus; the dots follow the threshold slider at once, the outlines when the analysis has been repeated. A ring marks a focus that colocalizes with a focus of another channel (when zoomed in). Colocalization: colocalizing foci get a white outline with a black edge, and where foci of two channels lie on top of each other is hatched black and white, so it shows on any colour. Colour cells by: a colour per cell for one of its numbers, from dark blue (lowest) to yellow (highest)."></span></h3>
+      <h3>Overlays <span class="help" data-help="Cells: outlines of the nuclei or cells. Foci: the detected foci, lightly filled, per foci channel. Markers: a dot on every focus; the dots follow the threshold slider at once, the outlines when the analysis has been repeated. A ring marks a focus that colocalizes with a focus of another channel (when zoomed in). Colocalization: colocalizing foci get a white outline with a black edge, and where foci of two channels lie on top of each other is hatched black and white, so it shows on any colour. Colour cells by: a colour per cell for one of its numbers, from dark blue (lowest) to yellow (highest); drag the ends of the slider below it to change the range. 'label' gives every cell its own colour, which shows where one cell ends and the next begins (useful in 3D). Numbers: the cell numbers of the tables. A thin grey line shows how far foci outside a cell still count for it ('Distance outside cells'). The selected cell has a thick yellow outline; cells removed from the analysis a red one."></span></h3>
       <div id="overlays">
         <label><input type="checkbox" id="show-cells" checked> Cells <kbd>C</kbd></label>
         <label><input type="checkbox" id="show-foci" checked> Foci <kbd>F</kbd></label>
         <div id="foci-toggles"></div>
         <label><input type="checkbox" id="show-markers" checked> Markers <kbd>M</kbd></label>
+        <label title="The number of every cell in the image, when it is large enough on the screen; the same number as in the tables (key N)"><input type="checkbox" id="show-numbers"> Numbers <kbd>N</kbd></label>
+        <label title="Draw the outlines as smooth lines instead of along the pixel edges (key S)"><input type="checkbox" id="smooth"> Smooth outlines <kbd>S</kbd></label>
         <label id="coloc-wrap" hidden title="The colocalization map: foci that colocalize with a focus of another channel get a white outline with a black edge, and the places where foci of two channels lie on top of each other are hatched (key O)"><input type="checkbox" id="show-coloc" checked> Colocalization <kbd>O</kbd></label>
         <div id="cell-color-wrap" hidden>
           <label for="cell-color" title="Fill every cell with a colour for one of its numbers, for example the number of foci or the share of colocalizing foci">Colour cells by</label>
           <select id="cell-color"></select>
-          <div id="cell-legend" hidden><span id="legend-lo"></span><span class="ramp"></span><span id="legend-hi"></span></div>
+          <div id="cell-legend" hidden>
+            <div class="legend-row"><span id="legend-lo"></span><span class="ramp"></span><span id="legend-hi"></span></div>
+            <div class="dual" title="Drag the two ends to choose the values at the ends of the colour scale">
+              <div class="track"></div><div class="fill" id="legend-fill"></div>
+              <input type="range" id="legend-a" min="0" max="1000" value="0" aria-label="Lowest value of the colour scale">
+              <input type="range" id="legend-b" min="0" max="1000" value="1000" aria-label="Highest value of the colour scale">
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -120,8 +130,9 @@
       <div id="preview-info" class="muted"></div>
     </div>
     <div class="section">
-      <h3>Selected cell</h3>
+      <h3>Selected cell <span class="help" data-help="Click a cell in the image to see its numbers. 'Remove from the analysis' (key X) leaves the cell and its foci out of the tables; it gets a red outline. This is remembered in the results folder (removed_cells.tsv, as the clicked points), so the cell stays out when the image is analyzed again, also with other settings. Press it again to put the cell back. Analyze all images again to update the tables in the results folder."></span></h3>
       <div id="cell-info" class="muted"></div>
+      <div id="cell-actions" class="row" hidden><button id="toggle-cell">Remove from the analysis <kbd>X</kbd></button></div>
     </div>
   </aside>
 </main>
@@ -145,7 +156,17 @@
     <div id="program" class="muted">Open this page to ask the networks.</div>
   </section>
   <section class="card">
-    <h2>Program</h2>
+    <h2>Program <span class="help" data-help="Settings of this computer, not of an analysis (they are not saved with the analysis settings)."></span></h2>
+    <div class="row">
+      <label><input type="checkbox" id="opt-gpu"> Use the graphics card for the neural networks</label>
+      <span class="help" data-help="Off: the networks run on the processor, which is slower but leaves the graphics card free, or avoids problems with a graphics card that has too little memory."></span>
+    </div>
+    <div class="row">
+      <label for="opt-workers">Images at a time (Analyze all images)</label>
+      <input type="number" id="opt-workers" min="0" max="32" step="1" style="width:70px">
+      <span class="help" data-help="How many images are analyzed side by side. 0 = automatic: half the processors (at most 6), or 3 when a neural network is used. Lower it when the computer runs out of memory on large images."></span>
+      <button id="opt-apply">Apply</button>
+    </div>
     <div id="program-about"></div>
   </section>
 </main>
