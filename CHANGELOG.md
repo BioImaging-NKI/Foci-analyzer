@@ -48,6 +48,16 @@ First working version. There are no earlier results to compare with.
 - Installers: `FociAnalyzer-Setup.exe` for Windows (choose the networks, or use your own environments) and
   `install.sh` for macOS and Linux. On Apple Silicon the PyTorch networks use the graphics chip.
   `installer/check.py` checks an installation. Results do not change.
+- Logo in the window, the browser tab, the setup and the shortcuts.
+- Colocalization map: a white line with a black edge, and overlap hatched black and white, visible on any colour.
+- After `Analyze all images` the viewer shows the stored result of an image at once (same settings), also
+  when it is opened from the Results page; contrast and channels shown stay when another image is opened.
+- `Load settings…` and `Save settings…` (a results folder's settings.toml can be loaded too).
+- Tables are tab-separated (`cells.tsv`, `foci.tsv`); older results folders with CSV are still read. `Save
+  graph data` writes into the results folder.
+- Save: the view (PNG), the whole image as shown (RGB TIFF), and the image for Fiji (TIFF with the outlines
+  as overlay; also for all images with `Also save images with overlays`). In a tracked time-lapse the label
+  images number a cell by its track.
 - Status bar at the bottom: what the program is doing, step and progress bar, and when it is ready.
   Shortcut keys are shown next to their buttons; `[` and `]` step through slices when there is no time-lapse.
   Results do not change.

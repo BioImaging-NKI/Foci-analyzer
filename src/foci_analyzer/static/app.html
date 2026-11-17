@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Foci Analyzer</title>
 <script>try { const t = localStorage.getItem("fa.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
+<link rel="icon" type="image/png" href="/static/favicon.png">
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
 <header>
-  <span class="brand">Foci Analyzer</span>
+  <span class="brand"><img src="/static/logo.png" alt="" width="26" height="26"> Foci Analyzer</span>
   <nav id="tabs">
     <button data-page="experiment" class="on">Experiment</button>
     <button data-page="analyze">Analyze</button>
@@ -40,7 +41,7 @@
       <label for="output">Results folder</label>
       <input type="text" id="output" placeholder="Foci_Analyzer_results next to the first image" style="flex:1">
       <button id="pick-output">Choose…</button>
-      <span class="help" data-help="Where the tables of the analysis are written (cells.csv, foci.csv, settings.toml). Empty = a folder 'Foci_Analyzer_results' next to the first image."></span>
+      <span class="help" data-help="Where the tables of the analysis are written (cells.tsv, foci.tsv, settings.toml; tab-separated, they open in Excel, R and Python). Empty = a folder 'Foci_Analyzer_results' next to the first image."></span>
     </div>
     <ul id="remarks"></ul>
   </section>
@@ -52,12 +53,17 @@
 
 <main id="page-analyze" class="page" hidden>
   <aside id="side">
+    <div class="row" id="settings-files">
+      <button id="load-settings" title="Load analysis settings from a file: one saved with Save settings, or the settings.toml in a results folder">Load settings…</button>
+      <button id="save-settings" title="Save the analysis settings to a file, to use them again later or on another computer">Save settings…</button>
+    </div>
     <div id="settings"></div>
     <div class="section" id="run-box">
       <button id="run" class="primary">Analyze all images</button>
       <button id="run-one">This image only</button>
       <span class="help" data-help="Runs the analysis with the current settings on all images of the experiment and writes the tables to the results folder. Images are analyzed side by side when no neural network is used."></span>
-      <label style="flex-basis:100%" title="Also write the outlines as label images (TIFF) to the folder 'labels' in the results folder: one file for the cells and one per foci channel, to look at in Fiji or napari"><input type="checkbox" id="save-labels"> Also save label images</label>
+      <label style="flex-basis:100%" title="Also write the outlines as label images (TIFF) to the folder 'labels' in the results folder: one file for the cells and one per foci channel, to look at in Fiji or napari. In a tracked time-lapse a cell keeps its number (its track) over time."><input type="checkbox" id="save-labels"> Also save label images</label>
+      <label style="flex-basis:100%" title="Also write every image as an ImageJ / Fiji TIFF to the folder 'images' in the results folder, with the outlines of the cells and foci as overlay (white cells, foci in the colour of their channel). Not compressed: Fiji would drop the overlay of a compressed file."><input type="checkbox" id="save-images"> Also save images with overlays (Fiji)</label>
       <div id="progress" hidden><div id="progress-bar"></div></div>
       <div id="progress-text" class="muted"></div>
     </div>
@@ -87,18 +93,26 @@
       <div id="channels"></div>
     </div>
     <div class="section">
-      <h3>Overlays <span class="help" data-help="Cells: outlines of the nuclei or cells. Foci: the detected foci, lightly filled, per foci channel. Markers: a dot on every focus; the dots follow the threshold slider at once, the outlines when the analysis has been repeated. A white ring marks a focus that colocalizes with a focus of another channel. Colocalization: the map of where foci of two channels meet. Colour cells by: a colour per cell for one of its numbers, from dark blue (lowest) to yellow (highest)."></span></h3>
+      <h3>Overlays <span class="help" data-help="Cells: outlines of the nuclei or cells. Foci: the detected foci, lightly filled, per foci channel. Markers: a dot on every focus; the dots follow the threshold slider at once, the outlines when the analysis has been repeated. A ring marks a focus that colocalizes with a focus of another channel (when zoomed in). Colocalization: colocalizing foci get a white outline with a black edge, and where foci of two channels lie on top of each other is hatched black and white, so it shows on any colour. Colour cells by: a colour per cell for one of its numbers, from dark blue (lowest) to yellow (highest)."></span></h3>
       <div id="overlays">
         <label><input type="checkbox" id="show-cells" checked> Cells <kbd>C</kbd></label>
         <label><input type="checkbox" id="show-foci" checked> Foci <kbd>F</kbd></label>
         <div id="foci-toggles"></div>
         <label><input type="checkbox" id="show-markers" checked> Markers <kbd>M</kbd></label>
-        <label id="coloc-wrap" hidden title="The colocalization map: foci that colocalize with a focus of another channel get a white outline, and the places where foci of two channels lie on top of each other are filled white (key O)"><input type="checkbox" id="show-coloc" checked> Colocalization <kbd>O</kbd></label>
+        <label id="coloc-wrap" hidden title="The colocalization map: foci that colocalize with a focus of another channel get a white outline with a black edge, and the places where foci of two channels lie on top of each other are hatched (key O)"><input type="checkbox" id="show-coloc" checked> Colocalization <kbd>O</kbd></label>
         <div id="cell-color-wrap" hidden>
           <label for="cell-color" title="Fill every cell with a colour for one of its numbers, for example the number of foci or the share of colocalizing foci">Colour cells by</label>
           <select id="cell-color"></select>
           <div id="cell-legend" hidden><span id="legend-lo"></span><span class="ramp"></span><span id="legend-hi"></span></div>
         </div>
+      </div>
+    </div>
+    <div class="section">
+      <h3>Save <span class="help" data-help="View: a PNG picture of the viewer as you see it now. Whole image: the shown slice or projection at full resolution, as an RGB TIFF with the channels and overlays as shown. For Fiji: the image with all its channels, slices and frames as a TIFF that opens in Fiji, with the outlines as overlay. Everything goes to the results folder (pictures, images)."></span></h3>
+      <div class="row" id="save-buttons">
+        <button id="save-view">View</button>
+        <button id="save-rgb">Whole image</button>
+        <button id="save-imagej">For Fiji</button>
       </div>
     </div>
     <div class="section">

@@ -333,6 +333,19 @@ nuclear stain (`Hi-res 3D`). Default: Cellpose.
 
 ---
 
+### State on 2026-11-17 (for continuing elsewhere)
+
+All work is committed and pushed to `bvandenbroek/Foci-Analyzer-Python` (main). Done last: logo; colocalization
+map in black and white; the viewer shows stored batch results; display settings kept between images;
+Load/Save settings; TSV tables; graph data and pictures saved in the results folder; RGB and Fiji exports;
+2.5D StarDist/InstanSeg; installers for Windows, macOS and Linux. The user tests setup.exe on another PC.
+Not done: the manual; foci tracking over time; a person trying macOS or Linux; a code-signing certificate
+(asked for); moving the repository to BioImaging-NKI. A new computer needs: uv, then `uv sync` with
+`UV_PROJECT_ENVIRONMENT` outside the synced folder (see CLAUDE.md), and the networks via
+`uv run --no-project --python 3.12 installer/install.py --target <folder> --networks all` or the setup.
+
+---
+
 ## 10. Way of working
 
 - Tokens matter more than building speed: one session, no `/orchestrate`, sub-agents only when they clearly

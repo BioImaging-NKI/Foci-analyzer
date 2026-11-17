@@ -13,7 +13,7 @@ New-Item -ItemType Directory -Force (Join-Path $payload "installer") | Out-Null
 Copy-Item -Recurse (Join-Path $root "src") (Join-Path $payload "src")
 Get-ChildItem -Recurse -Directory -Filter "__pycache__" (Join-Path $payload "src") | Remove-Item -Recurse -Force
 foreach ($f in "pyproject.toml", "uv.lock", "README.md", "CHANGELOG.md") { Copy-Item (Join-Path $root $f) $payload }
-foreach ($f in "install.py", "check.py", "run-install.cmd") { Copy-Item (Join-Path $here $f) (Join-Path $payload "installer") }
+foreach ($f in "install.py", "check.py", "run-install.cmd", "FociAnalyzer.ico", "FociAnalyzer.icns", "logo-512.png") { Copy-Item (Join-Path $here $f) (Join-Path $payload "installer") }
 
 $uv = if ($env:UV_EXE) { $env:UV_EXE } else { (Get-Command uv).Source }
 Copy-Item $uv (Join-Path $build "uv.exe")

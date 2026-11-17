@@ -172,8 +172,17 @@ def test_batch_writes_tables(tmp_path):
               for n in ("one", "two")]
     import threading
     results, progress = batch.Results(), batch.Progress()
-    batch.run(images, settings(), str(tmp_path / "out"), results, progress, threading.Lock(), labels=True)
+    batch.run(images, settings(), str(tmp_path / "out"), results, progress, threading.Lock(), labels=True, save_images=True)
     assert not progress.errors and progress.done == 2
+    assert (tmp_path / "out" / "cells.tsv").is_file() and not (tmp_path / "out" / "cells.csv").exists()
+    with tifffile.TiffFile(tmp_path / "out" / "images" / "cond_one.tif") as tf:  # for Fiji: the image + outlines
+        assert tf.series[0].shape == (5, 3, 128, 160) and len(tf.imagej_metadata["Overlays"]) >= 2 + 18
+        assert tf.pages[0].compression == 1  # Fiji drops the overlay of a compressed file
+    from foci_analyzer import export  # the store the viewer reads back gives the same result
+    c, f = results.cells, results.foci
+    back = export.load_store(export.store_path(tmp_path / "out", images[0].id), 0, c[c["path"] == images[0].id],
+                             f[f["image"] == "one"])
+    assert int(back.labels.max()) == 2 and [len(ch.kept) for ch in back.channels] == [9, 9] and len(back.cells) == 2
     saved = tifffile.imread(tmp_path / "out" / "labels" / "cond_one_foci_ch2.tif")
     assert saved.shape == (5, 128, 160) and saved.max() == 9
     assert tifffile.imread(tmp_path / "out" / "labels" / "cond_one_cells.tif").max() == 2

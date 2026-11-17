@@ -22,7 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import __version__, batch, config, experiment, models, pipeline, stats
+from . import __version__, batch, config, experiment, export, models, pipeline, stats
 from .imagestore import ImageStore
 from .stages import StageCache
 
@@ -33,6 +33,13 @@ root = tk.Tk(); root.withdraw(); root.attributes("-topmost", True)
 if sys.argv[1] == "files":
     out = filedialog.askopenfilenames(title="Choose images", filetypes=[("Images", "*.tif *.tiff *.czi *.lif"), ("All files", "*.*")])
     sys.stdout.write("\\n".join(out))
+elif sys.argv[1] == "open-settings":
+    sys.stdout.write(filedialog.askopenfilename(title="Load analysis settings", initialdir=sys.argv[2] or None,
+                     filetypes=[("Settings", "*.toml"), ("All files", "*.*")]) or "")
+elif sys.argv[1] == "save-settings":
+    sys.stdout.write(filedialog.asksaveasfilename(title="Save analysis settings", initialdir=sys.argv[2] or None,
+                     initialfile="foci_analyzer_settings.toml", defaultextension=".toml",
+                     filetypes=[("Settings", "*.toml")]) or "")
 else:
     sys.stdout.write(filedialog.askdirectory(title="Choose a folder") or "")
 """
@@ -325,11 +332,36 @@ class App:
         return {"busy": True, "stage": name, "text": note, "step": step, "steps": steps,
                 "seconds": time.time() - start}
 
+    def stored(self, image_id: str, t: int) -> pipeline.FrameResult | None:
+        """Frame t as the last batch run left it, when that run used the current settings; else None."""
+        meta = self.results.meta
+        if not meta or meta.get("settings") != config.to_dict(self.settings) or image_id not in meta.get("images", {}):
+            return None
+        e = self.entry(image_id)
+        c, f = self.results.cells, self.results.foci
+        cells = c[(c["path"] == image_id) & (c["frame"] == t + 1)] if len(c) else c
+        foci = f[(f["image"] == e.name) & (f["folder"] == e.folder) & (f["frame"] == t + 1)] if len(f) else f
+        try:
+            return export.load_store(export.store_path(meta.get("folder", ""), image_id), t, cells, foci)
+        except (OSError, ValueError, KeyError):
+            return None
+
     def preview(self, body: dict) -> dict:
         if "settings" in body:
             self.set_settings(body["settings"])
         self.cache.cancelled = False
-        r = self.frame(body.get("path", ""), int(body.get("t", 0)), box=body.get("box"))
+        image_id, t = body.get("path", ""), int(body.get("t", 0))
+        if body.get("stored"):  # show what the last batch run found, without analyzing again
+            self.image(image_id)
+            r = self.stored(image_id, t)
+            if r is None:
+                return {"stored": False}
+            with self.lock:
+                self.last[(image_id, t)] = r
+                while len(self.last) > 3:
+                    self.last.popitem(last=False)
+        else:
+            r = self.frame(image_id, t, box=body.get("box"))
         coloc = []
         for a in r.channels:  # per pair of channels: how many foci of a lie on a focus of b
             for b in r.channels:
@@ -343,6 +375,7 @@ class App:
         return {"key": r.key, "cells": int(r.labels.max()), "channels": [c.summary() for c in r.channels],
                 "remarks": r.remarks, "pixel_size": r.cal.pixel_size, "binning": r.binning, "border": r.border,
                 "table": _columns(r.cells), "coloc": coloc, "dimension": self.settings.foci_general.dimension, "offset": list(r.offset),
+                "stored": bool(body.get("stored")),
                 "part": [r.offset[0], r.offset[1], r.labels.shape[2] * r.binning + 2 * r.border,
                          r.labels.shape[1] * r.binning + 2 * r.border] if r.offset != (0, 0) or body.get("box") else None}
 
@@ -451,7 +484,7 @@ class App:
         self.progress.running = True
         threading.Thread(target=batch.run, daemon=True, args=(
             images, self.settings, self.results_folder(), self.results, self.progress, self.compute_lock,
-            bool(body.get("labels")))).start()
+            bool(body.get("labels")), bool(body.get("images_overlay")))).start()
         return self.progress.to_dict()
 
     def results_json(self) -> bytes:
@@ -479,6 +512,120 @@ class App:
         except ValueError as e:
             raise ApiError(str(e)) from e
 
+    def output_folder(self, sub: str = "") -> Path:
+        folder = self.results.meta.get("folder") or self.results_folder()
+        if not folder:
+            raise ApiError("there is no results folder: add images on the Experiment page first")
+        out = Path(folder) / sub
+        out.mkdir(parents=True, exist_ok=True)
+        return out
+
+    def save_text(self, body: dict) -> dict:
+        """A table made in the window (the data of a graph) as a file in the results folder."""
+        name = export.safe_name(Path(str(body.get("name", "table"))).stem) + ".tsv"
+        path = self.output_folder() / name
+        path.write_text(str(body.get("text", "")), encoding="utf-8")
+        return {"path": str(path)}
+
+    def save_view(self, body: dict) -> dict:
+        """The picture of the viewer as the user sees it (PNG made in the browser)."""
+        import base64
+        data = str(body.get("png", ""))
+        if not data.startswith("data:image/png;base64,"):
+            raise ApiError("no picture")
+        path = self._free(self.output_folder("pictures"), export.safe_name(str(body.get("name", "view"))), ".png")
+        path.write_bytes(base64.b64decode(data.split(",", 1)[1]))
+        return {"path": str(path)}
+
+    @staticmethod
+    def _free(folder: Path, stem: str, ext: str) -> Path:
+        path, k = folder / f"{stem}{ext}", 2
+        while path.exists():
+            path, k = folder / f"{stem}_{k}{ext}", k + 1
+        return path
+
+    def save_rgb(self, body: dict) -> dict:
+        """The whole image (one plane) as RGB at full resolution, with the overlays the viewer shows."""
+        image_id = body.get("path", "")
+        im = self.image(image_id)
+        t, z, _ = self._plane_args({"t": body.get("t", 0), "z": body.get("z", "mip")}, im.info)
+        display = body.get("display") or []
+        if len(display) != im.info.channels:
+            raise ApiError("the display settings do not match the image")
+        planes = [im.plane(t, c, z, 0) for c in range(im.info.channels)]
+        overlays = []
+        with self.lock:
+            r = self.last.get((image_id, t))
+        o = body.get("overlays") or {}
+        if r is not None:
+            zi = z if isinstance(z, int) else None
+            H, W = im.info.height, im.info.width
+            if o.get("cells"):
+                overlays.append({"labels": export.full_plane(r, r.labels, zi, H, W), "colour": (255, 255, 255)})
+            for k, ch in enumerate(r.channels):
+                if ch.channel in (o.get("foci") or []) and ch.labels is not None:
+                    overlays.append({"labels": export.full_plane(r, ch.labels, zi, H, W),
+                                     "colour": export.OUTLINE[k % len(export.OUTLINE)], "fill": 0.35})
+            if o.get("coloc"):
+                lab = self._overlay_labels(r, "coloc", {})
+                overlays.append({"labels": export.full_plane(r, lab, zi, H, W), "colour": (255, 255, 255), "halo": True})
+        rgb = export.render_rgb(planes, display, overlays)
+        name = export.safe_name(f"{self.entry(image_id).name}" + (f"_t{t + 1}" if im.info.frames > 1 else "")
+                                + ("" if z is None else f"_{z}" if isinstance(z, str) else f"_z{z + 1}"))
+        path = self._free(self.output_folder("pictures"), name, ".tif")
+        px = im.info.pixel_size or 1.0
+        import tifffile
+        tifffile.imwrite(path, rgb, photometric="rgb", compression="zlib", resolution=(1 / px, 1 / px),
+                         metadata={"unit": "micron" if im.info.unit == "µm" else im.info.unit}, imagej=True)
+        return {"path": str(path), "overlays": r is not None}
+
+    def save_imagej(self, body: dict) -> dict:
+        """The shown image as an ImageJ TIFF with the outlines as overlay: all frames of the last batch run
+        when it used the current settings, otherwise the frames analyzed in the viewer."""
+        image_id = body.get("path", "")
+        im = self.image(image_id)
+        frames = {}
+        for t in range(im.info.frames):
+            r = self.stored(image_id, t)
+            if r is None:
+                with self.lock:
+                    r = self.last.get((image_id, t))
+            if r is not None:
+                frames[t] = r
+        if not frames:
+            raise ApiError("analyze the image first (Analyze this image), then save it")
+        colours = [tuple(round(255 * v) for v in c) for c in (body.get("colours") or [])]
+        if len(colours) != im.info.channels:
+            s = self.settings
+            colours = export.default_colours(im.info.channels, s.image.nuclei_channel, s.image.cell_channel,
+                                             [f.channel for f in s.foci])
+        ranges = body.get("ranges")
+        if ranges and len(ranges) == im.info.channels and im.scale != 1.0:
+            ranges = [[v / im.scale for v in lohi] for lohi in ranges]
+        e = self.entry(image_id)
+        path = self.output_folder("images") / f"{export.safe_name(f'{e.condition}_{e.name}')}.tif"
+        n = export.write_imagej(path, im.data, im.info, frames, colours, ranges if ranges and len(ranges) == im.info.channels else None)
+        return {"path": str(path), "outlines": n, "frames": len(frames), "of": im.info.frames}
+
+    def load_settings(self, body: dict) -> dict:
+        path = body.get("path") or next(iter(pick("open-settings", self.results.meta.get("folder") or self.results_folder())), "")
+        if not path:
+            return {"cancelled": True}
+        try:
+            s = config.load(Path(path))
+        except (OSError, ValueError, TypeError) as e:
+            raise ApiError(f"cannot read {path}: {e}") from e
+        return {"settings": self.set_settings(config.to_dict(s)), "path": path}
+
+    def save_settings(self, body: dict) -> dict:
+        if "settings" in body:
+            self.set_settings(body["settings"])
+        path = body.get("path") or next(iter(pick("save-settings", self.results.meta.get("folder") or self.results_folder())), "")
+        if not path:
+            return {"cancelled": True}
+        config.save(self.settings, Path(path))
+        return {"path": path}
+
     def open_results_folder(self) -> dict:
         folder = self.results.meta.get("folder") or self.results_folder()
         if not folder or not Path(folder).is_dir():
@@ -490,10 +637,10 @@ class App:
         return {"folder": folder}
 
 
-def pick(kind: str) -> list[str]:
+def pick(kind: str, start: str = "") -> list[str]:
     """Folders or files chosen in a normal dialog (a browser cannot give the path of a folder)."""
     try:
-        out = subprocess.run([sys.executable, "-c", _PICK, kind], capture_output=True, text=True, timeout=600,
+        out = subprocess.run([sys.executable, "-c", _PICK, kind, start], capture_output=True, text=True, timeout=600,
                              check=False)
     except (OSError, subprocess.TimeoutExpired) as e:
         raise ApiError(f"the dialog could not be opened: {e}", 500) from e
@@ -602,6 +749,12 @@ def make_handler(app: App):
                 "/api/batch/stop": stop,
                 "/api/stats": lambda: app.compare(body),
                 "/api/results/open": app.open_results_folder,
+                "/api/results/save": lambda: app.save_text(body),
+                "/api/export/view": lambda: app.save_view(body),
+                "/api/export/rgb": lambda: app.save_rgb(body),
+                "/api/export/imagej": lambda: app.save_imagej(body),
+                "/api/settings/load": lambda: app.load_settings(body),
+                "/api/settings/save": lambda: app.save_settings(body),
             }
             if path == "/api/quit":
                 def quit_():

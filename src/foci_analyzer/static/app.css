@@ -32,7 +32,10 @@ input[type=checkbox], input[type=range] { accent-color: var(--accent); }
 
 header { display: flex; align-items: center; gap: 18px; padding: 8px 16px; background: var(--panel);
   border-bottom: 1px solid var(--line); }
-.brand { font-weight: 650; }
+.brand { font-weight: 650; display: flex; align-items: center; gap: 7px; }
+.brand img { display: block; }
+#settings-files { margin-bottom: 10px; }
+#settings-files button, #save-buttons button { flex: 1; }
 nav button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 4px; margin-right: 10px; }
 nav button.on { border-bottom-color: var(--accent); font-weight: 600; }
 #theme { margin-left: auto; }

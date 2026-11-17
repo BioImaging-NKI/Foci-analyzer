@@ -105,15 +105,24 @@ def ask(args) -> None:
 
 def shortcuts(target: Path, desktop: bool) -> None:
     exe = python_of(target / ".venv").parent / ("foci-analyzer-window.exe" if WINDOWS else "foci-analyzer-window")
+    icons = target / "icons"  # kept with the program: the folder the installer ran from may be removed later
+    icons.mkdir(exist_ok=True)
+    for name in ("FociAnalyzer.ico", "FociAnalyzer.icns", "logo-512.png"):
+        if (HERE / name).is_file():
+            shutil.copy2(HERE / name, icons / name)
     if WINDOWS:
         places = ["[Environment]::GetFolderPath('Programs')"] + (["[Environment]::GetFolderPath('Desktop')"] if desktop else [])
         for place in places:
             ps = (f"$s = (New-Object -ComObject WScript.Shell).CreateShortcut([IO.Path]::Combine({place}, 'Foci Analyzer.lnk')); "
-                  f"$s.TargetPath = '{exe}'; $s.WorkingDirectory = '{target}'; $s.Description = 'Foci Analyzer'; $s.Save()")
+                  f"$s.TargetPath = '{exe}'; $s.WorkingDirectory = '{target}'; $s.Description = 'Foci Analyzer'; "
+                  f"$s.IconLocation = '{icons / 'FociAnalyzer.ico'}'; $s.Save()")
             subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps], check=False)
     elif MAC:  # a small app in ~/Applications that starts the program (made here, so macOS does not block it)
         app = Path.home() / "Applications" / "Foci Analyzer.app" / "Contents"
         (app / "MacOS").mkdir(parents=True, exist_ok=True)
+        (app / "Resources").mkdir(exist_ok=True)
+        if (icons / "FociAnalyzer.icns").is_file():
+            shutil.copy2(icons / "FociAnalyzer.icns", app / "Resources" / "FociAnalyzer.icns")
         start = app / "MacOS" / "Foci Analyzer"
         start.write_text(f'#!/bin/sh\nexec "{exe}"\n', encoding="utf-8")
         start.chmod(0o755)
@@ -121,6 +130,7 @@ def shortcuts(target: Path, desktop: bool) -> None:
             '<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict>'
             "<key>CFBundleName</key><string>Foci Analyzer</string>"
             "<key>CFBundleExecutable</key><string>Foci Analyzer</string>"
+            "<key>CFBundleIconFile</key><string>FociAnalyzer</string>"
             "<key>CFBundleIdentifier</key><string>nl.nki.foci-analyzer</string>"
             "<key>CFBundlePackageType</key><string>APPL</string></dict></plist>\n", encoding="utf-8")
         say(f"Made {app.parent}")
@@ -129,7 +139,7 @@ def shortcuts(target: Path, desktop: bool) -> None:
         apps.mkdir(parents=True, exist_ok=True)
         (apps / "foci-analyzer.desktop").write_text(
             "[Desktop Entry]\nType=Application\nName=Foci Analyzer\nComment=Foci in nuclei and cells\n"
-            f'Exec="{exe}"\nTerminal=false\nCategories=Science;Education;\n', encoding="utf-8")
+            f'Exec="{exe}"\nIcon={icons / "logo-512.png"}\nTerminal=false\nCategories=Science;Education;\n', encoding="utf-8")
         say(f"Made {apps / 'foci-analyzer.desktop'}")
 
 

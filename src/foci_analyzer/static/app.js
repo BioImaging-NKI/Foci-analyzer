@@ -181,6 +181,10 @@ async function openImage(id, analyze = false) {
     Object.assign(V, { id, info, z: Math.floor(info.slices / 2), t: 0, preview: null, cand: [], slots: {}, lastDim: "" });
     const top = info.dtype === "uint8" ? 255 : 65535;
     V.ch = info.ranges.map(([lo, hi], c) => ({ on: true, lo, hi, auto: [lo, hi], top: Math.min(top, Math.max(hi * 3, lo + 10)), color: channelColor(c) }));
+    const kept = store("fa.display");  // the contrast and on/off of the image shown before
+    if (kept && kept.n === info.channels && kept.dtype === info.dtype && kept.scale === info.scale) {
+      kept.ch.forEach((k, c) => { Object.assign(V.ch[c], { on: k.on, lo: k.lo, hi: k.hi }); V.ch[c].top = Math.min(top, Math.max(V.ch[c].top, k.hi + 1)); });
+    }
     if (info.slices === 1) V.mode = "mip";
     $("z").max = info.slices - 1; $("z").value = V.z; $("t").max = info.frames - 1; $("t").value = 0;
     $("viewer-empty").hidden = true; showCell(null);
@@ -189,7 +193,8 @@ async function openImage(id, analyze = false) {
     viewer.setImage(info.width, info.height); viewer.pixelSize = info.pixel_size; viewer.unit = info.unit;
     renderCellColor(); renderChannels(); syncMode(); syncLayers(); viewer.fit(); status("");
     previewInfo();
-    if (analyze) runPreview();  // otherwise the user first checks the settings and presses Analyze this image
+    if (analyze) runPreview();  // otherwise the user first checks the settings and presses Analyze this image,
+    else await loadStored();  // unless the last batch run already analyzed it with these settings
   } catch (e) { status(e.message, true); }
 }
 function closeImage() {
@@ -203,7 +208,26 @@ function slot(name, key) {
   if (s.key !== key) { s.prev = s.key; s.key = key; }
   return s.prev;
 }
+function saveDisplay() {
+  if (V.info) store("fa.display", { n: V.info.channels, dtype: V.info.dtype, scale: V.info.scale, ch: V.ch.map((c) => ({ on: c.on, lo: c.lo, hi: c.hi })) });
+}
+// the result of the last batch run for this image and frame, when it used the current settings
+async function loadStored() {
+  const id = V.id, t = V.t;
+  if (!id) return;
+  try {
+    const r = await (await api("/api/preview", { path: id, t, settings: S.settings, stored: true })).json();
+    if (!r.stored || id !== V.id || t !== V.t || V.preview) return;
+    const cand = await Promise.all(r.channels.map(async (ch) =>
+      new Float32Array(await (await api(`/api/candidates?path=${encodeURIComponent(id)}&t=${t}&ch=${ch.channel}`)).arrayBuffer())));
+    if (id !== V.id || t !== V.t || V.preview) return;
+    V.preview = r; V.cand = cand;
+    renderCellColor(); syncMode(); syncLayers(); previewInfo();
+    status(`From the last run of Analyze all images (same settings) · ${r.cells} cells`);
+  } catch { /* nothing stored: the image waits for Analyze this image */ }
+}
 function syncLayers() {
+  saveDisplay();
   if (!V.info) { viewer.layers = []; viewer.markers = []; viewer.requestDraw(); return; }
   const det = DET[S.settings.foci_general.dimension];
   const z = V.mode === "slice" ? V.z : V.mode === "det" && det ? det[0] : "mip", base = `path=${encodeURIComponent(V.id)}&t=${V.t}&z=${z}`;
@@ -232,9 +256,11 @@ function syncLayers() {
     if ((V.preview.coloc || []).length) {  // the colocalization map, on top
       const on = $("show-coloc").checked;
       key = `l|coloc|${z}|${k}`;
-      layers.push({ type: "labels", key, prevKey: slot("coloc", key), url: region("/api/overlay?kind=coloc"), color: [1, 1, 1, 1], fill: 0.12, on });
+      const prev = slot("coloc", key), url = region("/api/overlay?kind=coloc");
+      layers.push({ type: "labels", key, prevKey: prev, url, color: [0, 0, 0, 1], width: 2.6, on });  // the black edge,
+      layers.push({ type: "labels", key, prevKey: prev, url, color: [1, 1, 1, 1], width: 1, on });  // the white line on it
       key = `l|overlap|${z}|${k}`;
-      layers.push({ type: "labels", key, prevKey: slot("overlap", key), url: region("/api/overlay?kind=overlap"), color: [1, 1, 1, 1], fill: 0.9, on });
+      layers.push({ type: "labels", key, prevKey: slot("overlap", key), url: region("/api/overlay?kind=overlap"), color: [0, 0, 0, 1], fill: 0.75, hatch: 3, on });
     }
   }
   viewer.box = V.preview && V.preview.part ? V.preview.part : null;
@@ -302,7 +328,8 @@ function countAbove(pts, thr) {  // heights are sorted from high to low
 function previewInfo() {
   const p = V.preview, box = $("preview-info");
   if (!p) { box.replaceChildren(V.id ? "Not analyzed yet. Check the settings, then press Analyze this image (A)." : ""); return; }
-  const lines = [p.part ? el("div", { class: "sub", style: "margin-left:0", textContent: "Of the part inside the dashed frame only:" }) : null, el("div", {}, el("b", { textContent: `${p.cells} ${p.cells === 1 ? "cell" : "cells"}` }))];
+  const lines = [p.stored ? el("div", { class: "sub", style: "margin-left:0", textContent: "From the last run of Analyze all images:" }) : null,
+    p.part ? el("div", { class: "sub", style: "margin-left:0", textContent: "Of the part inside the dashed frame only:" }) : null, el("div", {}, el("b", { textContent: `${p.cells} ${p.cells === 1 ? "cell" : "cells"}` }))];
   p.channels.forEach((ch, i) => {
     const live = ch.live !== undefined, n = live ? countAbove(V.cand[i], ch.live) : ch.foci;
     const thr = ch.height_unit === "× noise" ? `noise ${fmt(ch.noise)}, threshold ${fmt((ch.live ?? ch.threshold) * ch.noise)}`
@@ -314,7 +341,7 @@ function previewInfo() {
   for (const c of p.coloc || []) lines.push(el("div", {}, `Channel ${c.a} foci on a channel ${c.b} focus: `,
     el("b", { textContent: `${c.with} of ${c.n} (${Math.round(100 * c.with / c.n)} %)` }),
     c.chance !== null ? el("div", { class: "sub", textContent: `by chance about ${Math.round(100 * c.chance)} %` }) : null));
-  if ((p.coloc || []).length) lines.push(el("div", { class: "sub", textContent: "Map (key O): white outline = colocalizing focus, white fill = where foci of two channels overlap." }));
+  if ((p.coloc || []).length) lines.push(el("div", { class: "sub", textContent: "Map (key O): white outline with a black edge = colocalizing focus; hatched = where foci of two channels overlap." }));
   else if (p.channels.length > 1 && !S.settings.colocalization.enabled) lines.push(el("div", { class: "sub", textContent: "Colocalization is switched off (see the settings on the left)." }));
   for (const r of p.remarks) lines.push(el("div", { textContent: r }));
   box.replaceChildren(...lines.filter(Boolean));
@@ -386,7 +413,7 @@ function setT(t) {
   t = Math.min(V.info.frames - 1, Math.max(0, t)); if (t === V.t) return;
   const had = !!V.preview;
   V.t = t; $("t").value = t; V.preview = null; V.cand = []; renderCellColor(); syncMode(); syncLayers(); previewInfo(); showCell(null);
-  if (had && $("live").checked) runPreview();
+  if (had && $("live").checked) runPreview(); else loadStored();
 }
 $("mode").addEventListener("click", (e) => { if (e.target.dataset.mode) setMode(e.target.dataset.mode); });
 $("z").addEventListener("input", (e) => setZ(+e.target.value));
@@ -464,11 +491,51 @@ async function poll() {
   } catch (e) { status(e.message, true); }
 }
 async function run(images) {
-  try { showProgress(await (await api("/api/batch/start", { settings: S.settings, images, labels: $("save-labels").checked })).json()); poll(); }
+  try { showProgress(await (await api("/api/batch/start", { settings: S.settings, images, labels: $("save-labels").checked, images_overlay: $("save-images").checked })).json()); poll(); }
   catch (e) { status(e.message, true); }
 }
 $("save-labels").checked = store("fa.labels") === true;
 $("save-labels").onchange = (e) => store("fa.labels", e.target.checked);
+$("save-images").checked = store("fa.images") === true;
+$("save-images").onchange = (e) => store("fa.images", e.target.checked);
+
+// ---------------------------------------------------------------- settings files and saving pictures
+async function saved(what, request) {
+  status(`Saving ${what}…`, false, -1);
+  try { const r = await (await request()).json(); status(r.cancelled ? "" : `Saved ${what}: ${r.path}`); return r; }
+  catch (e) { status(e.message, true); return null; }
+}
+$("load-settings").onclick = async () => {
+  try {
+    const r = await (await api("/api/settings/load", {})).json();
+    if (r.cancelled) return;
+    S.settings = r.settings; renderSettings(); updateChannelColors();
+    status(`Settings loaded from ${r.path}`);
+    if (V.id && V.preview && $("live").checked) runPreview();
+  } catch (e) { status(e.message, true); }
+};
+$("save-settings").onclick = () => saved("the settings", () => api("/api/settings/save", { settings: S.settings }));
+function shownZ() {
+  const det = DET[S.settings.foci_general.dimension];
+  return V.mode === "slice" ? V.z : V.mode === "det" && det ? det[0] : "mip";
+}
+$("save-view").onclick = () => {
+  if (!V.info) return status("Choose an image first", true);
+  const name = `${S.images.find((im) => im.id === V.id)?.name || "view"}_view`;
+  return saved("the view", () => api("/api/export/view", { png: viewer.snapshot(), name }));
+};
+$("save-rgb").onclick = () => {
+  if (!V.info) return status("Choose an image first", true);
+  const p = V.preview;
+  const overlays = p ? { cells: $("show-cells").checked, coloc: $("show-coloc").checked && (p.coloc || []).length > 0,
+    foci: $("show-foci").checked ? p.channels.map((c) => c.channel).filter((c) => V.fociOn[c] !== false) : [] } : {};
+  const display = V.ch.map((c) => ({ on: c.on, lo: c.lo, hi: c.hi, colour: c.color.map((v) => Math.round(255 * v)) }));
+  return saved("the whole image", () => api("/api/export/rgb", { path: V.id, t: V.t, z: shownZ(), display, overlays }));
+};
+$("save-imagej").onclick = () => {
+  if (!V.info) return status("Choose an image first", true);
+  return saved("the image for Fiji", () => api("/api/export/imagej", { path: V.id, colours: V.ch.map((c) => c.color), ranges: V.ch.map((c) => [c.lo, c.hi]) }));
+};
 $("run").onclick = () => run(null);
 $("run-one").onclick = () => { if (V.id) run([V.id]); else status("Choose an image first", true); };
 

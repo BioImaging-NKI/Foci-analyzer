@@ -27,6 +27,8 @@ OutputBaseFilename=FociAnalyzer-Setup-{#AppVersion}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=FociAnalyzer.ico
+UninstallDisplayIcon={app}\program\installer\FociAnalyzer.ico
 UninstallDisplayName=Foci Analyzer
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -39,8 +41,8 @@ Source: "build\payload\*"; DestDir: "{app}\program"; Flags: ignoreversion recurs
 Source: "build\uv.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
 
 [Icons]
-Name: "{userprograms}\Foci Analyzer"; Filename: "{app}\.venv\Scripts\foci-analyzer-window.exe"; WorkingDir: "{app}"; Comment: "Foci in nuclei and cells"
-Name: "{userdesktop}\Foci Analyzer"; Filename: "{app}\.venv\Scripts\foci-analyzer-window.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{userprograms}\Foci Analyzer"; Filename: "{app}\.venv\Scripts\foci-analyzer-window.exe"; WorkingDir: "{app}"; IconFilename: "{app}\program\installer\FociAnalyzer.ico"; Comment: "Foci in nuclei and cells"
+Name: "{userdesktop}\Foci Analyzer"; Filename: "{app}\.venv\Scripts\foci-analyzer-window.exe"; WorkingDir: "{app}"; IconFilename: "{app}\program\installer\FociAnalyzer.ico"; Tasks: desktopicon
 
 [UninstallDelete]
 ; the environments, Python, the download cache and the log were made by install.py, not copied by the setup

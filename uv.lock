@@ -65,6 +65,7 @@ dependencies = [
     { name = "plotly" },
     { name = "pylibczirw", marker = "platform_machine == 'arm64' or sys_platform != 'darwin'" },
     { name = "readlif" },
+    { name = "roifile" },
     { name = "scikit-image" },
     { name = "scipy" },
     { name = "tifffile" },
@@ -84,6 +85,7 @@ requires-dist = [
     { name = "plotly", specifier = ">=7.1.0" },
     { name = "pylibczirw", marker = "platform_machine == 'arm64' or sys_platform != 'darwin'", specifier = ">=6.1.0" },
     { name = "readlif", specifier = ">=0.6.6" },
+    { name = "roifile", specifier = ">=2024.9" },
     { name = "scikit-image", specifier = ">=0.24" },
     { name = "scipy", specifier = ">=1.13" },
     { name = "tifffile", specifier = ">=2024.8" },
@@ -345,6 +347,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a1/ae/1f9e205c22c14920ea21f64ca26bd5fdae05d23cf049099bcee26fda31b0/readlif-0.6.6.tar.gz", hash = "sha256:54620db7d9532afbff7fa2ba5f05d96b5b79d351213b91edd88d15145c7a6b4b", size = 25302, upload-time = "2025-07-02T19:01:24.586Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e9/6f/b4736b507ede5ffd6abb1d9e3957e154d6e367823ac9ea9d88a10633f21e/readlif-0.6.6-py3-none-any.whl", hash = "sha256:f7dc4d515a4cd992ecc064fcd88552f48c8a33ac811c7d2c33cb155b0c889d84", size = 24326, upload-time = "2025-07-02T19:01:23.707Z" },
+]
+
+[[package]]
+name = "roifile"
+version = "2026.11.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/76/7f/0a1d0768be7a686a7e83648b2bf36d91d33d7910965d3680eaddfc76678b/roifile-2026.11.6.tar.gz", hash = "sha256:ec82880c154ba1548c83b5bbc52db63ca94fcf73d4b601e5aea2e0ec5f1b3208", size = 31890, upload-time = "2026-11-07T00:04:11.457Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/73/60/550b745097cabe1458a844dee81ed21f9a58352ff2b96d40df30d33876c3/roifile-2026.11.6-py3-none-any.whl", hash = "sha256:50f98abfe4bdac14224262648f8a304a6f5a61cede361dfb77de5fe276167845", size = 23813, upload-time = "2026-11-07T00:04:10.218Z" },
 ]
 
 [[package]]

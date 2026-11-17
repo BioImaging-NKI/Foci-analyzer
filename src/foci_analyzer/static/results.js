@@ -87,9 +87,9 @@ function render() {
       el("input", { type: "checkbox", checked: !C.off.includes(c), onchange: (e) => { C.off = e.target.checked ? C.off.filter((x) => x !== c) : [...C.off, c]; changed(); } }),
       el("span", { style: `color:${PALETTE[i % PALETTE.length]}`, textContent: " ● " }), c))),
     el("div", { class: "row", style: "margin-top:12px" },
-      el("button", { textContent: "Save graph data", title: "The values in this graph as a CSV file, one row per cell or focus", onclick: saveGraphData }),
+      el("button", { textContent: "Save graph data", title: "The values in this graph as a table (tab-separated, .tsv) in the results folder, one row per cell or focus", onclick: saveGraphData }),
       el("button", { textContent: "Open results folder", title: R.meta.folder || "", onclick: async () => { try { await api("/api/results/open", {}); } catch (e) { status(e.message, true); } } }),
-      helpIcon("The folder holds cells.csv (one row per cell), foci.csv (one row per focus), settings.toml (the settings of this analysis) and run.json. The tables open in Excel, R or Python.")));
+      helpIcon("The folder holds cells.tsv (one row per cell), foci.tsv (one row per focus), settings.toml (the settings of this analysis) and run.json. The tables open in Excel, R or Python.")));
   draw(); drawStats(); drawImages(); drawCheck();
 }
 function changed() { store("fa.results", C); render(); }
@@ -207,10 +207,11 @@ function saveGraphData() {
   const t = table(), idx = rows(t);
   const cols = ["condition", "folder", "image", "frame", "cell", ...(t.focus ? ["focus", "channel"] : []), ...(t.track ? ["track"] : []),
     ...(C.plot === "coloc" ? pairs().flatMap(([a, b]) => (b ? [a, b] : [a])) : [...(C.plot === "scatter" ? [C.x] : []), C.measure])];
-  const cell = (v) => v === null || v === undefined ? "" : /[",\n]/.test(String(v)) ? `"${String(v).replaceAll('"', '""')}"` : String(v);
-  const text = [cols.join(","), ...idx.map((i) => cols.map((c) => cell(t[c][i])).join(","))].join("\n");
-  const a = el("a", { href: URL.createObjectURL(new Blob([text], { type: "text/csv" })), download: `foci_analyzer_${C.plot === "coloc" ? "colocalization" : C.measure}.csv` });
-  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  const cell = (v) => v === null || v === undefined ? "" : String(v).replace(/[\t\n]/g, " ");
+  const text = [cols.join("\t"), ...idx.map((i) => cols.map((c) => cell(t[c][i])).join("\t"))].join("\n");
+  const name = `graph_${C.plot === "coloc" ? "colocalization" : C.measure}`;
+  api("/api/results/save", { name, text }).then(async (r) => status(`Saved the graph data: ${(await r.json()).path}`))
+    .catch((e) => status(e.message, true));
 }
 function pathOf(t, i) {
   if (t.path) return t.path[i];

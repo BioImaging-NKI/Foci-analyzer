@@ -16,6 +16,7 @@ dependencies = [
     "pylibczirw>=6.1.0; sys_platform != 'darwin' or platform_machine == 'arm64'",  # no package for Intel Macs
     "readlif>=0.6.6",
     "plotly>=7.1.0",
+    "roifile>=2024.9",
 ]
 
 [project.scripts]

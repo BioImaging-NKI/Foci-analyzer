@@ -41,6 +41,12 @@ reproduce the Fiji results. Design, state per milestone and open items: `plan.md
   The worker must not import `foci_analyzer`. `App.cancel()` kills the workers; `warm_up()` starts them early.
 - Preview: `App.frame()` computes and stores the result in `App.last`; overlays and candidates only read
   `App.last` (they never start an analysis). `StageCache.now` feeds the status bar, `.cancelled` stops it.
+- `export.py`: the store the viewer reads back after a batch run (`.viewer/*.npz` in the results folder:
+  labels and candidates per frame), label TIFFs, RGB rendering, ImageJ TIFFs with outline overlays (roifile).
+  Overlay TIFFs must stay uncompressed and their ROIs must have no `group` and no label options: Fiji drops
+  the overlay of a compressed TIFF, colours ROIs by group, and draws numbers otherwise (checked with Fiji).
+  Fiji can be asked from here: `C:/Fiji/fiji-windows-x64.exe --headless --run script.py` (Jython; write
+  results to a file, the console stays empty; Flatten does not work headless).
 - `batch.py`: all images (parallel processes without networks), tables to the results folder.
   `tracking.py`: overlap linking, or Trackastra. `stats.py`: tests with Holm correction.
 - `server.py`: standard-library server on 127.0.0.1; `/api/*` needs the token written into the page and a

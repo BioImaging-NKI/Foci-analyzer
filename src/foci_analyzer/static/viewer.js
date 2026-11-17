@@ -16,13 +16,18 @@ void main() {
 }`;
 const FS_LABELS = `#version 300 es
 precision highp float; precision highp usampler2D;
-uniform usampler2D tex; uniform vec2 d; uniform vec4 color; uniform float fill; in vec2 uv; out vec4 o;
+uniform usampler2D tex; uniform vec2 d; uniform vec4 color; uniform float fill; uniform float hatch; in vec2 uv; out vec4 o;
 void main() {
   uint c = texture(tex, uv).r;
   if (c == 0u) discard;
   bool edge = texture(tex, uv + vec2(d.x, 0.0)).r != c || texture(tex, uv - vec2(d.x, 0.0)).r != c
            || texture(tex, uv + vec2(0.0, d.y)).r != c || texture(tex, uv - vec2(0.0, d.y)).r != c;
   if (!edge && fill <= 0.0) discard;
+  if (!edge && hatch > 0.0) {  // black and white stripes: visible on any colour
+    float s = mod(floor((gl_FragCoord.x + gl_FragCoord.y) / hatch), 2.0);
+    o = vec4(vec3(s), fill);
+    return;
+  }
   o = edge ? color : vec4(color.rgb, color.a * fill);  // the inside lightly filled, the outline solid
 }`;
 
@@ -181,7 +186,7 @@ export class Viewer {
         gl.useProgram(pr.p); gl.uniform1i(pr.u.tex, 0);
         if (image) { gl.blendFunc(gl.ONE, gl.ONE); gl.uniform2f(pr.u.range, layer.lo, layer.hi); gl.uniform3fv(pr.u.color, layer.color); }
         else if (value) { gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.uniform1f(pr.u.alpha, layer.alpha ?? 0.6); }
-        else { gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.uniform4fv(pr.u.color, layer.color); gl.uniform1f(pr.u.fill, layer.fill || 0); }
+        else { gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.uniform4fv(pr.u.color, layer.color); gl.uniform1f(pr.u.fill, layer.fill || 0); gl.uniform1f(pr.u.hatch, (layer.hatch || 0) * dpr); }
         this._tile(layer, layer.key, this.maxLevel, 0, 0);  // the coarsest level is always kept as a stand-in
         for (let ty_ = y0; ty_ <= y1; ty_++) for (let tx_ = x0; tx_ <= x1; tx_++) {
           const tw = Math.min(TILE, lw - tx_ * TILE), th = Math.min(TILE, lh - ty_ * TILE);
@@ -198,13 +203,22 @@ export class Viewer {
           const ix = tx_ * TILE * f, iy = ty_ * TILE * f, iw = Math.min(tw * f, this.W - ix), ih = Math.min(th * f, this.H - iy);
           gl.uniform4f(pr.u.rect, (tx + ix * s) / cw * 2 - 1, 1 - (ty + iy * s) / ch * 2, iw * s / cw * 2, -ih * s / ch * 2);
           gl.uniform4f(pr.u.uvr, ...uv);
-          if (!image && !value) { const px = Math.min(1.5 / (texel * s * dpr), 1); /* a thin line inside the edge pixel when zoomed in */ gl.uniform2f(pr.u.d, px / t.w, px / t.h); }
+          if (!image && !value) { const px = Math.min((layer.width || 1) * 1.5 / (texel * s * dpr), 1); /* a thin line inside the edge pixel when zoomed in */ gl.uniform2f(pr.u.d, px / t.w, px / t.h); }
           gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, t.tex); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         }
       }
     }
     this._trim(); this._top(dpr, cw, ch);
     if (this.onview) this.onview();
+  }
+  // a PNG of what the viewer shows: the image layers and the markers and scale bar on top
+  snapshot() {
+    this.draw();  // the WebGL picture is only readable in the same task as it was drawn
+    const out = document.createElement("canvas");
+    out.width = this.canvas.width; out.height = this.canvas.height;
+    const ctx = out.getContext("2d");
+    ctx.drawImage(this.canvas, 0, 0); ctx.drawImage(this.top, 0, 0);
+    return out.toDataURL("image/png");
   }
   _top(dpr, cw, ch) {
     const ctx = this.top.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, cw, ch);
@@ -225,7 +239,7 @@ export class Viewer {
         ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, 6.2832);
         if (p[o + 5] === 2 && s >= 1.5) { /* only when zoomed in: at a distance the rings would hide the image */ rings.moveTo(x + r + 1.3, y); rings.arc(x, y, r + 1.3, 0, 6.2832); }  // colocalizes
       }
-      ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 0.8; ctx.stroke(rings);
+      ctx.fill(); ctx.strokeStyle = "#000"; ctx.lineWidth = 2.4; ctx.stroke(rings); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke(rings);
     }
     if (this.box) {  // the analyzed part of a large image
       const [bx, by, bw, bh] = this.box;
