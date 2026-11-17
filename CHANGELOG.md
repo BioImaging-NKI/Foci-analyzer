@@ -63,6 +63,8 @@ First working version. There are no earlier results to compare with.
 - Settings page: install a network with one click; use the graphics card or not; images at a time.
 - Experiment page: stays open after opening images, updates the image list by itself, ✓ for analyzed images
   (also in the image list of the Analyze page). The status bar keeps its progress bar in one place.
+- **Files named** matches with or without the extension (`*.tif` found nothing before).
+- A user manual (`manual/`, not online yet).
 - Logo in the window, the browser tab, the setup and the shortcuts.
 - Colocalization map: a white line with a black edge, and overlap hatched black and white, visible on any colour.
 - After `Analyze all images` the viewer shows the stored result of an image at once (same settings), also

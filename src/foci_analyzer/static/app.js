@@ -28,7 +28,7 @@ function renderConditions() {
       el("button", { class: "link", textContent: "Remove", onclick: () => { c.folders.splice(j, 1); renderConditions(); scan(); } }))));
     box.append(el("div", { class: "condition" },
       el("div", { class: "row" },
-        el("input", { type: "text", class: "name", value: c.name, placeholder: "Condition name", "aria-label": "Condition name", oninput: (e) => { c.name = e.target.value; } }),
+        el("input", { type: "text", class: "name", value: c.name, placeholder: "Condition name", "aria-label": "Condition name", oninput: (e) => { c.name = e.target.value; }, onchange: () => scan() }),
         el("label", {}, "Files named ", el("input", { type: "text", class: "pattern", value: c.pattern, title: "Pattern for the file name, * = anything", oninput: (e) => { c.pattern = e.target.value; }, onchange: () => scan() })),
         el("label", {}, el("input", { type: "checkbox", checked: c.recursive, onchange: (e) => { c.recursive = e.target.checked; scan(); } }), " with sub-folders"),
         el("button", { class: "link", textContent: "Remove condition", onclick: () => { S.conditions.splice(i, 1); renderConditions(); scan(); } })),

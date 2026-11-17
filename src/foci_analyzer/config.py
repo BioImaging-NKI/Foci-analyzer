@@ -47,9 +47,9 @@ class ImageSettings:
 class SegmentationSettings:
     """Nuclei / cells"""
     method: str = opt("stardist", "Method", "How nuclei or cells are found. StarDist, Cellpose and InstanSeg "
-                      "are neural networks and need the models to be installed. StarDist: nuclei only, in 2D, "
-                      "fast and robust. Cellpose: nuclei or cells, 2D or 3D, slower. InstanSeg: nuclei or cells, "
-                      "in 2D, fast; made for tissue as well. 'threshold' smooths the image, applies an Otsu "
+                      "are neural networks and need the models to be installed. StarDist: nuclei only, fast and "
+                      "robust. Cellpose: nuclei or cells, slower. InstanSeg: nuclei or cells, fast; made for "
+                      "tissue as well. All three also segment stacks (see Segment in). 'threshold' smooths the image, applies an Otsu "
                       "threshold and splits touching objects on the distance map. 'labels from file' reads "
                       "label images made elsewhere.",
                       choices=["stardist", "cellpose", "instanseg", "threshold", "labels from file"])

@@ -1,0 +1,73 @@
+# The user manual of Foci Analyzer. Preview: mkdocs serve   Build: mkdocs build --strict (into site/)
+# Made with the tools in docs-env (tools/manual/MAINTAINING.md); screenshots and reference pages by tools/manual.
+# Not published yet: it goes on GitHub Pages after the repository has moved to BioImaging-NKI.
+site_name: Foci Analyzer manual
+site_description: User manual of Foci Analyzer, detection and quantification of foci in nuclei and cells in 2D and 3D microscopy images
+repo_url: https://github.com/bvandenbroek/Foci-Analyzer-Python
+repo_name: Foci-Analyzer-Python
+docs_dir: manual
+copyright: Foci Analyzer · BioImaging Facility, Netherlands Cancer Institute
+
+theme:
+  name: material
+  logo: images/logo.png
+  favicon: images/logo.png
+  font: false  # system fonts: no requests to Google
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle: { icon: material/weather-night, name: Dark mode }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle: { icon: material/weather-sunny, name: Light mode }
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Installation: start/install.md
+      - Your first analysis: start/first-analysis.md
+  - User guide:
+      - The Experiment page: guide/experiment.md
+      - Settings and runs: guide/analyze.md
+      - The viewer: guide/viewer.md
+      - The Results page: guide/results.md
+      - The Settings page: guide/settings-page.md
+      - The results folder: guide/output-folder.md
+  - Reference:
+      - All settings: reference/settings.md
+      - Models: reference/models.md
+      - Keys: reference/keys.md
+      - Table columns: reference/tables.md
+      - How the analysis works: reference/analysis.md
+  - Help:
+      - Questions and problems: help/faq.md
+
+plugins:
+  - search
+  - glightbox:
+      zoomable: true
+      skip_classes: [no-lightbox]
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - tables
+  - toc: { permalink: true }
+  - pymdownx.details
+  - pymdownx.keys
+  - pymdownx.superfences

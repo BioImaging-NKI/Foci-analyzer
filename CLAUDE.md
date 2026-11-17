@@ -71,7 +71,10 @@ reproduce the Fiji results. Design, state per milestone and open items: `plan.md
 - Keep the number of visible settings low; sections with a collapsed Advanced part; context help everywhere.
 - Tokens matter more than building speed: no `/orchestrate`, few sub-agents, read only what is needed.
 - Analysis speed matters: parallel where possible, GPU where it helps.
-- The manual is made with `/anthropic-skills:update-manual` (not started; not online yet).
+- The manual: `manual/` (MkDocs Material, `mkdocs.yml`), kept with `/anthropic-skills:update-manual`; notes in
+  `tools/manual/MAINTAINING.md` (page map, example, screenshots, refresh). Not online until the move to
+  BioImaging-NKI. Tools in `C:/PythonProjects/Foci-Analyzer/docs-env`; `tests/test_manual.py` checks the
+  generated reference. A change to the window means checking the manual in the same piece of work.
 - Inspiration (same author, both readable with `gh`; Microirradiation is private):
   Jalink-lab/FAST-HIPPOS-Python and Jalink-lab/Microirradiation-recruitment-analysis.
 - gh CLI: `"C:/Program Files/GitHub CLI/gh.exe"` (not on PATH in Git Bash).

@@ -14,6 +14,18 @@
         "C:/PythonProjects/Foci-Analyzer/test-home"
       ],
       "port": 8771
+    },
+    {
+      "name": "foci-analyzer-manual",
+      "runtimeExecutable": "C:/PythonProjects/Foci-Analyzer/docs-env/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "mkdocs",
+        "serve",
+        "-a",
+        "127.0.0.1:8773"
+      ],
+      "port": 8773
     }
   ]
 }

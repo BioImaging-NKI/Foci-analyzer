@@ -304,7 +304,10 @@ nuclear stain (`Hi-res 3D`). Default: Cellpose.
    shows (at least 1024 px wide), a dashed frame marks it.
 2. **Results page**: done: colocalization graph with chance control, tracks graph, `Save graph data`.
    Open: more flags.
-3. **Manual** with `/anthropic-skills:update-manual` (methods are already in the context help).
+3. **Manual** (2026-11-17): `manual/`, 15 pages (getting started, guide per page, reference with generated
+   settings and models, keys, table columns, methods, FAQ), 9 scripted screenshots of an example of two
+   `3-channel` images; `tools/manual/MAINTAINING.md`. Not published (after the move to BioImaging-NKI;
+   workflow `manual` runs by hand). Open: a test run by people or agents following it as new users.
 4. **Installers** (2026-11-17): one script `installer/install.py` (standard library + uv) does the work on
    every system; `FociAnalyzer-Setup.exe` (Inno Setup, 14 MB: program + uv; pages for the networks and for
    own environments; unattended `/NETWORKS=` `/OWN=`), `install.sh` for macOS and Linux, `install.bat` for
@@ -328,7 +331,7 @@ nuclear stain (`Hi-res 3D`). Default: Cellpose.
 7. Tested on all test sets with every method (2026-11-16): StarDist found nuclei everywhere and is the
    default; Cellpose failed on `1-channel` (0 cells) and `Hi-res 3D` first image (1 cell); threshold fails on
    the dense organoid (1 cell). Not tested: real time-lapse data.
-8. Not built: foci tracking, the manual. Cellpose 4 has its own environment `cellpose4-env` (cellpose
+8. Not built: foci tracking. Cellpose 4 has its own environment `cellpose4-env` (cellpose
    4.2.1.1, installer option `cellpose4`); `cpsam_v2` works (2026-11-17: 21 nuclei on `3-channel/Foci_02`,
    49 s with the download). `cpdino-vitb` needs Meta's `dinov3` package, which is only on GitHub
    (`pip install git+https://github.com/facebookresearch/dinov3`); not in the installer: the user decides.

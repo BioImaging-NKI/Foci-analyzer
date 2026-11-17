@@ -60,7 +60,7 @@ def scan(conditions: list[Condition]) -> tuple[list[ImageEntry], list[str]]:
             else:
                 files = root.rglob("*") if cond.recursive else root.iterdir()
                 found = sorted(p for p in files if p.is_file() and p.suffix.lower() in EXTENSIONS
-                               and fnmatch(p.stem, cond.pattern))
+                               and (fnmatch(p.stem, cond.pattern) or fnmatch(p.name, cond.pattern)))  # with or without the extension
                 if not found:
                     remarks.append(f"{cond.name}: no images in {folder}")
             for p in found:
