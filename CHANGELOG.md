@@ -105,3 +105,10 @@ First working version. There are no earlier results to compare with.
   `conda activate` would. Results do not change.
 - Setup: a Python or environment left half-removed (an uninstall while the program ran) is removed and made
   again instead of failing; the folder choice is always shown.
+- Updates: Foci Analyzer looks on GitHub for a newer version (at start, at most once a day; Settings page:
+  on/off and Check for updates) and offers it with its release notes: Update now, Later, Not for a week,
+  Skip this version. Updating downloads the new version, installs it with the same networks and starts it
+  again; the browser tab follows. Results do not change.
+- Setup: finds an existing installation (version, folder, networks) and offers Update/add networks or
+  Remove; installed networks are shown as installed and only new ones count in the size. The window stays
+  movable and scrollable while it installs (it was frozen).

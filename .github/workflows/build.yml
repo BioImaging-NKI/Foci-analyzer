@@ -92,10 +92,23 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
       - uses: actions/download-artifact@v4
         with:
           name: windows-setup
+      # The release notes are the CHANGELOG section of this version ("## 1.2.3 ..."); the program shows them
+      # when it offers the update. It only counts releases with the setup attached (the repository also
+      # holds the releases of the Fiji macro).
+      - name: Release notes from the CHANGELOG
+        run: |
+          python3 - "${GITHUB_REF_NAME#v}" > notes.md <<'EOF'
+          import re, sys
+          text = open("CHANGELOG.md", encoding="utf-8").read()
+          m = re.search(r"^## " + re.escape(sys.argv[1]) + r"\b.*?$(.*?)(?=^## |\Z)", text, re.M | re.S)
+          print(m.group(1).strip() if m else "See CHANGELOG.md.")
+          EOF
       - uses: softprops/action-gh-release@v2
         with:
           draft: true
+          body_path: notes.md
           files: FociAnalyzer-Setup-*.exe

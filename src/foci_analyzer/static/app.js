@@ -748,6 +748,70 @@ $("quit").onclick = async () => {
   document.body.replaceChildren(el("p", { style: "margin:60px auto;font-size:16px", textContent: "Foci Analyzer has stopped. You can close this tab." }));
 };
 
+// ---------------------------------------------------------------- updates (updates.py)
+let U = null, updateLater = false;
+function renderUpdate(u) {
+  U = u;
+  $("upd-auto").checked = u.check;
+  const when = u.last_check ? new Date(u.last_check * 1000).toLocaleString() : "not yet";
+  const what = u.newer ? `Version ${u.latest.version} is available.` : u.latest ? "This is the newest version." : u.last_check ? "No release was found on GitHub." : "";
+  $("upd-info").replaceChildren(`You have Foci Analyzer ${u.current}. Last check: ${when}. ${what} `,
+    u.newer ? el("button", { textContent: "Show the new version…", onclick: () => showUpdate(true) }) : "");
+}
+function showUpdate(asked) {
+  if (!U || !U.newer || (!asked && (!U.show || updateLater))) return;
+  const d = $("upd-dialog");
+  const choose = async (choice) => {
+    d.hidden = true;
+    if (choice === "later") { updateLater = true; return; }
+    try { renderUpdate(await (await api("/api/update/choice", { choice })).json()); } catch (e) { status(e.message, true); }
+  };
+  const go = U.can_update ? el("button", { class: "primary", textContent: "Update now", onclick: startUpdate })
+    : el("a", { href: U.latest.page, target: "_blank", rel: "noopener", textContent: "Open the release page" });
+  d.replaceChildren(el("div", { class: "dialog-box" },
+    el("h2", { textContent: `Foci Analyzer ${U.latest.version} is available` }),
+    el("p", { class: "muted", textContent: `You have ${U.current}.${U.latest.date ? ` Released ${U.latest.date}.` : ""} ` + (U.can_update
+      ? "Updating takes a few minutes; Foci Analyzer then starts again. Your settings, experiment, results and networks stay."
+      : "This copy was not installed with the setup (a developer's copy): update it with git pull.") }),
+    el("div", { class: "notes", textContent: (U.latest.notes || "No release notes.").replace(/^#+\s*v?[\d.]+[^\n]*\n+/, "").replace(/^#+\s*/gm, "").replace(/\*\*/g, "") }),
+    el("div", { class: "row" }, go,
+      el("button", { textContent: "Later", title: "Ask again the next time Foci Analyzer starts", onclick: () => choose("later") }),
+      el("button", { textContent: "Not for a week", onclick: () => choose("week") }),
+      el("button", { textContent: "Skip this version", title: "Only a version newer than this one is offered again", onclick: () => choose("skip") }))));
+  d.hidden = false;
+}
+async function loadUpdate() {
+  try { renderUpdate(await (await api("/api/update")).json()); showUpdate(false); } catch { /* not important */ }
+}
+async function startUpdate() {
+  $("upd-dialog").hidden = true;
+  if (S.batch.running) { status("An analysis of all images is running: wait for it or stop it, then update.", true); return; }
+  try { await api("/api/update/start", {}); } catch (e) { status(e.message, true); return; }
+  const poll = async () => {
+    let u;
+    try { u = await (await api("/api/update")).json(); } catch { waitForUpdater(); return; }
+    if (u.state === "failed") { status(`The update failed: ${u.error}`, true); return; }
+    if (u.state === "restarting") { status("Foci Analyzer stops for the update…", false, -1); setTimeout(waitForUpdater, 1000); return; }
+    status(`Downloading Foci Analyzer ${U.latest.version}…`, false, u.total ? u.done / u.total : -1);
+    setTimeout(poll, 500);
+  };
+  poll();
+}
+function waitForUpdater() {  /* the page of the updater, or already the new window: anything but this program */
+  fetch("/", { cache: "no-store" }).then((r) => r.text()).then((t) => {
+    if (t.indexOf("(updating)") >= 0 || t.indexOf(window.TOKEN) < 0) location.reload(); else setTimeout(waitForUpdater, 1000);
+  }).catch(() => setTimeout(waitForUpdater, 1000));
+}
+$("upd-auto").onchange = async () => { try { renderUpdate(await (await api("/api/update/choice", { check: $("upd-auto").checked })).json()); } catch (e) { status(e.message, true); } };
+$("upd-check").onclick = async () => {
+  status("Looking for a newer version on GitHub…", false, -1);
+  try {
+    renderUpdate(await (await api("/api/update/check", {})).json());
+    status(U.newer ? `Foci Analyzer ${U.latest.version} is available` : "This is the newest version");
+    if (U.newer) showUpdate(true);
+  } catch (e) { status(e.message, true); }
+};
+
 // ---------------------------------------------------------------- start
 window.FA = { viewer, V, S };  // for looking at the state from the browser console
 initResults({
@@ -766,4 +830,5 @@ initResults({
     renderConditions(); renderImages(); renderSettings(); syncMode(); showProgress(S.batch);
     if (S.batch.running) poll();
   } catch (e) { status(e.message, true); }
+  loadUpdate(); setTimeout(loadUpdate, 20000);  /* the check at start runs in the background */
 })();

@@ -57,6 +57,10 @@ reproduce the Fiji results. Design, state per milestone and open items: `plan.md
   `tracking.py`: overlap linking, or Trackastra. `stats.py`: tests with Holm correction.
 - `cli.py` takes the port and opens the browser on a starting page before the slow imports, then hands the
   server to the app (`LocalServer`: no SO_REUSEADDR on Windows, else two programs share a port).
+- `updates.py`: the update check (GitHub releases of `BioImaging-NKI/Foci-analyzer` that have the setup
+  attached: the Fiji releases live there too) and the update (source archive -> `installer/install.py
+  --update`, which waits for the program, serves the progress on its port and starts the new version).
+  `FOCI_ANALYZER_UPDATE_URL` points the check at a test JSON (file:// works). Choices in `~/.foci_analyzer/updates.json`.
 - `server.py`: standard-library server on 127.0.0.1; `/api/*` needs the token written into the page and a
   local Host header; only images of the experiment can be read.
 - `static/`: `app.js` (pages, form, preview, batch), `viewer.js` (WebGL2 tile viewer), `results.js`

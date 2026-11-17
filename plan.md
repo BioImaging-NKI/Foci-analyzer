@@ -341,6 +341,16 @@ nuclear stain (`Hi-res 3D`). Default: Cellpose.
 
 ---
 
+### State on 2026-11-18
+
+Updates from GitHub (`updates.py`, `install.py --update`; tested end to end with a fake release on a test
+installation: the tab followed the update and reloaded into the new version). Setup: existing installation
+page (update/add networks, remove), installed networks greyed and ticked, folder page skipped on update; the
+window no longer freezes during the installation (own wait loop with PeekMessage instead of a waiting Exec,
+which disables the wizard). Conda environments tested with StarDist in a miniforge environment (needs the
+PATH of `env_for`; without it TensorFlow's process stops). Open: where the repository lives (proposal:
+rename the Fiji repository to Foci-analyzer-Fiji, move this one to BioImaging-NKI/Foci-analyzer, version 2.0.0).
+
 ### State on 2026-11-17, late evening
 
 Setup (Inno Setup): sizes per network with a total, own environments only for unticked networks, progress

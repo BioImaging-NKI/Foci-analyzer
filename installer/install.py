@@ -354,6 +354,132 @@ def shortcuts(target: Path, desktop: bool, menu: bool = True) -> None:
         say(f"Made {apps / 'foci-analyzer.desktop'}")
 
 
+# ---- updating (installer --update, started by the program; see foci_analyzer/updates.py)
+
+UPDATE: dict = {}
+APP_ID = "{6C1F7E52-3A0B-4C55-9E4D-F0C1A11A1A11}_is1"  # FociAnalyzer.iss AppId: the entry under Apps
+UPDATING_PAGE = """<!doctype html><html><head><meta charset="utf-8"><title>Foci Analyzer (updating)</title>
+<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font:15px system-ui,
+sans-serif;background:#f4f5f7;color:#333}@media(prefers-color-scheme:dark){body{background:#1d1f23;color:#ddd}}
+main{width:min(640px,92vw)}h2{font-weight:600}.bar{height:10px;border-radius:5px;background:#0002;overflow:hidden}
+.bar div{height:100%;width:0;background:#2f7fc8;transition:width .4s}pre{font:12px Consolas,monospace;opacity:.75;
+white-space:pre-wrap;max-height:40vh;overflow:auto}</style></head><body><main><h2>Updating Foci Analyzer</h2>
+<p id="s">Starting</p><div class="bar"><div id="b"></div></div><pre id="l"></pre>
+<p><small>Your settings, experiment and results stay as they are. The window comes back by itself.</small></p>
+</main><script>
+function back(){fetch("/",{cache:"no-store"}).then(r=>r.text()).then(t=>{if(t.indexOf("(updating)")<0)
+location.reload();else setTimeout(back,1000);}).catch(()=>setTimeout(back,1000));}
+(function poll(){fetch("/update-progress",{cache:"no-store"}).then(r=>r.json()).then(p=>{
+document.getElementById("s").textContent=p.status;document.getElementById("b").style.width=p.permille/10+"%";
+const l=document.getElementById("l");l.textContent=p.lines.join("\\n");l.scrollTop=l.scrollHeight;
+setTimeout(poll,700);}).catch(()=>back());})();
+</script></body></html>"""
+
+
+def serve_progress(port: int) -> None:
+    """While updating, the window's port shows the progress (the browser tab that started the update is
+    there). Stopped just before the new version starts on the same port."""
+    import http.server
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            if self.path.startswith("/update-progress"):
+                body = json.dumps({"permille": PROGRESS.permille(), "status": PROGRESS.status,
+                                   "lines": PROGRESS.lines[-14:]}).encode()
+                kind = "application/json"
+            elif self.path.startswith("/api/"):
+                self.send_response(503)
+                self.end_headers()
+                return
+            else:
+                body, kind = UPDATING_PAGE.encode(), "text/html; charset=utf-8"
+            self.send_response(200)
+            self.send_header("Content-Type", kind)
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+
+    class Server(http.server.ThreadingHTTPServer):
+        allow_reuse_address = not WINDOWS
+        daemon_threads = True
+
+    import threading
+
+    def go():
+        for _ in range(120):  # the program still has the port until it has stopped
+            try:
+                UPDATE["server"] = Server(("127.0.0.1", port), Handler)
+                break
+            except OSError:
+                time.sleep(0.5)
+        else:
+            return
+        UPDATE["server"].serve_forever()
+
+    threading.Thread(target=go, daemon=True).start()
+
+
+def wait_for(pid: int, seconds: float = 120) -> None:
+    """Until the program that started the update has stopped (its files are then free)."""
+    end = time.time() + seconds
+    if WINDOWS:
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        h = k32.OpenProcess(0x00100000, False, pid)  # SYNCHRONIZE
+        if h:
+            k32.WaitForSingleObject(h, int(seconds * 1000))
+            k32.CloseHandle(h)
+    else:
+        while time.time() < end:
+            try:
+                os.kill(pid, 0)
+            except OSError:
+                break
+            time.sleep(0.3)
+    time.sleep(1.0)  # its network processes stop with it
+
+
+def program_version(source: Path) -> str:
+    text = (source / "src" / "foci_analyzer" / "__init__.py").read_text(encoding="utf-8")
+    m = re.search(r'__version__\s*=\s*"([^"]+)"', text)
+    return m[1] if m else "?"
+
+
+def set_windows_version(version: str) -> None:
+    """The version shown under Apps (the setup wrote it at installation)."""
+    if not WINDOWS:
+        return
+    import winreg
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\" + APP_ID,
+                            0, winreg.KEY_SET_VALUE) as key:
+            winreg.SetValueEx(key, "DisplayVersion", 0, winreg.REG_SZ, version)
+    except OSError:
+        pass  # installed with install.bat or install.sh
+
+
+def finish_update(target: Path, ok: bool) -> None:
+    """Stop showing the progress and start Foci Analyzer (the new version, or after a failure the one that
+    is there), on the same port; the browser tab reloads into it."""
+    if not ok:
+        time.sleep(20)  # time to read what went wrong
+    server = UPDATE.get("server")
+    if server:
+        server.shutdown()
+        server.server_close()
+    exe = target / "Foci Analyzer.exe" if WINDOWS else python_of(target / ".venv").parent / "foci-analyzer"
+    cmd = [str(exe), "--after-update"] + (["--port", str(UPDATE["port"])] if UPDATE.get("port") else [])
+    if WINDOWS:
+        subprocess.Popen(cmd, cwd=str(target), creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+                         close_fds=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        subprocess.Popen(cmd, cwd=str(target), start_new_session=True, close_fds=True, stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
 def main(argv: list[str] | None = None) -> None:
     global LOG, PROGRESS
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
@@ -369,6 +495,10 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--shortcut", action="store_true", help="add the program to the start menu / Applications")
     p.add_argument("--desktop", action="store_true", help="also put a shortcut on the desktop (Windows)")
     p.add_argument("--progress", help="a file in which the Windows setup follows the installation")
+    p.add_argument("--update", action="store_true", help="update the installation in --target to this version "
+                   "(started by the program: copies this program folder there, then starts the new version)")
+    p.add_argument("--wait", type=int, help="with --update: the process id of the Foci Analyzer to wait for")
+    p.add_argument("--serve", type=int, help="with --update: show the progress on this port (the window's)")
     args = p.parse_args(argv)
     if args.networks is None:
         if sys.stdin.isatty():
@@ -411,13 +541,25 @@ def main(argv: list[str] | None = None) -> None:
         PROGRESS.next(short)
         say(f"\n[{step}/{steps}] {text}")
 
-    say(f"Foci Analyzer: installing in {target} ({platform.system()} {platform.machine()})")
+    source = SOURCE
+    if args.update:
+        UPDATE.update(port=args.serve, target=target)
+        if args.serve:
+            serve_progress(args.serve)
+        if args.wait:
+            PROGRESS.status = "Waiting for Foci Analyzer to close"
+            wait_for(args.wait)
+        if SOURCE != target / "program":  # the new version becomes the program folder (the setup's layout)
+            shutil.rmtree(target / "program", ignore_errors=True)
+            shutil.copytree(SOURCE, target / "program", ignore=shutil.ignore_patterns(".git", "__pycache__"))
+            source = target / "program"
+    say(f"Foci Analyzer: {'updating' if args.update else 'installing'} in {target} ({platform.system()} {platform.machine()})")
     if not args.networks_only:
         next_step("The program", "Python and the program")
         if (target / ".venv").exists() and not healthy(target / ".venv"):
             say("Removing the incomplete program environment")
             shutil.rmtree(target / ".venv", ignore_errors=True)
-        run(args.uv, "sync", "--project", str(SOURCE), "--no-dev", "--frozen", "--no-editable", "--python", "3.12",
+        run(args.uv, "sync", "--project", str(source), "--no-dev", "--frozen", "--no-editable", "--python", "3.12",
             env={**env, "UV_PROJECT_ENVIRONMENT": str(target / ".venv")})
     index = [] if MAC else ["--index-url", "https://download.pytorch.org/whl/" + ("cu124" if gpu else "cpu"),
                             "--extra-index-url", "https://pypi.org/simple", "--index-strategy", "unsafe-best-match"]
@@ -470,6 +612,13 @@ def main(argv: list[str] | None = None) -> None:
     next_step("Shortcuts", "Shortcuts")
     shortcuts(target, args.desktop, menu=args.shortcut)  # on Windows always "Foci Analyzer.exe" with the logo
     exe = target / "Foci Analyzer.exe" if WINDOWS else python_of(target / ".venv").parent / "foci-analyzer"
+    if args.update:
+        version = program_version(source)
+        set_windows_version(version)
+        say(f"\nUpdated to Foci Analyzer {version}.")
+        PROGRESS.done()
+        finish_update(target, ok=True)
+        return
     say(f"\nReady. Start Foci Analyzer {'from the start menu' if args.shortcut and WINDOWS else 'from Applications' if args.shortcut and MAC else 'from the applications menu' if args.shortcut else 'with'}"
         f"{'' if args.shortcut else ' ' + str(exe)}; it opens in the browser.")
     PROGRESS.done()
@@ -483,4 +632,6 @@ if __name__ == "__main__":
             say(str(e.code))
             PROGRESS.status = "The installation did not finish: " + str(e.code).strip().splitlines()[0]
             PROGRESS.write()
+            if UPDATE.get("target"):
+                finish_update(UPDATE["target"], ok=False)
         raise

@@ -29,6 +29,10 @@ Start Foci Analyzer from the start menu, or with `Foci Analyzer.exe` in the inst
 (`%LOCALAPPDATA%\FociAnalyzer`). It opens in your web browser: first a page with the logo while the program
 starts, then the window. Starting it a second time shows the window that is already open.
 
+Running the setup when Foci Analyzer is installed already offers **Update it, or add networks** (into the
+same folder; installed networks are ticked and stay) or **Remove it**. Updating can also be done from Foci
+Analyzer itself: see [Updates](../guide/settings-page.md#updates).
+
 Silent installation, for example for several computers:
 `FociAnalyzer-Setup.exe /SILENT /NETWORKS=stardist,spotiflow`
 (`all`, `none`, or a list of `stardist`, `cellpose`, `cellpose4`, `instanseg`, `spotiflow`, `trackastra`).

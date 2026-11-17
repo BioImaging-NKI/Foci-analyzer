@@ -11,6 +11,7 @@ import argparse
 import os
 import sys
 import threading
+import time
 import traceback
 import urllib.request
 import webbrowser
@@ -43,11 +44,13 @@ class StartingHandler(BaseHTTPRequestHandler):
     """Answers while the program loads: the starting page, and the logo it shows."""
 
     error = ""  # set when the program could not start: shown instead of the starting page
+    seen = False  # a browser asked for something (after an update: the tab that started it is still open)
 
     def log_message(self, *args):
         pass
 
     def do_GET(self):
+        StartingHandler.seen = True
         name = self.path.split("?")[0].rsplit("/", 1)[-1]
         if self.path.startswith("/static/") and name in ("logo.png", "favicon.png"):
             body, kind = (resources.files("foci_analyzer") / "static" / name).read_bytes(), "image/png"
@@ -84,6 +87,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--no-browser", action="store_true", help="start the server without opening a browser tab")
     p.add_argument("--home", help="folder for the last settings and experiment (default: ~/.foci_analyzer); "
                    "a separate one gives a test window that leaves your own state alone")
+    p.add_argument("--after-update", action="store_true",
+                   help="started by an update: open the browser only if no tab is waiting for the window")
     p.add_argument("--version", action="version", version=__version__)
     args = p.parse_args(argv)
     if args.home:
@@ -101,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     serving = threading.Thread(target=httpd.serve_forever, daemon=True)
     serving.start()
-    if not args.no_browser:
+    if not args.no_browser and not args.after_update:
         webbrowser.open(url)
 
     try:
@@ -110,7 +115,10 @@ def main(argv: list[str] | None = None) -> int:
 
         app = App()
         app.warm = True
+        app.port = httpd.server_address[1]
+        app.stop_server = httpd.shutdown
         app.warm_up()
+        app.check_updates_soon()
     except Exception:  # noqa: BLE001 - shown in the browser: there may be no console
         StartingHandler.error = traceback.format_exc()
         print(StartingHandler.error)
@@ -119,6 +127,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     httpd.RequestHandlerClass = make_handler(app)  # read per request: from now on the window answers
     print(f"Foci Analyzer {__version__} at {url}  (Ctrl+C to stop)")
+    if args.after_update and not args.no_browser:
+        time.sleep(3)  # the tab that started the update asks every second
+        if not StartingHandler.seen:
+            webbrowser.open(url)
     try:
         while serving.is_alive():  # /api/quit stops serve_forever
             serving.join(0.5)

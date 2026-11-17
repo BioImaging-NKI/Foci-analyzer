@@ -34,3 +34,20 @@ used for the Cellpose 4 models as well when there is no Cellpose 4 environment o
 
 The line below gives the version of Foci Analyzer and the folder where the window keeps its state (the last
 settings and experiment).
+
+## Updates
+
+Foci Analyzer can look on GitHub whether there is a newer version: when it starts (at most once a day, in
+the background) if **Look for a newer version when Foci Analyzer starts** is on, and at once with **Check for
+updates**. Only the question goes to GitHub; nothing about you or your images.
+
+A newer version is offered in a window with its release notes:
+
+- **Update now** downloads it, closes Foci Analyzer, installs the new version and starts it again. The
+  browser tab shows the progress and turns into the new window by itself; this takes a minute or a few
+  (longer when a network needs a newer version). Your settings, experiment, results and networks stay.
+- **Later** asks again the next time Foci Analyzer starts; **Not for a week** waits a week; **Skip this
+  version** only offers a version newer than this one.
+
+A copy that was not installed with the setup or `install.sh` (a developer's copy) shows the release notes and
+a link instead; update it with `git pull`.

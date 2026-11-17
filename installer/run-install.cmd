@@ -14,7 +14,8 @@ title Foci Analyzer: installing
 rem a Python that is only partly there (an uninstall while the program ran) is removed: uv would take it as installed
 if exist "%TARGET%\python" for /d %%P in ("%TARGET%\python\cpython-*") do if not exist "%%P\Lib\os.py" rmdir /s /q "%%P"
 set "HIDDEN="
-echo %* | find "--progress" >nul && set "HIDDEN=1"
+rem the full path: with Git's tools on PATH, "find" is the Unix find
+echo %* | "%SystemRoot%\System32\find.exe" "--progress" >nul && set "HIDDEN=1"
 if defined HIDDEN goto hidden
 "%UV%" run --no-project --python 3.12 "%~dp0install.py" --target "%TARGET%" --uv "%UV%" %*
 if errorlevel 1 goto failed
@@ -22,8 +23,10 @@ exit /b 0
 
 :hidden
 "%UV%" run --no-project --python 3.12 "%~dp0install.py" --target "%TARGET%" --uv "%UV%" %* > "%TARGET%\install-output.log" 2>&1
-if errorlevel 1 exit /b 1
-exit /b 0
+set "CODE=%errorlevel%"
+rem the setup waits for this file (it does not wait for this script: that would freeze its window)
+> "%TARGET%\install-exit.txt" echo %CODE%
+exit /b %CODE%
 
 :failed
 echo.

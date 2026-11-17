@@ -152,8 +152,7 @@
 
 <main id="page-settings" class="page" hidden>
   <section class="card">
-    <h2>Neural networks <span class="help" data-help="Which networks Foci Analyzer can use on this computer, from which Python environment, and whether they run on the graphics card. Leave the boxes empty to use the environment that was installed with Foci Analyzer. To use your own environment (for example an existing Cellpose 4 installation), give the path of its python.exe, for all networks or for one of them. A venv and a conda environment (…envs
-amepython.exe) both work."></span></h2>
+    <h2>Neural networks <span class="help" data-help="Which networks Foci Analyzer can use on this computer, from which Python environment, and whether they run on the graphics card. Leave the boxes empty to use the environment that was installed with Foci Analyzer. To use your own environment (for example an existing Cellpose 4 installation), give the path of its python.exe, for all networks or for one of them. A venv and a conda environment (…/envs/name/python.exe) both work."></span></h2>
     <div id="program" class="muted">Open this page to ask the networks.</div>
   </section>
   <section class="card">
@@ -170,7 +169,16 @@ amepython.exe) both work."></span></h2>
     </div>
     <div id="program-about"></div>
   </section>
+  <section class="card">
+    <h2>Updates <span class="help" data-help="Foci Analyzer can look on GitHub whether there is a newer version (once a day at most, when it starts; only the question is sent). A newer version is offered with its release notes; updating keeps your settings, experiment, results and networks, and takes a few minutes."></span></h2>
+    <div class="row">
+      <label><input type="checkbox" id="upd-auto"> Look for a newer version when Foci Analyzer starts</label>
+      <button id="upd-check">Check for updates</button>
+    </div>
+    <div id="upd-info" class="muted"></div>
+  </section>
 </main>
+<div id="upd-dialog" class="dialog" hidden></div>
 
 <footer id="statusbar">
   <div id="busy"><div id="busy-bar"></div></div>

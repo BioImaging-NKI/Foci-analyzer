@@ -24,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import __version__, batch, config, curation, experiment, export, models, pipeline, stats
+from . import __version__, batch, config, curation, experiment, export, models, pipeline, stats, updates
 from . import analysis as an
 from .imagestore import ImageStore
 from .stages import StageCache
@@ -102,6 +102,10 @@ class App:
         self.removed_version = 0
         self._contours: OrderedDict[tuple, bytes] = OrderedDict()
         self.install = {"network": "", "running": False, "lines": [], "ok": None}
+        self.updates = updates.Preferences(home() / "updates.json")
+        self.updating = {"state": "", "done": 0, "total": 0, "error": ""}  # "", downloading, restarting, failed
+        self.port = 0
+        self.stop_server = None  # set by cli.main: stops serving (after handing over to the update)
         self._load()
 
     # ---- state on disk
@@ -258,6 +262,73 @@ class App:
         self._apply_program()
         self._warming.clear()
         return self.program_info()
+
+    # ---- updates (updates.py)
+    def update_info(self) -> dict:
+        d = self.updates.data
+        return {"current": __version__, "check": d["check"], "last_check": d["last_check"], "latest": d["latest"],
+                "newer": bool(d["latest"] and updates.is_newer(d["latest"]["version"])), "show": self.updates.show(),
+                "can_update": updates.layout() is not None, "repository": updates.REPOSITORY, **self.updating}
+
+    def check_updates(self, quiet: bool = False) -> dict:
+        try:
+            found = updates.latest()
+        except (OSError, ValueError) as e:
+            if quiet:
+                return self.update_info()
+            raise ApiError(f"could not reach GitHub: {e}") from e
+        with self.updates.lock:
+            self.updates.data.update(latest=found, last_check=time.time())
+            self.updates.save()
+        return self.update_info()
+
+    def check_updates_soon(self) -> None:
+        """At start, in the background, at most once a day."""
+        if self.updates.due():
+            threading.Thread(target=self.check_updates, kwargs={"quiet": True}, daemon=True).start()
+
+    def update_choice(self, body: dict) -> dict:
+        d = self.updates.data
+        choice = body.get("choice")
+        if choice == "week":
+            d["snooze_until"] = time.time() + 7 * updates.DAY
+        elif choice == "skip" and d["latest"]:
+            d["skip"] = d["latest"]["version"]
+        if "check" in body:
+            d["check"] = bool(body["check"])
+        self.updates.save()
+        return self.update_info()
+
+    def start_update(self) -> dict:
+        new = self.updates.data["latest"]
+        if not new or not updates.is_newer(new["version"]):
+            raise ApiError("there is no newer version")
+        if updates.layout() is None:
+            raise ApiError("this Foci Analyzer was not installed with the setup or install.sh; update it with git pull")
+        if self.progress.running:
+            raise ApiError("an analysis of all images is running; wait for it or stop it first")
+        if self.updating["state"] in ("downloading", "restarting"):
+            return self.update_info()
+        nets = updates.networks_installed(updates.layout()["target"], models.installed(), models.python_for)
+        self.updating.update(state="downloading", done=0, total=0, error="")
+
+        def progress(done, total):
+            self.updating.update(done=done, total=total)
+
+        def go():
+            try:
+                updates.start(new, self.port, nets, progress)
+            except Exception as e:  # noqa: BLE001 - shown in the window
+                self.updating.update(state="failed", error=str(e))
+                return
+            self.updating["state"] = "restarting"
+            time.sleep(1.5)  # the window reads "restarting" before the server stops
+            models.stop_all()
+            if self.stop_server:
+                self.stop_server()
+
+        threading.Thread(target=go, daemon=True).start()
+        return self.update_info()
 
     def cancel(self) -> dict:
         """Stop what is being analyzed: before its next stage, and at once when a network is running."""
@@ -888,6 +959,7 @@ def make_handler(app: App):
                 "/api/analyzed": lambda: self._json(app.analyzed()),
                 "/api/program/install": lambda: self._json(app.install),
                 "/api/program": lambda: self._json(app.program_info()),
+                "/api/update": lambda: self._json(app.update_info()),
                 "/api/activity": lambda: self._json(app.activity()),
                 "/api/batch": lambda: self._json(app.progress.to_dict()),
                 "/api/results": lambda: self._send(200, app.results_json(), "application/json"),
@@ -915,6 +987,9 @@ def make_handler(app: App):
                 "/api/cancel": app.cancel,
                 "/api/program": lambda: app.set_program(body),
                 "/api/program/install": lambda: app.install_network(body),
+                "/api/update/check": lambda: app.check_updates(),
+                "/api/update/choice": lambda: app.update_choice(body),
+                "/api/update/start": lambda: app.start_update(),
                 "/api/cells/toggle": lambda: app.toggle_cell(body),
                 "/api/batch/start": lambda: app.start_batch(body),
                 "/api/batch/stop": stop,

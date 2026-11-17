@@ -76,11 +76,42 @@ var
   LogMemo: TNewMemo;
   ProgressFile: String;
   LinesShown: Integer;
+  { an installation that is there already (from the Apps entry the setup wrote) }
+  PrevDir, PrevVersion: String;
+  ExistPage: TInputOptionWizardPage;
+  Installed: array[0..5] of Boolean;
+  Removing: Boolean;
 
-function SetTimer(hWnd, nIDEvent, uElapse, lpTimerFunc: Longword): Longword;
-external 'SetTimer@user32.dll stdcall';
-function KillTimer(hWnd, nIDEvent: Longword): Bool;
-external 'KillTimer@user32.dll stdcall';
+{ While the installation runs, Setup waits in its own loop and handles the window's messages itself: a script
+  Exec that waits disables the whole wizard (it cannot be moved, scrolled or clicked). Setup is 32-bit. }
+type
+  TWinMsg = record
+    hwnd: Longword;
+    message: Longword;
+    wParam: Longint;
+    lParam: Longint;
+    time: Longword;
+    ptX: Longint;
+    ptY: Longint;
+  end;
+
+function PeekMessage(var Msg: TWinMsg; hWnd, MsgFilterMin, MsgFilterMax, RemoveMsg: Longword): Bool;
+external 'PeekMessageW@user32.dll stdcall';
+function TranslateMessage(var Msg: TWinMsg): Bool;
+external 'TranslateMessage@user32.dll stdcall';
+function DispatchMessage(var Msg: TWinMsg): Longint;
+external 'DispatchMessageW@user32.dll stdcall';
+
+procedure HandleMessages;
+var
+  Msg: TWinMsg;
+begin
+  while PeekMessage(Msg, 0, 0, 0, 1) do  { PM_REMOVE }
+  begin
+    TranslateMessage(Msg);
+    DispatchMessage(Msg);
+  end;
+end;
 
 function GB(Tenths: Integer): String;
 begin
@@ -98,17 +129,22 @@ var
   i, Total: Integer;
   Torch: Boolean;
 begin
-  Total := SizeProgram;
+  { only what is not installed yet counts }
+  Total := 0;
+  if PrevDir = '' then Total := SizeProgram;
   Torch := False;
   for i := 0 to NetCount - 1 do
-    if NetPage.Values[i] then
+    if NetPage.Values[i] and not Installed[i] then
     begin
       Total := Total + Sizes[i];
       if (i >= 1) and (i <= 4) then Torch := True;
       if i = 5 then Total := Total + TorchSize;
     end;
-  if Torch then Total := Total + TorchSize;
-  TotalLabel.Caption := 'Together with the program: about ' + GB(Total) + ' on disk.';
+  if Torch and not (Installed[1] or Installed[2] or Installed[3] or Installed[4]) then Total := Total + TorchSize;
+  if PrevDir = '' then
+    TotalLabel.Caption := 'Together with the program: about ' + GB(Total) + ' on disk.'
+  else
+    TotalLabel.Caption := 'Added to the installation: about ' + GB(Total) + ' on disk.';
   if NetPage.Values[5] then
     TotalLabel.Caption := TotalLabel.Caption + ' Cellpose 4 downloads its model (CellposeSAM v2, 1.2 GB) when it ' +
       'is first used.';
@@ -126,11 +162,58 @@ begin
     OwnEdit[i].Text := FileName;
 end;
 
+function HasPackage(Env, Dist: String): Boolean;
+var
+  R: TFindRec;
+begin
+  Result := FindFirst(PrevDir + '\' + Env + '\Lib\site-packages\' + Dist + '-*.dist-info', R);
+  if Result then FindClose(R);
+end;
+
+{ the installation this setup made earlier: where, which version, which networks }
+procedure FindPrevious;
+var
+  Key: String;
+begin
+  Key := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{6C1F7E52-3A0B-4C55-9E4D-F0C1A11A1A11}_is1';
+  PrevDir := '';
+  PrevVersion := '';
+  if RegQueryStringValue(HKCU, Key, 'InstallLocation', PrevDir) then
+  begin
+    PrevDir := RemoveBackslashUnlessRoot(PrevDir);
+    if not FileExists(PrevDir + '\unins000.exe') then PrevDir := '';
+  end;
+  if PrevDir = '' then Exit;
+  RegQueryStringValue(HKCU, Key, 'DisplayVersion', PrevVersion);
+  Installed[0] := HasPackage('stardist-env', 'stardist');
+  Installed[1] := HasPackage('models-env', 'cellpose');
+  Installed[2] := HasPackage('models-env', 'instanseg_torch');
+  Installed[3] := HasPackage('models-env', 'spotiflow');
+  Installed[4] := HasPackage('models-env', 'trackastra');
+  Installed[5] := HasPackage('cellpose4-env', 'cellpose');
+end;
+
 procedure InitializeWizard;
 var
   i: Integer;
-  Torch: String;
+  Torch, Which: String;
 begin
+  FindPrevious;
+  if PrevDir <> '' then
+  begin
+    if PrevVersion = '{#AppVersion}' then
+      Which := 'This version (' + PrevVersion + ') is installed'
+    else
+      Which := 'Foci Analyzer ' + PrevVersion + ' is installed';
+    ExistPage := CreateInputOptionPage(wpWelcome, 'Foci Analyzer is installed already',
+      Which + ' in ' + PrevDir + '.',
+      'This setup has version {#AppVersion}. Updating keeps your settings, experiments, results and the networks ' +
+      'that are installed; on the next pages you can add networks. Removing takes Foci Analyzer and its networks ' +
+      'off this computer (your settings and results stay).', True, False);
+    ExistPage.Add('Update it, or add networks');
+    ExistPage.Add('Remove it');
+    ExistPage.SelectedValueIndex := 0;
+  end;
   Names[0] := 'stardist'; Names[1] := 'cellpose'; Names[2] := 'instanseg'; Names[3] := 'spotiflow'; Names[4] := 'trackastra'; Names[5] := 'cellpose4';
   Shown[0] := 'StarDist'; Shown[1] := 'Cellpose 3'; Shown[2] := 'InstanSeg'; Shown[3] := 'Spotiflow'; Shown[4] := 'Trackastra'; Shown[5] := 'Cellpose 4';
   Sizes[0] := 16; Sizes[1] := 1; Sizes[2] := 3; Sizes[3] := 2; Sizes[4] := 2; Sizes[5] := 1;
@@ -153,7 +236,14 @@ begin
   NetPage.Add('Trackastra: tracking of cells in time-lapses - ' + GB(Sizes[4]) + ' + PyTorch');
   NetPage.Add('Cellpose 4: CellposeSAM, the newest model; slow without a modern graphics card - ' + GB(Sizes[5] + TorchSize));
   for i := 0 to NetCount - 2 do
-    NetPage.Values[i] := True;
+    NetPage.Values[i] := PrevDir = '';
+  for i := 0 to NetCount - 1 do
+    if Installed[i] then
+    begin
+      NetPage.Values[i] := True;
+      NetPage.CheckListBox.ItemEnabled[i] := False;
+      NetPage.CheckListBox.ItemCaption[i] := NetPage.CheckListBox.ItemCaption[i] + ' (installed)';
+    end;
   TotalLabel := TNewStaticText.Create(NetPage);
   TotalLabel.Parent := NetPage.Surface;
   TotalLabel.AutoSize := False;
@@ -248,6 +338,8 @@ var
   i: Integer;
 begin
   Result := False;
+  if (PageID = wpSelectDir) and (PrevDir <> '') then
+    Result := True;  { an update goes into the folder that is there }
   if PageID = OwnPage.ID then
   begin
     Result := True;
@@ -298,6 +390,19 @@ var
   i: Integer;
 begin
   Result := True;
+  if (PrevDir <> '') and (CurPageID = ExistPage.ID) and (ExistPage.SelectedValueIndex = 1) then
+  begin
+    { the uninstaller of that installation; this setup then closes }
+    if Exec(PrevDir + '\unins000.exe', '', '', SW_SHOW, ewNoWait, i) then
+    begin
+      Removing := True;
+      WizardForm.Close;
+    end
+    else
+      MsgBox('The uninstaller could not be started: ' + SysErrorMessage(i), mbError, MB_OK);
+    Result := False;
+    Exit;
+  end;
   if CurPageID = OwnPage.ID then
     for i := 0 to NetCount - 1 do
       if (OwnPython(i) <> '') and not FileExists(OwnPython(i)) then
@@ -335,11 +440,6 @@ begin
   LinesShown := Count;
 end;
 
-procedure ProgressTimer(Arg1, Arg2, Arg3, Arg4: Longword);
-begin
-  ShowProgress;
-end;
-
 { the last lines of the installation: from the window, or, when Python did not even start, from the output file }
 function LastMessages: String;
 var
@@ -362,37 +462,6 @@ begin
       Result := Result + Lines[i] + #13#10;
   end;
   if Trim(Result) = '' then Result := '(none)';
-end;
-
-procedure CurStepChanged(CurStep: TSetupStep);
-var
-  Code: Integer;
-  Timer: Longword;
-  Script: String;
-begin
-  if CurStep = ssPostInstall then
-  begin
-    ProgressFile := ExpandConstant('{app}\install-progress.txt');
-    DeleteFile(ProgressFile);
-    LinesShown := 0;
-    WizardForm.ProgressGauge.Min := 0;
-    WizardForm.ProgressGauge.Max := 1000;
-    WizardForm.ProgressGauge.Position := 30;
-    WizardForm.FilenameLabel.Caption := '';
-    WizardForm.StatusLabel.Caption := 'Downloading Python, the program''s packages and the networks...';
-    LogMemo.Visible := True;
-    Script := ExpandConstant('{app}\program\installer\run-install.cmd');
-    Timer := SetTimer(0, 0, 500, CreateCallback(@ProgressTimer));
-    if not Exec(ExpandConstant('{cmd}'), '/c "' + Quote(Script) + ' ' + InstallArguments + ' --progress ' +
-                Quote(ProgressFile) + '"', '', SW_HIDE, ewWaitUntilTerminated, Code) then
-      Code := -1;
-    KillTimer(0, Timer);
-    ShowProgress;
-    if Code <> 0 then
-      MsgBox('The installation did not finish. The last messages:' + #13#10#13#10 + LastMessages + #13#10#13#10 +
-             'All messages are in ' + ExpandConstant('{app}\install-output.log') + '. Run this setup again to retry.',
-             mbError, MB_OK);
-  end;
 end;
 
 { A Foci Analyzer that runs from the installation folder (the program, or its network processes) keeps its
@@ -436,10 +505,65 @@ begin
   Result := CloseRunning(ExpandConstant('{app}'), UninstallSilent);
 end;
 
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  Code, Ticks: Integer;
+  Script, ExitFile, Text: AnsiString;
+begin
+  if CurStep = ssPostInstall then
+  begin
+    ProgressFile := ExpandConstant('{app}\install-progress.txt');
+    DeleteFile(ProgressFile);
+    LinesShown := 0;
+    WizardForm.ProgressGauge.Min := 0;
+    WizardForm.ProgressGauge.Max := 1000;
+    WizardForm.ProgressGauge.Position := 30;
+    WizardForm.FilenameLabel.Caption := '';
+    WizardForm.StatusLabel.Caption := 'Downloading Python, the program''s packages and the networks...';
+    LogMemo.Visible := True;
+    Script := ExpandConstant('{app}\program\installer\run-install.cmd');
+    { run-install.cmd writes its exit code to install-exit.txt when it is done }
+    ExitFile := ExpandConstant('{app}\install-exit.txt');
+    DeleteFile(ExitFile);
+    Code := -1;
+    if Exec(ExpandConstant('{cmd}'), '/c "' + Quote(Script) + ' ' + InstallArguments + ' --progress ' +
+            Quote(ProgressFile) + '"', '', SW_HIDE, ewNoWait, Code) then
+    begin
+      Ticks := 0;
+      while not FileExists(ExitFile) do
+      begin
+        HandleMessages;
+        Sleep(40);
+        Ticks := Ticks + 1;
+        if Ticks mod 12 = 0 then ShowProgress;
+        { about once a minute: has the installation stopped without saying so? (nothing of it runs any more) }
+        if (Ticks mod 1500 = 0) and not FileExists(ExitFile) and (RunningCount(ExpandConstant('{app}'), False) = 0) then
+        begin
+          Sleep(2000);
+          if not FileExists(ExitFile) then Break;
+        end;
+      end;
+      Sleep(200);
+      if LoadStringFromFile(ExitFile, Text) then
+        Code := StrToIntDef(Trim(String(Text)), -1);
+    end;
+    ShowProgress;
+    if Code <> 0 then
+      MsgBox('The installation did not finish. The last messages:' + #13#10#13#10 + LastMessages + #13#10#13#10 +
+             'All messages are in ' + ExpandConstant('{app}\install-output.log') + '. Run this setup again to retry.',
+             mbError, MB_OK);
+  end;
+end;
+
 function UpdateReadyMemo(Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoTypeInfo, MemoComponentsInfo,
   MemoGroupInfo, MemoTasksInfo: String): String;
 begin
   Result := MemoDirInfo + NewLine + NewLine + 'Installation steps:' + NewLine + Space + InstallArguments;
   if MemoTasksInfo <> '' then
     Result := Result + NewLine + NewLine + MemoTasksInfo;
+end;
+
+procedure CancelButtonClick(CurPageID: Integer; var Cancel, Confirm: Boolean);
+begin
+  if Removing then Confirm := False;  { closed because the uninstaller took over }
 end;
