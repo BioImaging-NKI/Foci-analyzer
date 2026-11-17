@@ -177,6 +177,21 @@ def nvidia() -> bool:
         return False
 
 
+def conda_env(python: str) -> dict:
+    """Environment variables for a Python of a conda environment that is not activated (the same as
+    models.env_for in the program, which this script cannot import)."""
+    env = dict(os.environ)
+    root = Path(python).parent
+    if not (root / "conda-meta").is_dir():
+        root = root.parent
+    if (root / "conda-meta").is_dir():
+        dirs = ([root, root / "Library" / "mingw-w64" / "bin", root / "Library" / "usr" / "bin", root / "Library" / "bin",
+                 root / "Scripts", root / "bin"] if WINDOWS else [root / "bin"])
+        env["PATH"] = os.pathsep.join([*map(str, dirs), env.get("PATH", "")])
+        env["CONDA_PREFIX"] = str(root)
+    return env
+
+
 def check_python(path: str, network: str) -> str:
     """The version of the network in another environment, or why it cannot be used."""
     if not Path(path).is_file():
@@ -185,7 +200,8 @@ def check_python(path: str, network: str) -> str:
     dist = "instanseg-torch" if network == "instanseg" else mod
     code = f"import importlib.metadata as m, importlib; importlib.import_module('{mod}'); print(m.version('{dist}'))"
     try:
-        r = subprocess.run([path, "-c", code], check=False, capture_output=True, text=True, timeout=300)
+        r = subprocess.run([path, "-c", code], check=False, capture_output=True, text=True, timeout=300,
+                           env=conda_env(path))
     except (OSError, subprocess.TimeoutExpired) as e:
         return f"cannot run it: {e}"
     last = r.stdout.strip().splitlines()[-1:] or ["?"]  # the networks print their own messages first

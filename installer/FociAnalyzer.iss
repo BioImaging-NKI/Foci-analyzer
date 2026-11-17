@@ -107,8 +107,10 @@ begin
       if i = 5 then Total := Total + TorchSize;
     end;
   if Torch then Total := Total + TorchSize;
-  TotalLabel.Caption := 'Together with the program: about ' + GB(Total) + ' on disk. Some models are downloaded ' +
-    'when they are first used (CellposeSAM: 1.2 GB).';
+  TotalLabel.Caption := 'Together with the program: about ' + GB(Total) + ' on disk.';
+  if NetPage.Values[5] then
+    TotalLabel.Caption := TotalLabel.Caption + ' Cellpose 4 downloads its model (CellposeSAM v2, 1.2 GB) when it ' +
+      'is first used.';
 end;
 
 procedure BrowseClick(Sender: TObject);
@@ -129,7 +131,7 @@ var
   Torch: String;
 begin
   Names[0] := 'stardist'; Names[1] := 'cellpose'; Names[2] := 'instanseg'; Names[3] := 'spotiflow'; Names[4] := 'trackastra'; Names[5] := 'cellpose4';
-  Shown[0] := 'StarDist'; Shown[1] := 'Cellpose'; Shown[2] := 'InstanSeg'; Shown[3] := 'Spotiflow'; Shown[4] := 'Trackastra'; Shown[5] := 'Cellpose 4';
+  Shown[0] := 'StarDist'; Shown[1] := 'Cellpose 3'; Shown[2] := 'InstanSeg'; Shown[3] := 'Spotiflow'; Shown[4] := 'Trackastra'; Shown[5] := 'Cellpose 4';
   Sizes[0] := 16; Sizes[1] := 1; Sizes[2] := 3; Sizes[3] := 2; Sizes[4] := 2; Sizes[5] := 1;
   HasGpu := FileExists(ExpandConstant('{sys}\nvcuda.dll')) or FileExists(ExpandConstant('{sys}\nvidia-smi.exe'));
   if HasGpu then
@@ -140,15 +142,15 @@ begin
   NetPage := CreateInputOptionPage(wpSelectTasks, 'Neural networks',
     'Which networks should be installed?',
     'Foci Analyzer works without them (threshold segmentation, watershed foci), but they find nuclei and foci ' +
-    'better. Cellpose, InstanSeg, Spotiflow and Trackastra share one ' + Torch + '; Cellpose 4 has its own. ' +
+    'better. Cellpose 3, InstanSeg, Spotiflow and Trackastra share one ' + Torch + '; Cellpose 4 has its own. ' +
     'StarDist runs on the processor. Networks you leave unticked can be taken from a Python environment of your ' +
     'own on the next page, or added later.', False, False);
   NetPage.Add('StarDist: nuclei, fast and robust (recommended) - ' + GB(Sizes[0]));
-  NetPage.Add('Cellpose: nuclei or whole cells, also in 3D - ' + GB(Sizes[1]) + ' + PyTorch');
+  NetPage.Add('Cellpose 3: nuclei or whole cells, also in 3D - ' + GB(Sizes[1]) + ' + PyTorch');
   NetPage.Add('InstanSeg: nuclei or whole cells, fast; also made for tissue - ' + GB(Sizes[2]) + ' + PyTorch');
   NetPage.Add('Spotiflow: foci detection by a network - ' + GB(Sizes[3]) + ' + PyTorch');
   NetPage.Add('Trackastra: tracking of cells in time-lapses - ' + GB(Sizes[4]) + ' + PyTorch');
-  NetPage.Add('Cellpose 4: CellposeSAM, the newest model; slow without a graphics card - ' + GB(Sizes[5] + TorchSize));
+  NetPage.Add('Cellpose 4: CellposeSAM, the newest model; slow without a modern graphics card - ' + GB(Sizes[5] + TorchSize));
   for i := 0 to NetCount - 2 do
     NetPage.Values[i] := True;
   TotalLabel := TNewStaticText.Create(NetPage);
@@ -172,12 +174,13 @@ begin
   OwnIntro.AutoSize := False;
   OwnIntro.WordWrap := True;
   OwnIntro.Width := OwnPage.SurfaceWidth;
-  OwnIntro.Height := ScaleY(84);
+  OwnIntro.Height := ScaleY(100);
   OwnIntro.Anchors := [akLeft, akTop, akRight];
   OwnIntro.Caption := 'These networks are not installed. If one of them is installed in a Python environment of ' +
-    'your own, give the python.exe of that environment (for example C:\PythonProjects\Cellpose4\.venv\Scripts\' +
-    'python.exe): Foci Analyzer then uses it. Leave a box empty otherwise. This can be changed later on the ' +
-    'Settings page of Foci Analyzer.';
+    'your own, give the python.exe of that environment: Foci Analyzer then uses it. A venv (for example ' +
+    'C:\PythonProjects\Cellpose4\.venv\Scripts\python.exe) and a conda environment (for example ' +
+    'C:\Users\you\miniconda3\envs\cellpose\python.exe) both work. Leave a box empty otherwise; this can be ' +
+    'changed later on the Settings page.';
   for i := 0 to NetCount - 1 do
   begin
     OwnLabel[i] := TNewStaticText.Create(OwnPage);
@@ -336,6 +339,30 @@ begin
   ShowProgress;
 end;
 
+{ the last lines of the installation: from the window, or, when Python did not even start, from the output file }
+function LastMessages: String;
+var
+  Lines: TArrayOfString;
+  i, First: Integer;
+begin
+  Result := '';
+  if LogMemo.Lines.Count > 0 then
+  begin
+    First := LogMemo.Lines.Count - 8;
+    if First < 0 then First := 0;
+    for i := First to LogMemo.Lines.Count - 1 do
+      Result := Result + LogMemo.Lines[i] + #13#10;
+  end
+  else if LoadStringsFromFile(ExpandConstant('{app}\install-output.log'), Lines) then
+  begin
+    First := GetArrayLength(Lines) - 8;
+    if First < 0 then First := 0;
+    for i := First to GetArrayLength(Lines) - 1 do
+      Result := Result + Lines[i] + #13#10;
+  end;
+  if Trim(Result) = '' then Result := '(none)';
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   Code: Integer;
@@ -361,9 +388,51 @@ begin
     KillTimer(0, Timer);
     ShowProgress;
     if Code <> 0 then
-      MsgBox('The installation did not finish (an internet connection is needed). The messages are in ' +
-             ExpandConstant('{app}\install.log') + '. Run this setup again to retry.', mbError, MB_OK);
+      MsgBox('The installation did not finish. The last messages:' + #13#10#13#10 + LastMessages + #13#10#13#10 +
+             'All messages are in ' + ExpandConstant('{app}\install-output.log') + '. Run this setup again to retry.',
+             mbError, MB_OK);
   end;
+end;
+
+{ A Foci Analyzer that runs from the installation folder (the program, or its network processes) keeps its
+  files in use, so they cannot be replaced or removed: it is closed first. }
+function RunningCount(Dir: String; Stop: Boolean): Integer;
+var
+  Command: String;
+begin
+  Command := '$d = ''' + RemoveBackslashUnlessRoot(Dir) + '\''; ' +
+    '$p = @(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and ' +
+    '$_.ExecutablePath.StartsWith($d, [StringComparison]::OrdinalIgnoreCase) }); ';
+  if Stop then
+    Command := Command + '$p | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; ' +
+      'Start-Sleep -Seconds 2; ';
+  Command := Command + 'exit $p.Count';
+  if not Exec('powershell.exe', '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "' + Command + '"', '',
+              SW_HIDE, ewWaitUntilTerminated, Result) then
+    Result := 0;
+end;
+
+function CloseRunning(Dir: String; Silent: Boolean): Boolean;
+begin
+  Result := True;
+  if not DirExists(Dir) or (RunningCount(Dir, False) = 0) then Exit;
+  if not Silent then
+    Result := MsgBox('Foci Analyzer is running from ' + Dir + '. Setup closes it first (your experiment and ' +
+                     'settings are kept).', mbConfirmation, MB_OKCANCEL) = IDOK;
+  if Result then
+    RunningCount(Dir, True);
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := '';
+  if not CloseRunning(WizardDirValue, WizardSilent) then
+    Result := 'Foci Analyzer is still running. Close it and run this setup again.';
+end;
+
+function InitializeUninstall: Boolean;
+begin
+  Result := CloseRunning(ExpandConstant('{app}'), UninstallSilent);
 end;
 
 function UpdateReadyMemo(Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoTypeInfo, MemoComponentsInfo,

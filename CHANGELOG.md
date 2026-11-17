@@ -97,3 +97,9 @@ First working version. There are no earlier results to compare with.
 - Starting: the browser opens at once with a starting page, which turns into the window when the program is
   ready. On Windows a second Foci Analyzer (for example an installed one next to a development one) could
   take the same port, so the two answered at random; now the second start shows the first window.
+- Setup: a Foci Analyzer still running from the installation folder is closed first (it made a reinstall
+  fail); a failure shows the last messages, also when Python itself could not start
+  (`install-output.log`). Cellpose is called Cellpose 3 there; the CellposeSAM download is only mentioned
+  with Cellpose 4.
+- Your own network environments may be conda environments: their library folders are put on PATH as
+  `conda activate` would. Results do not change.

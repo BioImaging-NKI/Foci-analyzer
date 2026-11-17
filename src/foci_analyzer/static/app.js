@@ -137,7 +137,7 @@ function modelControl(f, group, id) {
   const sel = el("select", { id, onchange: (e) => {
     if (e.target.value === OWN) { own.hidden = false; path.focus(); } else { own.hidden = true; save(e.target.value); renderSettings(); } } },
   list.map((m) => el("option", { value: m.name, disabled: !installed(m.network) && m.name !== v,
-    textContent: m.label + (installed(m.network) ? (m.name === "cpsam_v2" && S.gpu && S.gpu.cellpose4 === false ? " · slow without a graphics card" : "")
+    textContent: m.label + (installed(m.network) ? (m.name === "cpsam_v2" && S.gpu && S.gpu.cellpose4 === false ? " · slow without a modern graphics card" : "")
       : m.network === "cellpose3" && installed("cellpose") ? " · needs Cellpose 3" : " · not installed (Settings page)") })),
   el("option", { value: OWN, textContent: "Own model…" }));
   sel.value = known ? v : OWN;
@@ -718,7 +718,7 @@ async function loadProgram(change) {
           el("td", { class: n.error ? "bad" : "", textContent: device(n) }), el("td", { class: "path", textContent: n.python, title: n.python }),
           el("td", {}, inputs[n.name] = el("input", { type: "text", value: p.pythons[n.name] || "", placeholder: "the same as the others", "aria-label": `Python for ${n.name}` })))))),
       el("pre", { id: "program-log", hidden: !p.install.lines.length, textContent: p.install.lines.join("\n") }),
-      el("div", { class: "row" }, el("label", { textContent: "Python of the networks" }), helpIcon("The python.exe of the environment that holds the networks, for example C:/PythonProjects/Cellpose4/Scripts/python.exe. Empty = the environment installed with Foci Analyzer. A network can have its own in the table above."),
+      el("div", { class: "row" }, el("label", { textContent: "Python of the networks" }), helpIcon("The python.exe of the environment that holds the networks, for example C:/PythonProjects/Cellpose4/Scripts/python.exe. Empty = the environment installed with Foci Analyzer. A conda environment works too (…/envs/name/python.exe). A network can have its own in the table above."),
         el("div", { style: "flex:1" }, general), el("button", { class: "primary", textContent: "Apply", onclick: apply })));
     general.style.width = "100%";
     $("program-about").replaceChildren(`Foci Analyzer ${p.version} · Python ${p.app_python} · the window keeps its state in ${p.home}`);

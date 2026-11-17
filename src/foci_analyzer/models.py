@@ -37,7 +37,7 @@ DOCS = {"stardist": "https://github.com/stardist/stardist#pretrained-models-for-
         "spotiflow": "https://weigertlab.org/spotiflow/pretrained.html"}
 CATALOG = {
     "stardist": [("", "Versatile fluorescent nuclei (2D_versatile_fluo)", "stardist")],
-    "cellpose": [("", "Automatic: nuclei or cyto3 (Cellpose 3), cpsam (Cellpose 4)", "cellpose"),
+    "cellpose": [("", "Automatic: nuclei or cyto3 (Cellpose 3), CellposeSAM (Cellpose 4)", "cellpose"),
                  ("nuclei", "Nuclei (Cellpose 3)", "cellpose3"),
                  ("cyto3", "Cells, general (Cellpose 3)", "cellpose3"),
                  ("tissuenet_cp3", "Tissue, cells and nuclei (Cellpose 3)", "cellpose3"),
@@ -85,7 +85,7 @@ def _versions_in(py: str) -> dict[str, str]:
         code = (f"import importlib.metadata as m, json\nout = {{}}\nfor n in {names!r}:\n    try: out[n] = m.version(n)\n"
                 "    except Exception: pass\nprint(json.dumps(out))")
         try:
-            r = subprocess.run([py, "-c", code], check=False, capture_output=True, text=True, timeout=30,
+            r = subprocess.run([py, "-c", code], check=False, env=env_for(py), capture_output=True, text=True, timeout=30,
                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             found = json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0 and r.stdout.strip() else {}
         except (OSError, ValueError, subprocess.TimeoutExpired):
@@ -170,6 +170,24 @@ def default_python(op: str = "") -> str:
     return sys.executable if importlib.util.find_spec("torch") else ""
 
 
+def env_for(python: str) -> dict:
+    """The environment variables to run this Python with. A conda environment is used without `conda activate`:
+    its library folders are put on PATH as activating would (else PyTorch or numpy may fail to load a DLL)."""
+    env = dict(os.environ)
+    root = Path(python).parent
+    if not (root / "conda-meta").is_dir():
+        root = root.parent  # bin/python on macOS and Linux
+    if (root / "conda-meta").is_dir():
+        if sys.platform == "win32":
+            dirs = [root, root / "Library" / "mingw-w64" / "bin", root / "Library" / "usr" / "bin",
+                    root / "Library" / "bin", root / "Scripts", root / "bin"]
+        else:
+            dirs = [root / "bin"]
+        env["PATH"] = os.pathsep.join([*map(str, dirs), env.get("PATH", "")])
+        env["CONDA_PREFIX"] = str(root)
+    return env
+
+
 class Worker:
     """One running `model_worker.py`; requests go through it one at a time."""
 
@@ -186,7 +204,7 @@ class Worker:
         self.proc = subprocess.Popen(
             [self.python, "-u", str(script)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=self.log.open("ab"), text=True, encoding="utf-8",
-            env={**os.environ, **({} if USE_GPU else {"CUDA_VISIBLE_DEVICES": "-1", "PYTORCH_ENABLE_MPS_FALLBACK": "1"})},
+            env={**env_for(self.python), **({} if USE_GPU else {"CUDA_VISIBLE_DEVICES": "-1", "PYTORCH_ENABLE_MPS_FALLBACK": "1"})},
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
     def call(self, op: str, arrays: dict | None = None, params: dict | None = None) -> tuple[dict, dict]:
