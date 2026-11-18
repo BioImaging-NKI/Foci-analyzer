@@ -8,6 +8,7 @@ run never leaves a half-written table.
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
 import threading
 import time
@@ -164,7 +165,11 @@ def run(images: list[ImageEntry], s: config.Settings, folder: str, results: Resu
                 finished(i, entry, lambda entry=entry: analyze_image(entry, s, compute_lock, folder, labels, save_images))
         else:
             progress.current = f"{workers} images at a time"
-            with (ThreadPoolExecutor if networks else ProcessPoolExecutor)(workers) as pool:
+            # new processes are started fresh ("spawn", as on Windows and macOS): on Linux the default "fork"
+            # copies this process with its threads (server, thread pools) and the copies can hang for ever
+            pool = (ThreadPoolExecutor(workers) if networks
+                    else ProcessPoolExecutor(workers, mp_context=multiprocessing.get_context("spawn")))
+            with pool:
                 futures = {pool.submit(analyze_image, entry, s, None, folder, labels, save_images): (i, entry) for i, entry in enumerate(images)}
                 for fut in as_completed(futures):
                     finished(*futures[fut], fut.result)

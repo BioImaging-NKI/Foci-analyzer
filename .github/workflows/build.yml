@@ -22,12 +22,13 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30  # a hanging test fails here instead of after six hours
     steps:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v7
       - run: uv sync --python 3.12
       - run: uv run ruff check src tests installer
-      - run: uv run pytest -q -p no:warnings
+      - run: uv run pytest -v -p no:warnings  # -v: the log shows the test that hangs, if one does
 
   windows-setup:
     if: github.event_name == 'workflow_dispatch' && inputs.installers || startsWith(github.ref, 'refs/tags/v')
