@@ -2,7 +2,7 @@
 
 Every entry says whether results change.
 
-## 2.0.0b1 (2026-11-19)
+## 2.0.0b1 (2026-11-18)
 
 The first public version of Foci Analyzer in Python, the successor of the Fiji macro (1.x, now in
 [Foci-analyzer-Fiji](https://github.com/BioImaging-NKI/Foci-analyzer-Fiji)). A beta: please report problems.
