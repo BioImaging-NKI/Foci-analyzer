@@ -71,6 +71,26 @@ def apply(r: FrameResult, pts: list[tuple[float, float, int]]) -> FrameResult:
     return replace(r, cells=cells.reset_index(drop=True), foci=foci.reset_index(drop=True), removed=ids)
 
 
+def set_removed(df: pd.DataFrame, r: FrameResult, image_id: str, t: int, pts: list, remove: bool) -> tuple[pd.DataFrame, int]:
+    """Remove the cells under the points (x, y, z) from the analysis, or put them back. Returns the table and how
+    many cells changed."""
+    changed = 0
+    for x, y, z in pts:
+        cell = label_at(r, float(x), float(y), int(z))
+        if cell == 0:
+            continue
+        here = (df["image"] == image_id) & (df["frame"] == t + 1)
+        same = [i for i, row in df[here].iterrows() if label_at(r, row.x, row.y, int(row.z)) == cell]
+        if remove and not same:
+            row = pd.DataFrame([[image_id, t + 1, round(float(x), 1), round(float(y), 1), int(z)]], columns=COLUMNS)
+            df = row if df.empty else pd.concat([df, row], ignore_index=True)
+            changed += 1
+        elif not remove and same:
+            df = df.drop(index=same).reset_index(drop=True)
+            changed += 1
+    return df, changed
+
+
 def toggle(df: pd.DataFrame, r: FrameResult, image_id: str, t: int, x: float, y: float, z: int) -> tuple[pd.DataFrame, bool]:
     """Remove the cell under (x, y, z), or put it back when it was removed. Returns the table and whether it is
     now removed."""

@@ -14,7 +14,7 @@ leaves half a table.
 | `removed_cells.tsv` | the cells removed by hand in the viewer, as clicked points (image, frame, x, y, z in pixels; z = −1 for a click in a projection) |
 | `labels/` | with **Also save label images**: per image `<condition>_<image>_cells.tif` and `<condition>_<image>_foci_ch<N>.tif` (T, Z, Y, X, 16-bit) |
 | `images/` | with **Also save images with overlays (Fiji)**, or **For Fiji**: the image as an ImageJ TIFF with the outlines as overlay, in a `.zip` that Fiji opens directly |
-| `pictures/` | **View** (PNG) and **Whole image** (RGB TIFF) from the Save section of the viewer |
+| `pictures/` | **View** (PNG) and **Full image** (RGB TIFF) from the Save images section of the viewer |
 | `graph_<measure>.tsv` | **Save graph data** on the Results page |
 | `.viewer/` | the outlines and foci of the last run, so the viewer can show an image without analyzing it again; can be deleted |
 

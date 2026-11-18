@@ -30,7 +30,9 @@ Start Foci Analyzer from the start menu, or with `Foci Analyzer.exe` in the inst
 starts, then the window. Starting it a second time shows the window that is already open.
 
 Running the setup when Foci Analyzer is installed already offers **Update it, or add networks** (into the
-same folder; installed networks are ticked and stay) or **Remove it**. Updating can also be done from Foci
+same folder; installed networks are ticked and stay) or **Remove it**. Networks that Foci Analyzer takes
+from an environment of your own are marked *now from your own environment*; they stay unticked, and the next
+page shows their `python.exe` again. Ticking one installs it and uses that instead of your own. Updating can also be done from Foci
 Analyzer itself: see [Updates](../guide/settings-page.md#updates).
 
 Silent installation, for example for several computers:

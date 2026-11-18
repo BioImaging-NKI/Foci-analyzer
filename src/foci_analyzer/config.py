@@ -16,14 +16,15 @@ import tomli_w
 
 def opt(default: Any, label: str, help: str = "", *, advanced: bool = False, choices: list[str] | None = None,
         min: float | None = None, max: float | None = None, step: float | None = None, unit: str = "",
-        slider: bool = False, when: dict | None = None, catalog: bool = False):
+        slider: bool = False, when: dict | None = None, off_when: dict | None = None, catalog: bool = False):
     """A setting with what the window needs to show it. `help` is the context help (the ? in the form).
 
-    `when` names settings of the same group and the values for which this one is shown. `catalog`: a model
+    `when` names settings of the same group and the values for which this one is shown; `off_when` those for
+    which it is shown but greyed out (not used). `catalog`: a model
     name, chosen from the pretrained models of the network (models.CATALOG) or a model of your own.
     """
     meta = {"label": label, "help": help, "advanced": advanced, "choices": choices, "min": min, "max": max,
-            "step": step, "unit": unit, "slider": slider, "when": when,
+            "step": step, "unit": unit, "slider": slider, "when": when, "off_when": off_when,
             "catalog": catalog}
     return field(default=default, metadata=meta)
 
@@ -91,9 +92,14 @@ class FociGeneralSettings:
                          "work in X, Y and Z. A projection detects them in one plane, which is often more "
                          "reliable for thin samples and few slices. Ignored for 2D images.",
                          choices=["3D", "max projection", "extended depth of focus", "sum projection"])
-    outside_distance: float = opt(0.0, "Distance outside cells", "Foci up to this distance outside a nucleus "
-                                  "or cell still count for it. -1 = every focus counts for the nearest cell.",
-                                  advanced=True, min=-1, unit="µm")
+    outside_distance: float = opt(0.0, "Cell border shift", "Moves the border within which foci count for a "
+                                  "nucleus or cell. Positive: foci up to this distance outside it still count. "
+                                  "Negative: the border moves inwards, so foci near the edge are left out. 0: the "
+                                  "outline as found. The cell measurements themselves always use the outline as "
+                                  "found.", advanced=True, min=-50, max=50, unit="µm",
+                                  off_when={"whole_image": [True]})
+    whole_image: bool = opt(False, "Foci in the whole image", "Every focus counts for the nearest nucleus or "
+                            "cell, wherever it is (the cell border shift is then not used).", advanced=True)
     z_elongation: float = opt(2.0, "Axial elongation", "How much longer a focus is in Z than in XY because "
                               "of the microscope optics. Used for the filter size in Z (3D detection).",
                               advanced=True, min=0.5, max=10, step=0.5, unit="×")
@@ -111,11 +117,14 @@ class FociChannelSettings:
     size: float = opt(0.5, "Foci size", "Expected diameter of a focus (full width at half maximum). It sets "
                       "the filter scale and the smallest distance between two foci.", min=0.05, step=0.05,
                       unit="µm")
-    sensitivity: float = opt(8.0, "Threshold", "A local maximum is a focus when it is this many times higher "
-                             "than the noise of the filtered image. The noise is 1.4826 × the median absolute "
-                             "deviation of the filtered values inside the cells, which is hardly influenced "
-                             "by the foci themselves. Lower finds more foci. The viewer follows this slider "
-                             "directly.", min=1, max=50, step=0.1, unit="× noise", slider=True, when={"method": ["watershed"]})
+    sensitivity: float = opt(8.0, "Threshold", "A local maximum is a focus when its height in the filtered "
+                             "image is this many times the noise. The noise is how much the filtered image "
+                             "goes up and down by chance between the foci: the typical size of those "
+                             "random ups and downs inside the cells. It is measured as 1.4826 × the median "
+                             "absolute deviation, which equals the standard deviation for pure noise but is "
+                             "hardly raised by the foci themselves. So 8 means: 8 times higher than the "
+                             "usual ups and downs. Lower finds more and fainter foci, but also more chance "
+                             "peaks. The viewer follows this slider directly.", min=1, max=50, step=0.1, unit="× noise", slider=True, when={"method": ["watershed"]})
     probability: float = opt(0.5, "Spotiflow probability", "Spots below this probability are left out.",
                              min=0, max=1, step=0.01, slider=True, when={"method": ["spotiflow"]})
     filter: str = opt("DoG", "Filter", "DoG: difference of two Gaussians around the foci size. LoG: Laplacian "
@@ -226,6 +235,9 @@ def _group_from_dict(cls, data: dict):
 def from_dict(data: dict) -> Settings:
     """Settings from a dictionary; missing settings get their default, unknown ones are ignored."""
     s = Settings()
+    fg = data.get("foci_general")
+    if isinstance(fg, dict) and "whole_image" not in fg and fg.get("outside_distance", 0) == -1:
+        data = {**data, "foci_general": {**fg, "outside_distance": 0.0, "whole_image": True}}  # before 0.2: -1 meant this
     for f in fields(Settings):
         if f.name not in data:
             continue

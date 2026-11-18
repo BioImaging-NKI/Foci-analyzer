@@ -343,6 +343,18 @@ nuclear stain (`Hi-res 3D`). Default: Cellpose.
 
 ### State on 2026-11-18
 
+Later that night: the repository moved to `BioImaging-NKI/Foci-analyzer` (private; the Fiji macro is now
+`BioImaging-NKI/Foci-analyzer-Fiji`; imagej.net links to `.../Foci-analyzer/tree/main/QuPath`, which must become
+`Foci-analyzer-Fiji`). Window: Z/T sliders under the viewer with play, Ctrl/Alt + wheel, several cells removed at
+once (Ctrl + click, Shift + box), Cell border shift (negative shrinks) with *Foci in the whole image*, Save images
+feedback, grouped Colour cells by, progress bar that fills before it empties, starting page fixed (it reloaded
+itself every 0.4 s). Synthetic time-lapse with Z in `TestData/Synthetic time-lapse` (12 frames, 5 slices).
+
+Auto-estimate of foci size and threshold, tried and left out: the size from the half-maximum width of the
+brightest peaks came close (synthetic: 0.86 µm for 0.75 µm), but no threshold rule (Otsu on the log of the
+candidate heights, a noise model for the maxima) followed the counts of Fiji: the threshold that gives Fiji's
+count ranged from 2.4 to 16.5 × noise over the test images, and the estimate was up to 15 times off in count.
+
 Updates from GitHub (`updates.py`, `install.py --update`; tested end to end with a fake release on a test
 installation: the tab followed the update and reloaded into the new version). Setup: existing installation
 page (update/add networks, remove), installed networks greyed and ticked, folder page skipped on update; the

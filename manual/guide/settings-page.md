@@ -12,7 +12,7 @@ which Python environment runs it. Opening the page asks the networks themselves,
 
 - **Install**: a network that is not installed has this button instead of a version. It downloads the
   network into the folder of Foci Analyzer (a few GB; minutes). The messages of the installer appear under
-  the table. Close other Foci Analyzer windows first: a network that is in use cannot be replaced.
+  the table while it runs (and stay there when it failed). Close other Foci Analyzer windows first: a network that is in use cannot be replaced.
 - **Own Python for this network**: use a network from a Python environment of your own, for example an
   existing Cellpose installation: give its `python.exe` (Windows, in the `Scripts` folder of the
   environment) or `bin/python` (macOS, Linux), and click **Apply**.

@@ -158,7 +158,7 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
             f"Filtering channel {fc.channel}", (3 + 3 * n, steps))
 
         def candidates(fc=fc, raw=raw, F=F, sigma=sigma):
-            cellmap = an.match_z(an.expand(labels, cal, general.outside_distance), raw.shape[0])
+            cellmap = an.match_z(an.expand(labels, cal, an.reach(general)), raw.shape[0])
             unit, noise = an.noise_unit(F, an.match_z(labels, raw.shape[0]), fc.threshold_scope)
             if fc.method == "spotiflow":
                 pos, prob = models.spots(raw, cal, fc)
@@ -170,7 +170,7 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
             return (cellmap, unit, noise, floor, *an.find_candidates(S, sigma, floor, cellmap, True))
 
         k_cand, (cellmap, unit, noise, floor, pos, height, cell) = cache.run(
-            "candidates", {"scope": fc.threshold_scope, "out": general.outside_distance, "method": fc.method,
+            "candidates", {"scope": fc.threshold_scope, "out": an.reach(general), "method": fc.method,
                            "model": fc.spotiflow_model if fc.method == "spotiflow" else ""}, (k_det, k_seg),
             candidates, f"Finding foci in channel {fc.channel}"
             + (" (Spotiflow)" if fc.method == "spotiflow" else ""), (4 + 3 * n, steps))

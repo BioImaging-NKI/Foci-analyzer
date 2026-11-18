@@ -149,20 +149,36 @@ export class Viewer {
     const top = this.top; let drag = null;
     top.addEventListener("wheel", (e) => {
       e.preventDefault(); const r = top.getBoundingClientRect();
+      // Ctrl + wheel: Z, Alt + wheel: T (one step per notch; a touchpad's small steps add up)
+      if ((e.ctrlKey || e.altKey) && this.onstep) {
+        const axis = e.ctrlKey ? "z" : "t", d = e.deltaY || e.deltaX;
+        if (this._stepAxis !== axis) { this._stepAxis = axis; this._stepSum = 0; }
+        this._stepSum += Math.abs(d) >= 50 ? Math.sign(d) * 50 : d;
+        while (Math.abs(this._stepSum) >= 50) { const s = Math.sign(this._stepSum); this._stepSum -= s * 50; this.onstep(axis, s); }
+        return;
+      }
       this.zoomAt(e.clientX - r.left, e.clientY - r.top, Math.pow(1.33, -e.deltaY / 100));
     }, { passive: false });
-    top.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, moved: 0 }; top.setPointerCapture(e.pointerId); top.classList.add("dragging"); });
+    const at = (e) => { const r = top.getBoundingClientRect(); return [(e.clientX - r.left - this.view.tx) / this.view.s, (e.clientY - r.top - this.view.ty) / this.view.s]; };
+    top.addEventListener("pointerdown", (e) => {
+      // Shift + drag: a box that selects the cells in it (instead of moving the image)
+      drag = { x: e.clientX, y: e.clientY, moved: 0, box: e.shiftKey && this.onbox ? at(e) : null };
+      top.setPointerCapture(e.pointerId); if (!drag.box) top.classList.add("dragging");
+    });
     top.addEventListener("pointermove", (e) => {
       if (!drag) return;
+      if (drag.box) { drag.moved += Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y); drag.x = e.clientX; drag.y = e.clientY; this.selBox = [...drag.box, ...at(e)]; this.requestDraw(); return; }
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       drag.moved += Math.abs(dx) + Math.abs(dy); drag.x = e.clientX; drag.y = e.clientY;
       this.view.tx += dx; this.view.ty += dy; this.requestDraw();
     });
     top.addEventListener("pointerup", (e) => {
       top.classList.remove("dragging");
-      if (drag && drag.moved < 4 && this.onclick && this.W) {
-        const r = top.getBoundingClientRect();
-        this.onclick((e.clientX - r.left - this.view.tx) / this.view.s, (e.clientY - r.top - this.view.ty) / this.view.s);
+      if (drag && drag.box && drag.moved >= 4 && this.selBox) {
+        const [x0, y0, x1, y1] = this.selBox; this.selBox = null; this.requestDraw();
+        this.onbox(Math.min(x0, x1), Math.min(y0, y1), Math.max(x0, x1), Math.max(y0, y1));
+      } else if (drag && drag.moved < 4 && this.onclick && this.W) {
+        this.selBox = null; this.onclick(...at(e), e);
       }
       drag = null;
     });
@@ -202,7 +218,9 @@ export class Viewer {
   // ---- drawing
   draw() {
     const gl = this.gl, dpr = window.devicePixelRatio || 1, [cw, ch] = this.size();
-    const W = Math.max(1, Math.round(cw * dpr)), H = Math.max(1, Math.round(ch * dpr));
+    // an image opened while the viewer was hidden (zero size) got zoom 0: fit it once it can be seen
+    if (this.W && cw > 0 && ch > 0 && !(this.view.s > 0)) { this.fit(); return; }
+    const W =Math.max(1, Math.round(cw * dpr)), H = Math.max(1, Math.round(ch * dpr));
     for (const c of [this.canvas, this.top]) if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
     gl.viewport(0, 0, W, H); gl.clearColor(0.043, 0.051, 0.071, 1); gl.clear(gl.COLOR_BUFFER_BIT);
     this.frame++; this.wanted = new Set();
@@ -320,6 +338,12 @@ export class Viewer {
       const [bx, by, bw, bh] = this.box;
       ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = 1; ctx.setLineDash([6, 4]);
       ctx.strokeRect(tx + bx * s, ty + by * s, bw * s, bh * s); ctx.setLineDash([]);
+    }
+    if (this.selBox) {  // the box being drawn with Shift + drag
+      const [x0, y0, x1, y1] = this.selBox;
+      ctx.fillStyle = "rgba(255,212,0,.12)"; ctx.strokeStyle = "#ffd400"; ctx.lineWidth = 1.2; ctx.setLineDash([5, 3]);
+      ctx.fillRect(tx + Math.min(x0, x1) * s, ty + Math.min(y0, y1) * s, Math.abs(x1 - x0) * s, Math.abs(y1 - y0) * s);
+      ctx.strokeRect(tx + Math.min(x0, x1) * s, ty + Math.min(y0, y1) * s, Math.abs(x1 - x0) * s, Math.abs(y1 - y0) * s); ctx.setLineDash([]);
     }
     if (this.pixelSize) {  // scale bar
       const um = 110 / s * this.pixelSize, e = Math.pow(10, Math.floor(Math.log10(um)));

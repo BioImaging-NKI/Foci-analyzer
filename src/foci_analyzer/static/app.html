@@ -78,14 +78,18 @@
       <span id="mode-wrap" hidden title="Slice: one Z slice. Max projection: the brightest value over Z. A third choice appears when the foci are detected on another projection (key P)">
         <span class="seg" id="mode"><button data-mode="slice">Slice</button><button data-mode="mip" class="on">Max projection</button><button data-mode="det" hidden></button></span> <kbd>P</kbd>
       </span>
-      <label id="z-wrap" hidden title="Z slice (keys , and .; also [ and ] when there is no time-lapse)">Z <kbd>,</kbd><kbd>.</kbd> <input id="z" type="range" min="0" max="0" value="0"> <span id="z-label"></span></label>
-      <label id="t-wrap" hidden title="Time frame (keys [ and ])">T <kbd>[</kbd><kbd>]</kbd> <input id="t" type="range" min="0" max="0" value="0"> <span id="t-label"></span></label>
       <button id="fit" title="Show the whole image (key 0)">Fit <kbd>0</kbd></button>
-      <span class="help" data-help="Wheel: zoom. Drag: move. Click a cell: its numbers on the right. Keys: A analyze this image, L live, 1-9 channels on/off, C cells, F foci, M markers, P slice or projection, , and . previous and next slice, [ and ] previous and next frame (or slice, when there is no time-lapse), 0 fit. The viewer loads large images in tiles at the resolution that is needed."></span>
+      <span class="help" data-help="Wheel: zoom. Ctrl + wheel: Z slice. Alt + wheel: time frame. Drag: move. Click a cell: its numbers on the right. Keys: A analyze this image, L live, 1-9 channels on/off, C cells, F foci, M foci markers, P slice or projection, , and . previous and next slice, [ and ] previous and next frame (or slice, when there is no time-lapse), 0 fit. The viewer loads large images in tiles at the resolution that is needed."></span>
     </div>
     <div id="canvas-wrap">
       <canvas id="canvas"></canvas><canvas id="markers"></canvas>
       <div id="viewer-empty">Choose an image on the Experiment page.</div>
+    </div>
+    <div id="dims">
+      <div class="dim" id="z-wrap" hidden title="Z slice: drag, Ctrl + wheel over the image, or the keys , and . (also [ and ] when there is no time-lapse)">
+        <span class="axis">Z</span><span class="play-gap"></span><input id="z" type="range" min="0" max="0" value="0" aria-label="Z slice"><span class="dim-label" id="z-label"></span></div>
+      <div class="dim" id="t-wrap" hidden title="Time frame: drag, Alt + wheel over the image, or the keys [ and ]; play steps through the frames">
+        <span class="axis">T</span><button id="t-play" class="play" title="Play or pause the time-lapse" aria-label="Play">&#9654;</button><input id="t" type="range" min="0" max="0" value="0" aria-label="Time frame"><span class="dim-label" id="t-label"></span></div>
     </div>
   </section>
   <aside id="display">
@@ -94,12 +98,12 @@
       <div id="channels"></div>
     </div>
     <div class="section">
-      <h3>Overlays <span class="help" data-help="Cells: outlines of the nuclei or cells. Foci: the detected foci, lightly filled, per foci channel. Markers: a dot on every focus; the dots follow the threshold slider at once, the outlines when the analysis has been repeated. A ring marks a focus that colocalizes with a focus of another channel (when zoomed in). Colocalization: colocalizing foci get a white outline with a black edge, and where foci of two channels lie on top of each other is hatched black and white, so it shows on any colour. Colour cells by: a colour per cell for one of its numbers, from dark blue (lowest) to yellow (highest); drag the ends of the slider below it to change the range. 'label' gives every cell its own colour, which shows where one cell ends and the next begins (useful in 3D). Numbers: the cell numbers of the tables. A thin grey line shows how far foci outside a cell still count for it ('Distance outside cells'). The selected cell has a thick yellow outline; cells removed from the analysis a red one."></span></h3>
+      <h3>Overlays <span class="help" data-help="Cells: outlines of the nuclei or cells. Foci outlines: the detected foci, lightly filled, per foci channel. Foci markers: a dot on every focus; the dots follow the threshold slider at once, the outlines when the analysis has been repeated. A ring marks a focus that colocalizes with a focus of another channel (when zoomed in). Colocalization: colocalizing foci get a white outline with a black edge, and where foci of two channels lie on top of each other is hatched black and white, so it shows on any colour. Colour cells by: a colour per cell for one of its numbers, from dark blue (lowest) to yellow (highest); drag the ends of the slider below it to change the range. 'label' gives every cell its own colour, which shows where one cell ends and the next begins (useful in 3D). Numbers: the cell numbers of the tables. A thin dashed grey line shows the border within which foci count for a cell ('Cell border shift'). The selected cell has a thick yellow outline; cells removed from the analysis a red one."></span></h3>
       <div id="overlays">
         <label><input type="checkbox" id="show-cells" checked> Cells <kbd>C</kbd></label>
-        <label><input type="checkbox" id="show-foci" checked> Foci <kbd>F</kbd></label>
+        <label><input type="checkbox" id="show-foci" checked> Foci outlines <kbd>F</kbd></label>
         <div id="foci-toggles"></div>
-        <label><input type="checkbox" id="show-markers" checked> Markers <kbd>M</kbd></label>
+        <label><input type="checkbox" id="show-markers" checked> Foci markers <kbd>M</kbd></label>
         <label title="The number of every cell in the image, when it is large enough on the screen; the same number as in the tables (key N)"><input type="checkbox" id="show-numbers"> Numbers <kbd>N</kbd></label>
         <label title="Draw the outlines as smooth lines instead of along the pixel edges (key S)"><input type="checkbox" id="smooth"> Smooth outlines <kbd>S</kbd></label>
         <label id="coloc-wrap" hidden title="The colocalization map: foci that colocalize with a focus of another channel get a white outline with a black edge, and the places where foci of two channels lie on top of each other are hatched (key O)"><input type="checkbox" id="show-coloc" checked> Colocalization <kbd>O</kbd></label>
@@ -118,19 +122,20 @@
       </div>
     </div>
     <div class="section">
-      <h3>Save <span class="help" data-help="View: a PNG picture of the viewer as you see it now. Whole image: the shown slice or projection at full resolution, as an RGB TIFF with the channels and overlays as shown. For Fiji: the image with all its channels, slices and frames as a TIFF that opens in Fiji, with the outlines as overlay; in a .zip that Fiji opens directly. Everything goes to the results folder (pictures, images)."></span></h3>
+      <h3>Save images <span class="help" data-help="View: a PNG picture of the viewer as you see it now. Full image: the shown slice or projection at full resolution, as an RGB TIFF with the channels and overlays as shown. For Fiji: the image with all its channels, slices and frames as a TIFF that opens in Fiji, with the outlines as overlay; in a .zip that Fiji opens directly. Everything goes to the results folder (pictures, images)."></span></h3>
       <div class="row" id="save-buttons">
         <button id="save-view">View</button>
-        <button id="save-rgb">Whole image</button>
+        <button id="save-rgb">Full image</button>
         <button id="save-imagej">For Fiji</button>
       </div>
+      <div id="save-note" class="muted" hidden></div>
     </div>
     <div class="section">
       <h3>This image</h3>
       <div id="preview-info" class="muted"></div>
     </div>
     <div class="section">
-      <h3>Selected cell <span class="help" data-help="Click a cell in the image to see its numbers. 'Remove from the analysis' (key X) leaves the cell and its foci out of the tables; it gets a red outline. This is remembered in the results folder (removed_cells.tsv, as the clicked points), so the cell stays out when the image is analyzed again, also with other settings. Press it again to put the cell back. Analyze all images again to update the tables in the results folder."></span></h3>
+      <h3>Selected cell <span class="help" data-help="Click a cell in the image to see its numbers. 'Remove from the analysis' (key X) leaves the cell and its foci out of the tables; it gets a red outline. This is remembered in the results folder (removed_cells.tsv, as the clicked points), so the cell stays out when the image is analyzed again, also with other settings. Press it again to put the cell back. Several cells at once: Ctrl + click adds or drops a cell, Shift + drag draws a box that adds the cells whose centre is in it, Esc clears the selection; then one press removes them all. Analyze all images again to update the tables in the results folder."></span></h3>
       <div id="cell-info" class="muted"></div>
       <div id="cell-actions" class="row" hidden><button id="toggle-cell">Remove from the analysis <kbd>X</kbd></button></div>
     </div>

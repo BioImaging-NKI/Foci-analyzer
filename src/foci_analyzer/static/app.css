@@ -121,7 +121,27 @@ details.advanced > summary { cursor: pointer; color: var(--muted); font-size: 12
 #viewer-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 #viewer-bar label, #mode-wrap { white-space: nowrap; }
 #viewer-bar .primary kbd { color: inherit; background: none; border-color: currentColor; opacity: .8; }
-#z-wrap.off { opacity: .35; }
+/* the Z and T sliders under the viewer (as in napari): a plain track, no 'filled' part */
+#dims { display: flex; flex-direction: column; gap: 2px; }
+#dims:not(:has(.dim:not([hidden]))) { display: none; }
+.dim { display: flex; align-items: center; gap: 8px; }
+.dim .axis { width: 14px; font-weight: 600; color: var(--muted); text-align: center; }
+.dim .play, .dim .play-gap { width: 28px; flex: none; }
+.dim .play { padding: 0; height: 22px; font-size: 11px; line-height: 1; }
+.dim .dim-label { min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.dim input[type=range] { flex: 1; -webkit-appearance: none; appearance: none; background: none; height: 18px; margin: 0; }
+.dim input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--line); }
+.dim input[type=range]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--line); }
+.dim input[type=range]::-moz-range-progress { background: none; }
+.dim input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px;
+  border-radius: 50%; border: 2px solid var(--panel); background: var(--accent); cursor: ew-resize; }
+.dim input[type=range]::-moz-range-thumb { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--panel);
+  background: var(--accent); cursor: ew-resize; }
+#z-wrap.off, .field.off { opacity: .45; }
+#save-buttons { flex-wrap: nowrap; } #save-buttons button { flex: 1 1 0; min-width: 0; white-space: nowrap; padding-left: 6px; padding-right: 6px; }
+#save-buttons button.saved { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; }
+#save-note { margin-top: 6px; font-size: 12.5px; overflow-wrap: anywhere; }
+#save-note button { padding: 0 6px; font-size: 12px; margin-left: 4px; }
 #z, #t { width: 110px; vertical-align: middle; }
 #display { width: 285px; flex: none; overflow-y: auto; font-size: 13px; }
 #overlays label { display: block; margin: 3px 0; }

@@ -144,13 +144,27 @@ def filter_labels(labels: np.ndarray, cal: Calibration, min_diameter: float, max
 
 
 def expand(labels: np.ndarray, cal: Calibration, distance: float) -> np.ndarray:
-    """Labels grown by `distance` (in µm or px); a negative distance gives every pixel to its nearest object."""
+    """Labels grown by `distance` (in µm or px), or shrunk when it is negative (also away from a touching
+    neighbour); infinite gives every pixel to its nearest object."""
     if distance == 0 or labels.max() == 0:
         return labels
-    d = np.inf if distance < 0 else distance / cal.pixel_size
+    d = abs(distance) / cal.pixel_size
+    spacing = (cal.z_spacing / cal.pixel_size if labels.shape[0] > 1 else 1.0, 1.0, 1.0)
+    if distance < 0:
+        inner = (labels > 0) & ~segmentation.find_boundaries(labels, mode="inner")
+        if labels.shape[0] == 1:
+            depth = ndi.distance_transform_edt(np.pad(inner[0], 1))[1:-1, 1:-1][None]
+        else:
+            depth = ndi.distance_transform_edt(np.pad(inner, 1), sampling=spacing)[1:-1, 1:-1, 1:-1]
+        return np.where(depth >= d, labels, 0).astype(labels.dtype)
     if labels.shape[0] == 1:
         return segmentation.expand_labels(labels[0], distance=d)[None]
-    return segmentation.expand_labels(labels, distance=d, spacing=(cal.z_spacing / cal.pixel_size, 1, 1))
+    return segmentation.expand_labels(labels, distance=d, spacing=spacing)
+
+
+def reach(general) -> float:
+    """How far foci outside a cell still count for it (µm): infinite for the whole image."""
+    return np.inf if general.whole_image else general.outside_distance
 
 
 # ---------------------------------------------------------------- foci: filtering

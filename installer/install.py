@@ -513,13 +513,13 @@ def main(argv: list[str] | None = None) -> None:
     own = {}
     for item in args.own:
         name, _, path = item.partition("=")
-        if name not in NETWORKS or not path.strip():
+        if name not in NETWORKS or "=" not in item:  # NETWORK= (empty): no longer the user's own, the installed one
             raise SystemExit(f"--own needs NETWORK=PYTHON with NETWORK one of {', '.join(NETWORKS)}: {item}")
         own[name] = path.strip().strip('"')
     wanted = set(NETWORKS) if args.networks == "all" else set() if args.networks in ("none", "") else set(args.networks.split(","))
     if wanted - set(NETWORKS):
         raise SystemExit(f"unknown network(s): {', '.join(sorted(wanted - set(NETWORKS)))}")
-    wanted -= set(own)  # a network from the user's own environment is not installed again
+    wanted -= {n for n, p in own.items() if p}  # a network from the user's own environment is not installed again
     # Python versions and the download cache inside the program folder: removing the folder removes all.
     # (The cache costs little extra disk space: uv links the files from it into the environments.)
     env = {"UV_PYTHON_INSTALL_DIR": str(target / "python"), "UV_CACHE_DIR": str(target / "cache"),
@@ -601,8 +601,11 @@ def main(argv: list[str] | None = None) -> None:
         program.setdefault("python", "")
         program.setdefault("pythons", {})
         for name, path in own.items():
-            say(f"  {name}: {path} -> {check_python(path, name)}")
-            program["pythons"][name] = path
+            if path:
+                say(f"  {name}: {path} -> {check_python(path, name)}")
+                program["pythons"][name] = path
+            elif program["pythons"].pop(name, None):
+                say(f"  {name}: the installed one instead of your own environment")
         pj.write_text(json.dumps(program, indent=1), encoding="utf-8")
 
     if args.networks_only:

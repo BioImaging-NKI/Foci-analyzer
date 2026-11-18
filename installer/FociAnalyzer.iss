@@ -80,6 +80,8 @@ var
   PrevDir, PrevVersion: String;
   ExistPage: TInputOptionWizardPage;
   Installed: array[0..5] of Boolean;
+  { the networks the user took from an environment of their own (program.json of the window) }
+  OwnBefore: array[0..5] of String;
   Removing: Boolean;
 
 { While the installation runs, Setup waits in its own loop and handles the window's messages itself: a script
@@ -193,6 +195,45 @@ begin
   Installed[5] := HasPackage('cellpose4-env', 'cellpose');
 end;
 
+{ "Name": "C:\\path\\python.exe" in program.json (written by Python's json module) }
+function JsonString(Text, Name: String): String;
+var
+  P: Integer;
+begin
+  Result := '';
+  P := Pos('"' + Name + '":', Text);
+  if P = 0 then Exit;
+  Text := Copy(Text, P + Length(Name) + 3, Length(Text));
+  Text := TrimLeft(Text);
+  if (Text = '') or (Text[1] <> '"') then Exit;
+  P := 2;
+  while (P <= Length(Text)) and (Text[P] <> '"') do
+  begin
+    if Text[P] = '\' then
+    begin
+      P := P + 1;
+      if P > Length(Text) then Exit;
+    end;
+    Result := Result + Text[P];
+    P := P + 1;
+  end;
+end;
+
+procedure FindOwn;
+var
+  Text: AnsiString;
+  i, P: Integer;
+begin
+  if not LoadStringFromFile(ExpandConstant('{%USERPROFILE}\.foci_analyzer\program.json'), Text) then Exit;
+  P := Pos('"pythons":', Text);
+  if P = 0 then Exit;
+  Text := Copy(Text, P, Length(Text));
+  P := Pos('}', Text);
+  if P > 0 then Text := Copy(Text, 1, P);
+  for i := 0 to NetCount - 1 do
+    OwnBefore[i] := JsonString(Text, Names[i]);
+end;
+
 procedure InitializeWizard;
 var
   i: Integer;
@@ -216,6 +257,7 @@ begin
   end;
   Names[0] := 'stardist'; Names[1] := 'cellpose'; Names[2] := 'instanseg'; Names[3] := 'spotiflow'; Names[4] := 'trackastra'; Names[5] := 'cellpose4';
   Shown[0] := 'StarDist'; Shown[1] := 'Cellpose 3'; Shown[2] := 'InstanSeg'; Shown[3] := 'Spotiflow'; Shown[4] := 'Trackastra'; Shown[5] := 'Cellpose 4';
+  FindOwn;
   Sizes[0] := 16; Sizes[1] := 1; Sizes[2] := 3; Sizes[3] := 2; Sizes[4] := 2; Sizes[5] := 1;
   HasGpu := FileExists(ExpandConstant('{sys}\nvcuda.dll')) or FileExists(ExpandConstant('{sys}\nvidia-smi.exe'));
   if HasGpu then
@@ -243,6 +285,13 @@ begin
       NetPage.Values[i] := True;
       NetPage.CheckListBox.ItemEnabled[i] := False;
       NetPage.CheckListBox.ItemCaption[i] := NetPage.CheckListBox.ItemCaption[i] + ' (installed)';
+    end;
+  { a network from the user's own environment is not ticked; ticking it installs it and uses that instead }
+  for i := 0 to NetCount - 1 do
+    if OwnBefore[i] <> '' then
+    begin
+      if not Installed[i] then NetPage.Values[i] := False;
+      NetPage.CheckListBox.ItemCaption[i] := NetPage.CheckListBox.ItemCaption[i] + ' - now from your own environment';
     end;
   TotalLabel := TNewStaticText.Create(NetPage);
   TotalLabel.Parent := NetPage.Surface;
@@ -291,6 +340,7 @@ begin
     OwnButton[i].Anchors := [akTop, akRight];
     OwnButton[i].Tag := i;
     OwnButton[i].OnClick := @BrowseClick;
+    OwnEdit[i].Text := OwnBefore[i];
   end;
 
   { the installation's messages, shown under the progress bar instead of in a console window }
@@ -382,7 +432,9 @@ begin
   Result := '--networks ' + Nets;
   for i := 0 to NetCount - 1 do
     if OwnPython(i) <> '' then
-      Result := Result + ' --own ' + Quote(Names[i] + '=' + OwnPython(i));
+      Result := Result + ' --own ' + Quote(Names[i] + '=' + OwnPython(i))
+    else if (OwnBefore[i] <> '') and not Installed[i] then
+      Result := Result + ' --own ' + Names[i] + '=';  { no longer the user's own: the installed one }
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;

@@ -43,11 +43,13 @@ of focus, which takes every pixel from the slice where it is sharpest):
    *LoG*, the Laplacian of Gaussian; or *wavelet*, the product of two neighbouring à trous wavelet planes
    (Olivo-Marin, 2002). Spots of about the foci size stand out; smooth background disappears.
 2. **Noise.** The noise is 1.4826 × the median absolute deviation of the filtered values inside the cells:
-   a robust standard deviation that the foci themselves hardly affect. *Noise from* `per image` takes one
+   a robust standard deviation that the foci themselves hardly affect. It is the typical size of the random
+   ups and downs of the filtered image between the foci; for pure noise it equals the standard deviation. *Noise from* `per image` takes one
    value for all cells, `per cell` one per cell, and `fixed value` uses the same absolute threshold for all
    images.
-3. **Candidates.** Local maxima of the filtered image inside the cells (or within *Distance outside cells*
-   of them).
+3. **Candidates.** Local maxima of the filtered image inside the cells, with their border moved by *Cell
+   border shift* (outwards when positive, inwards when negative), or anywhere with *Foci in the whole image*
+   (then every focus counts for the nearest cell).
 4. **Threshold.** A candidate is a focus when its height is at least *Threshold* × the noise. The viewer
    keeps all candidates, which is why the markers follow the threshold slider at once.
 5. **Extent.** A seeded watershed grows every focus from its peak, down to half of its own peak height

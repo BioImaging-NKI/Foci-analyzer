@@ -112,3 +112,16 @@ First working version. There are no earlier results to compare with.
 - Setup: finds an existing installation (version, folder, networks) and offers Update/add networks or
   Remove; installed networks are shown as installed and only new ones count in the size. The window stays
   movable and scrollable while it installs (it was frozen).
+- Cell border shift (was *Distance outside cells*): negative values move the border inwards, so foci near the
+  edge of a cell are left out; the new checkbox *Foci in the whole image* replaces the old -1 (settings files
+  with -1 are converted). **Results change** only when a negative shift is chosen.
+- Several cells can be removed at once: Ctrl + click and Shift + drag a box select them, Esc clears.
+- Viewer: the Z and T sliders are under the image, with a play button for time-lapses; Ctrl + wheel steps
+  through Z, Alt + wheel through time. An image opened while the Analyze page was hidden no longer stays black.
+- Overlays *Foci outlines* and *Foci markers* (were Foci and Markers); *Save images* with View, Full image and
+  For Fiji, a green tick and Show in folder; *Colour cells by* in groups; the Threshold help explains the noise.
+- The progress bar fills up when a task ends and then empties at once (it slid back); it no longer jumps back
+  during an analysis. The starting page no longer reloads itself all the time (the logo blinked).
+- Settings page: installing a network no longer asks the other networks for their version while it runs (red
+  errors) and hides its messages when it succeeded.
+- Setup: networks taken from your own environment are remembered and shown as such.

@@ -133,7 +133,7 @@ def test_expand_and_filter_labels():
     lab[0, 0:4, 0:4] = 2
     grown = an.expand(lab, cal, 1.0)
     assert grown[0, 17, 25] == 1 and grown[0, 10, 25] == 0
-    assert (an.expand(lab, cal, -1) > 0).all()
+    assert (an.expand(lab, cal, np.inf) > 0).all()
     kept = an.filter_labels(lab, cal, 1.5, 50, True)
     assert kept.max() == 1 and kept[0, 25, 25] == 1 and kept[0, 1, 1] == 0
 

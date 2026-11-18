@@ -148,7 +148,7 @@ function control(f, group, sectionKey, index) {
   const set = (v, delay) => {
     group[f.key] = v;
     if (sectionKey === "segmentation" && f.key === "dimension" && v === "3D") S.settings.foci_general.dimension = "3D";
-    settingsChanged(delay); if (f.type === "choice") renderSettings();
+    settingsChanged(delay); if (f.type === "choice" || f.type === "bool") renderSettings();
   };
   const id = `f${Math.random().toString(36).slice(2)}`, v = group[f.key];
   if (f.catalog) return modelControl(f, group, id);
@@ -156,6 +156,8 @@ function control(f, group, sectionKey, index) {
   const lock3d = sectionKey === "foci_general" && f.key === "dimension" && S.settings.segmentation.dimension === "3D";
   const number = (e) => { const n = f.type === "int" ? parseInt(e.target.value, 10) : parseFloat(e.target.value); return Number.isFinite(n) ? n : null; };
   let input, range = null;
+  // shown, but not used with the current choices (for example the border shift when foci count in the whole image)
+  const off = !!f.off_when && Object.entries(f.off_when).every(([k, values]) => values.includes(group[k]));
   if (f.type === "bool") input = el("input", { id, type: "checkbox", checked: v, onchange: (e) => set(e.target.checked) });
   else if (f.type === "choice") {
     input = el("select", { id, onchange: (e) => set(e.target.value) },
@@ -169,7 +171,8 @@ function control(f, group, sectionKey, index) {
     if (f.slider) range = el("input", { type: "range", min: f.min, max: f.max, step: f.step, value: v, "aria-label": f.label,
       oninput: (e) => { const n = number(e); input.value = n; liveThreshold(sectionKey, index, f.key, n); set(n, 120); } });
   }
-  return el("div", { class: `field${f.type === "bool" ? " check" : ""}${range ? " slider" : ""}` },
+  if (off) { input.disabled = true; if (range) range.disabled = true; }
+  return el("div", { class: `field${f.type === "bool" ? " check" : ""}${range ? " slider" : ""}${off ? " off" : ""}` },
     el("label", { htmlFor: id, textContent: f.label }), helpIcon(f.help),
     el("div", { class: "control" }, input, f.unit ? el("span", { class: "unit", textContent: f.unit }) : null), range,
     lock3d ? el("div", { class: "sub", textContent: "The cells are segmented in 3D, so the foci are detected in 3D too. Set 'Segment in' to 2D to use a projection." }) : null);
@@ -204,7 +207,7 @@ function renderSettings() {
 // ---------------------------------------------------------------- viewer
 const viewer = new Viewer($("canvas"), $("markers"), (url) => api(url));
 const V = { id: "", info: null, mode: "mip", z: 0, t: 0, ch: [], preview: null, cand: [], load: 0, slots: {}, fociOn: {}, lastDim: "",
-  polys: {}, polysPrev: {}, sel: 0, selPt: null, vr: [0, 1] };
+  polys: {}, polysPrev: {}, sel: 0, selPt: null, multi: new Map(), vr: [0, 1] };
 const rgba = (c, a) => `rgba(${c.map((v) => Math.round(v * 255)).join(",")},${a})`;
 // the projection the foci are detected on, when it is not the max projection: [name in a request, name on the button]
 const DET = { "extended depth of focus": ["edf", "EDF"], "sum projection": ["sum", "Sum"] };
@@ -234,7 +237,9 @@ async function openImage(id, analyze = false) {
     status("Reading the image…", false, -1);
     const info = await (await api(`/api/image/info?path=${encodeURIComponent(id)}`)).json();
     if (load !== V.load) return;
+    play(false);
     Object.assign(V, { id, info, z: Math.floor(info.slices / 2), t: 0, preview: null, cand: [], slots: {}, lastDim: "", polys: {}, polysPrev: {}, sel: 0, selPt: null });
+    V.multi.clear();
     const top = info.dtype === "uint8" ? 255 : 65535;
     V.ch = info.ranges.map(([lo, hi], c) => ({ on: true, lo, hi, auto: [lo, hi], top: Math.min(top, Math.max(hi * 3, lo + 10)), color: channelColor(c) }));
     const kept = store("fa.display");  // the contrast and on/off of the image shown before
@@ -349,7 +354,7 @@ function syncShapes() {
   if (!p || !V.info) { viewer.shapes = []; viewer.numbers = null; viewer.requestDraw(); return; }
   const smooth = $("smooth").checked, cellsOn = $("show-cells").checked, removed = new Set(p.removed || []);
   const cells = polys("cells"), sh = [];
-  if (p.outside > 0 && cellsOn) sh.push({ polys: polys("reach"), stroke: "rgba(215,215,215,.8)", width: 1, dash: [4, 3], on: true });
+  if (p.outside !== 0 && cellsOn) sh.push({ polys: polys("reach"), stroke: "rgba(215,215,215,.8)", width: 1, dash: [4, 3], on: true });
   if (smooth) {
     sh.push({ polys: cells, stroke: "rgba(255,255,255,.85)", width: 1.3, on: cellsOn });
     p.channels.forEach((ch, i) => {
@@ -361,6 +366,7 @@ function syncShapes() {
   }
   if (removed.size) sh.push({ polys: cells, only: removed, stroke: "#ff3b3b", width: 2, halo: 1, on: true });
   if (V.sel) sh.push({ polys: cells, only: new Set([V.sel]), stroke: "#ffd400", width: 2.6, halo: 1.6, on: true });
+  if (V.multi.size) sh.push({ polys: cells, only: new Set(V.multi.keys()), stroke: "#ffd400", width: 2.6, halo: 1.6, on: true });
   viewer.shapes = sh;
   viewer.numbers = { on: $("show-numbers").checked, polys: cells, removed };
   viewer.requestDraw();
@@ -397,7 +403,7 @@ async function runPreview() {
       if (!previewBusy || !a.busy) return;
       const secs = a.seconds >= 2 ? ` · ${Math.round(a.seconds)} s` : "";
       if (a.steps) best = Math.max(best, (a.step - 0.5) / a.steps);
-      status(`${a.text}…${secs}`, false, a.steps ? best : -1, true);
+      status(`${a.text}…${secs}`, false, a.steps || best ? best : -1, true);  // once it shows how far, it never falls back
     } catch { /* the answer of the analysis itself reports problems */ }
   }, 300);
   try {
@@ -465,12 +471,26 @@ function liveThreshold(section, index, key, value) {
   }
 }
 // the choice "Colour cells by" and its legend, from the numbers of the analyzed image
+// the numbers of a cell in groups: the cell itself, the foci per channel, colocalization, the rest
+function colourGroups(names) {
+  const groups = new Map(), add = (g, n, text) => { if (!groups.has(g)) groups.set(g, []); groups.get(g).push([n, text]); };
+  const FOCI = { "": "number of foci", total_intensity: "total intensity", total_size: "total size", mean_size: "mean size", mean_intensity: "mean intensity" };
+  for (const n of names) {
+    let m;
+    if (n === "area") add("Cell", n, "area");
+    else if ((m = n.match(/^mean_ch(\d+)$/))) add("Cell", n, `mean intensity, channel ${m[1]}`);
+    else if ((m = n.match(/^foci_ch(\d+)_?(.*)$/))) add(`Foci in channel ${m[1]}`, n, FOCI[m[2]] || m[2].replaceAll("_", " "));
+    else if (/^(coloc|fraction|manders|pearson)_/.test(n)) add("Colocalization", n, n.replace(/_ch(\d+)/g, " ch$1").replaceAll("_", " "));
+    else add("Other", n, n.replaceAll("_", " "));
+  }
+  return [...groups];
+}
 function renderCellColor() {
   const p = V.preview, sel = $("cell-color"), keep = sel.value;
   const names = p && p.table.cell ? Object.keys(p.table).filter((n) => !["cell", "x", "y"].includes(n) && p.table[n].some((v) => typeof v === "number")) : [];
   $("cell-color-wrap").hidden = !names.length; $("coloc-wrap").hidden = !(p && (p.coloc || []).length);
   sel.replaceChildren(el("option", { value: "", textContent: "nothing" }), el("option", { value: "label", textContent: "label (a colour per cell)" }),
-    ...names.map((n) => el("option", { value: n, textContent: n.replaceAll("_", " ") })));
+    ...colourGroups(names).map(([group, items]) => el("optgroup", { label: group }, items.map(([n, text]) => el("option", { value: n, textContent: text })))));
   sel.value = names.includes(keep) || (keep === "label" && names.length) ? keep : "";
   cellLegend();
 }
@@ -490,8 +510,9 @@ $("legend-b").oninput = (e) => { V.vr = [V.vr[0], Math.max(+e.target.value / 100
 function showCell(rows) {
   $("cell-info").replaceChildren(rows ? el("table", {}, rows) : V.preview ? "Click a cell in the image for its numbers." : "");
 }
-viewer.onclick = (x, y) => {
-  const p = V.preview;
+viewer.onclick = (x, y, e) => {
+  const p = V.preview, ctrl = !!e && (e.ctrlKey || e.metaKey);
+  if (!ctrl) V.multi.clear();
   if (!p || !p.table.cell) { selectCell(0, null); return; }
   const cells = polys("cells");  // the cell under the click; else the nearest centre
   let id = 0;
@@ -503,8 +524,45 @@ viewer.onclick = (x, y) => {
       if (d < bestD && d < 1.2 * Math.sqrt(p.table.area[i] / Math.PI) * k) { id = c; bestD = d; }
     });
   }
+  if (ctrl) { if (id) pickCells([[id, [x, y]]], true); return; }
   selectCell(id, id ? [x, y] : null);
 };
+// several cells at once: Ctrl + click adds or drops one, Shift + drag a box adds those whose centre is in it
+function cellCentres() {
+  const p = V.preview, k = p.binning / p.pixel_size;
+  return p.table.cell.map((c, i) => [c, [p.table.x[i] * k + p.border + p.offset[0], p.table.y[i] * k + p.border + p.offset[1]]]);
+}
+function pickCells(list, toggle) {
+  if (!V.multi.size && V.sel && V.selPt) V.multi.set(V.sel, V.selPt);  // the cell selected before counts too
+  for (const [id, pt] of list) { if (toggle && V.multi.has(id)) V.multi.delete(id); else V.multi.set(id, pt); }
+  V.sel = 0; V.selPt = null;
+  showSelection();
+}
+viewer.onbox = (x0, y0, x1, y1) => {
+  if (!V.preview || !V.preview.table.cell) return;
+  const cells = polys("cells");
+  const hit = cellCentres().filter(([, [x, y]]) => x >= x0 && x <= x1 && y >= y0 && y <= y1)
+    // a point that lies in the cell itself (the centre of a bent cell can lie outside it)
+    .map(([id, pt]) => { const poly = cells && cells.find((q) => q.id === id); return [id, poly && !inside(poly, ...pt) ? pointIn(poly, pt) : pt]; });
+  if (hit.length) pickCells(hit, false); else status("No cell has its centre in the box", true);
+};
+function pointIn(poly, [cx, cy]) {  // a point just inside the outline, on the way from a corner to the centre
+  for (let i = 0; i < poly.pts.length; i += 2) {
+    const x = poly.pts[i], y = poly.pts[i + 1], d = Math.hypot(cx - x, cy - y) || 1;
+    for (const step of [0.5, 1, 2]) { const px = x + step * (cx - x) / d, py = y + step * (cy - y) / d; if (inside(poly, px, py)) return [px, py]; }
+  }
+  return [cx, cy];
+}
+function showSelection() {
+  const n = V.multi.size, removed = new Set((V.preview && V.preview.removed) || []);
+  if (!n) { selectCell(0, null); return; }
+  const back = [...V.multi.keys()].every((id) => removed.has(id));
+  $("cell-actions").hidden = false;
+  $("toggle-cell").firstChild.textContent = back ? `Put ${n} ${n === 1 ? "cell" : "cells"} back ` : `Remove ${n} ${n === 1 ? "cell" : "cells"} from the analysis `;
+  $("cell-info").replaceChildren(el("div", { textContent: `${n} ${n === 1 ? "cell" : "cells"} selected: ${[...V.multi.keys()].sort((a, b) => a - b).join(", ")}` }),
+    el("div", { class: "muted", textContent: "Ctrl + click: add or drop a cell. Shift + drag: a box. Esc: clear." }));
+  syncShapes();
+}
 function selectCell(id, pt) {
   const p = V.preview;
   V.sel = p ? id : 0; V.selPt = V.sel ? pt : null;
@@ -519,6 +577,17 @@ function selectCell(id, pt) {
   syncShapes();
 }
 async function toggleCell() {
+  if (V.multi.size && V.preview) {
+    const removed = new Set(V.preview.removed || []), ids = [...V.multi.keys()], back = ids.every((id) => removed.has(id));
+    const z = V.mode === "slice" ? V.z : -1;
+    try {
+      const r = await (await api("/api/cells/set", { path: V.id, t: V.t, remove: !back, points: [...V.multi.values()].map(([x, y]) => [x, y, z]) })).json();
+      V.preview = r; V.multi.clear(); renderCellColor(); syncLayers(); previewInfo(); selectCell(0, null);
+      status(back ? `${r.changed} cells are back in the analysis`
+        : `${r.changed} cells removed from the analysis; remembered in the results folder (Analyze all images again to update its tables)`);
+    } catch (e) { status(e.message, true); }
+    return;
+  }
   if (!V.sel || !V.selPt || !V.preview) return;
   const cell = V.sel;
   try {
@@ -555,12 +624,23 @@ function setT(t) {
   if (!V.info) return;
   t = Math.min(V.info.frames - 1, Math.max(0, t)); if (t === V.t) return;
   const had = !!V.preview;
-  V.t = t; $("t").value = t; V.preview = null; V.cand = []; V.sel = 0; renderCellColor(); syncMode(); syncLayers(); previewInfo(); selectCell(0, null);
+  V.t = t; $("t").value = t; V.preview = null; V.cand = []; V.sel = 0; V.multi.clear(); renderCellColor(); syncMode(); syncLayers(); previewInfo(); selectCell(0, null);
   if (had && $("live").checked) runPreview(); else loadStored();
 }
 $("mode").addEventListener("click", (e) => { if (e.target.dataset.mode) setMode(e.target.dataset.mode); });
 $("z").addEventListener("input", (e) => setZ(+e.target.value));
 $("t").addEventListener("change", (e) => setT(+e.target.value));
+viewer.onstep = (axis, d) => axis === "z" ? stepZ(d) : setT(V.t + d);
+// play through the time frames, 4 per second, round and round
+let playing = null;
+function play(on) {
+  clearTimeout(playing); playing = null;
+  $("t-play").innerHTML = on ? "&#10074;&#10074;" : "&#9654;"; $("t-play").setAttribute("aria-label", on ? "Pause" : "Play");
+  if (!on || !V.info || V.info.frames < 2) return;
+  const tick = () => { if (!playing) return; setT((V.t + 1) % V.info.frames); playing = setTimeout(tick, 250); };
+  playing = setTimeout(tick, 250);
+}
+$("t-play").onclick = () => play(!playing);
 $("fit").onclick = () => viewer.fit();
 $("image-select").onchange = (e) => openImage(e.target.value);
 $("analyze-now").onclick = () => runPreview();
@@ -604,6 +684,7 @@ function renderOverlays() {
 
 document.addEventListener("keydown", (e) => {
   if ($("page-analyze").hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === "Escape" && V.multi.size) { V.multi.clear(); selectCell(0, null); return; }
   const tag = e.target.tagName, type = e.target.type;
   if (tag === "SELECT" || tag === "TEXTAREA" || (tag === "INPUT" && !["checkbox", "range", "color"].includes(type))) return;
   const toggle = (id) => { $(id).checked = !$(id).checked; $(id).onchange({ target: $(id) }); };
@@ -652,10 +733,25 @@ $("save-images").checked = store("fa.images") === true;
 $("save-images").onchange = (e) => store("fa.images", e.target.checked);
 
 // ---------------------------------------------------------------- settings files and saving pictures
-async function saved(what, request) {
+// saving from the Save images card: the button shows a green tick for a moment, and a line under the buttons
+// names the file, with a button that opens its folder
+async function saved(what, request, button) {
   status(`Saving ${what}…`, false, -1);
-  try { const r = await (await request()).json(); status(r.cancelled ? "" : `Saved ${what}: ${r.path}`); return r; }
-  catch (e) { status(e.message, true); return null; }
+  const label = button ? button.textContent : "";
+  if (button) button.disabled = true;
+  try {
+    const r = await (await request()).json();
+    status(r.cancelled ? "" : `Saved ${what}: ${r.path}`);
+    if (button && !r.cancelled) {
+      button.classList.add("saved"); button.textContent = "✓ Saved";
+      setTimeout(() => { button.classList.remove("saved"); button.textContent = label; }, 1500);
+      const file = String(r.path).split(/[\\/]/), sub = file.length > 1 ? file.at(-2) : "";
+      $("save-note").hidden = false;
+      $("save-note").replaceChildren(`Saved ${file.at(-1)}`, el("button", { textContent: "Show in folder", title: r.path,
+        onclick: async () => { try { await api("/api/results/open", { sub }); } catch (e) { status(e.message, true); } } }));
+    }
+    return r;
+  } catch (e) { status(e.message, true); return null; } finally { if (button) button.disabled = false; }
 }
 $("load-settings").onclick = async () => {
   try {
@@ -674,7 +770,7 @@ function shownZ() {
 $("save-view").onclick = () => {
   if (!V.info) return status("Choose an image first", true);
   const name = `${S.images.find((im) => im.id === V.id)?.name || "view"}_view`;
-  return saved("the view", () => api("/api/export/view", { png: viewer.snapshot(), name }));
+  return saved("the view", () => api("/api/export/view", { png: viewer.snapshot(), name }), $("save-view"));
 };
 $("save-rgb").onclick = () => {
   if (!V.info) return status("Choose an image first", true);
@@ -682,11 +778,11 @@ $("save-rgb").onclick = () => {
   const overlays = p ? { cells: $("show-cells").checked, coloc: $("show-coloc").checked && (p.coloc || []).length > 0,
     foci: $("show-foci").checked ? p.channels.map((c) => c.channel).filter((c) => V.fociOn[c] !== false) : [] } : {};
   const display = V.ch.map((c) => ({ on: c.on, lo: c.lo, hi: c.hi, colour: c.color.map((v) => Math.round(255 * v)) }));
-  return saved("the whole image", () => api("/api/export/rgb", { path: V.id, t: V.t, z: shownZ(), display, overlays }));
+  return saved("the full image", () => api("/api/export/rgb", { path: V.id, t: V.t, z: shownZ(), display, overlays }), $("save-rgb"));
 };
 $("save-imagej").onclick = () => {
   if (!V.info) return status("Choose an image first", true);
-  return saved("the image for Fiji", () => api("/api/export/imagej", { path: V.id, colours: V.ch.map((c) => c.color), ranges: V.ch.map((c) => [c.lo, c.hi]) }));
+  return saved("the image for Fiji", () => api("/api/export/imagej", { path: V.id, colours: V.ch.map((c) => c.color), ranges: V.ch.map((c) => [c.lo, c.hi]) }), $("save-imagej"));
 };
 $("run").onclick = () => run(null);
 $("run-one").onclick = () => { if (V.id) run([V.id]); else status("Choose an image first", true); };
@@ -717,7 +813,7 @@ async function loadProgram(change) {
           el("td", { textContent: n.label || n.name }), el("td", {}, version(n)),
           el("td", { class: n.error ? "bad" : "", textContent: device(n) }), el("td", { class: "path", textContent: n.python, title: n.python }),
           el("td", {}, inputs[n.name] = el("input", { type: "text", value: p.pythons[n.name] || "", placeholder: "the same as the others", "aria-label": `Python for ${n.name}` })))))),
-      el("pre", { id: "program-log", hidden: !p.install.lines.length, textContent: p.install.lines.join("\n") }),
+      el("pre", { id: "program-log", hidden: !(p.install.running || p.install.ok === false) || !p.install.lines.length, textContent: p.install.lines.join("\n") }),
       el("div", { class: "row" }, el("label", { textContent: "Python of the networks" }), helpIcon("The python.exe of the environment that holds the networks, for example C:/PythonProjects/Cellpose4/Scripts/python.exe. Empty = the environment installed with Foci Analyzer. A conda environment works too (…/envs/name/python.exe). A network can have its own in the table above."),
         el("div", { style: "flex:1" }, general), el("button", { class: "primary", textContent: "Apply", onclick: apply })));
     general.style.width = "100%";

@@ -23,13 +23,22 @@ export async function api(path, body) {
   return r;
 }
 // The status bar at the bottom. `progress`: undefined = not busy, -1 = busy for an unknown time, 0..1 = how far.
+// The bar only grows while one task runs; when it ends it fills up and then empties at once (no sliding back).
+let barRun = 0;
+function barJump(bar, width) { bar.style.transition = "none"; bar.style.width = width; void bar.offsetWidth; bar.style.transition = ""; }
 export function status(text, error = false, progress, cancellable = false) {
-  const s = $("status"), busy = progress !== undefined;
+  const s = $("status"), busy = progress !== undefined, bar = $("busy-bar"), wasBusy = !$("busy").classList.contains("idle"), wasUnknown = $("busy").classList.contains("unknown");
   s.textContent = text || (busy ? "Working…" : "Ready"); s.title = s.textContent;
   s.classList.toggle("error", error); s.classList.toggle("busy", busy && !error);
   $("busy").classList.toggle("idle", !busy);  /* always there, so the text never moves */ $("cancel").hidden = !(busy && cancellable); $("busy").classList.toggle("unknown", progress === -1);
-  if (busy && progress >= 0) $("busy-bar").style.width = `${Math.round(100 * Math.min(1, progress))}%`;
-  else $("busy-bar").style.width = "";
+  const run = ++barRun, shown = parseFloat(bar.style.width) || 0;
+  if (busy && (!wasBusy || (wasUnknown && progress >= 0))) barJump(bar, "0%");  // a new task, or the first known step: from empty
+  if (busy && progress >= 0) bar.style.width = `${Math.round(100 * Math.min(1, Math.max(progress, wasBusy ? shown / 100 : 0)))}%`;
+  else if (busy) bar.style.width = "";
+  else if (wasBusy && shown > 0 && !error) {
+    bar.style.width = "100%";
+    setTimeout(() => { if (run === barRun) barJump(bar, ""); }, 400);
+  } else barJump(bar, "");
 }
 
 // a number as people read it: 3 significant digits, no exponent for ordinary sizes

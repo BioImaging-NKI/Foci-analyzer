@@ -26,10 +26,12 @@ body{margin:0;height:100vh;display:flex;align-items:center;justify-content:cente
 background:#f4f5f7;color:#333}@media(prefers-color-scheme:dark){body{background:#1d1f23;color:#ddd}}
 div{text-align:center}img{width:128px;height:128px;animation:p 1.6s ease-in-out infinite}
 @keyframes p{50%{opacity:.45}}p{margin:18px 0 0}small{opacity:.7}</style></head>
-<body><div><img src="/static/logo.png" alt=""><p>Starting Foci Analyzer&hellip;</p>
+<body data-starting><div><img src="/static/logo.png" alt=""><p>Starting Foci Analyzer&hellip;</p>
 <small>The window opens here in a moment.</small></div><script>
+// reloads once the answer is no longer this page (the window, or the error); the page must not contain the
+// text it looks for, else it reloads itself all the time
 (function poll(){fetch("/",{cache:"no-store"}).then(r=>r.text()).then(t=>{
-if(t.indexOf("<title>Foci Analyzer</title>")>=0||t.indexOf("(error)")>=0)location.reload();else setTimeout(poll,400);})
+if(t.indexOf("data-starting")<0)location.reload();else setTimeout(poll,400);})
 .catch(()=>setTimeout(poll,1000));})();</script></body></html>"""
 
 

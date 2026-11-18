@@ -26,8 +26,16 @@ Some things to know:
   **Browse…**. The **?** links to the documentation of the models. See [Models](../reference/models.md).
 - **Segment in** `3D` with **Detect foci in** a projection does not fit together (a focus on a projection
   has no slice); with 3D cells, the projections are greyed out and foci are detected in 3D.
-- **Threshold** of a foci channel is in units of the noise of the filtered image: 8 means eight times the
-  noise. The markers in the viewer follow the slider at once.
+- **Threshold** of a foci channel is in units of the noise of the filtered image. The filter makes foci of
+  the chosen size stand out; between the foci, the filtered image still goes up and down a little by chance
+  (camera noise, uneven staining). The *noise* is the typical size of those random ups and downs inside the
+  cells. A threshold of 8 means: a focus must be eight times higher than that. Lower values find more and
+  fainter foci, but also more peaks that are only noise. The foci markers in the viewer follow the slider at
+  once.
+- **Cell border shift** (*Foci*, Advanced) moves the border within which foci count for a cell: a positive
+  value also counts foci just outside it, a negative value leaves out foci near its edge. **Foci in the whole
+  image** lets every focus count for the nearest cell, wherever it is; the shift is then greyed out. The cell
+  measurements (area, intensities) always use the outline as found.
 - **Foci channels**: **Add** adds a foci channel, **Remove** takes one away. Each foci channel has its own
   colour in the panel and in the viewer.
 

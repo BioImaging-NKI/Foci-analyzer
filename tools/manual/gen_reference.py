@@ -31,6 +31,13 @@ def _shown_when(f: dict, labels: dict) -> str:
     return " Shown when " + " and ".join(parts) + "."
 
 
+def _off_when(f: dict, labels: dict) -> str:
+    if not f.get("off_when"):
+        return ""
+    parts = [f"*{labels.get(k, k)}* is {' or '.join(f'`{_value(v)}`' for v in values)}" for k, values in f["off_when"].items()]
+    return " Greyed out (not used) when " + " and ".join(parts) + "."
+
+
 def render() -> str:
     lines = ["<!-- Made by tools/manual/gen_reference.py from config.py: do not edit by hand. -->", "",
              "# All settings", "",
@@ -55,7 +62,7 @@ def render() -> str:
                 text += f" Range: {lo} to {hi}." if lo and hi else (f" At least {lo}." if lo else f" At most {hi}.")
             if f.get("catalog"):
                 text += " The list of models is on [Models](models.md)."
-            text += _shown_when(f, labels)
+            text += _shown_when(f, labels) + _off_when(f, labels)
             lines.append(f"| {name} | {default} | {text.strip().replace('|', '/')} |")
         lines.append("")
     return "\n".join(lines)

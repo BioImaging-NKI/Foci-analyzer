@@ -168,7 +168,10 @@ class App:
         """For the Settings page: which networks there are, from which Python, and whether they use the GPU."""
         asked: dict[str, dict] = {}
         rows = []
-        for op in models.NETWORKS:
+        # While a network is installed, its environment is not asked: a network process started now would
+        # fail (red errors on the page) and keep files open that the installation has to replace.
+        busy = self.install["running"] and getattr(self, "_rows", None)
+        for op in [] if busy else models.NETWORKS:
             py = models.python_for(op)
             if py not in asked:
                 try:
@@ -185,6 +188,9 @@ class App:
             rows.append({"name": op, "label": LABELS.get(op, op), "python": py, "version": version, "torch": info.get("torch"),
                          "device": info.get("device"), "gpu": info.get("gpu"), "gpu_memory": info.get("gpu_memory"),
                          "error": error})
+        if busy:
+            rows = self._rows
+        self._rows = rows
         return {"version": __version__, "app_python": sys.version.split()[0], "home": str(home()),
                 "default_python": models.default_python(), **self.program, "networks": rows, "installed": models.installed(), "gpu_ready": models.gpu_ready(),
                 "can_install": bool(self._installer()), "install": self.install}
@@ -514,6 +520,28 @@ class App:
         out["toggled"] = "removed" if now else "back"
         return out
 
+    def set_cells(self, body: dict) -> dict:
+        """Remove several cells (points in them) from the analysis at once, or put them back."""
+        image_id, t = body.get("path", ""), int(body.get("t", 0))
+        with self.lock:
+            raw = self.last.get((image_id, t))
+        if raw is None:
+            raise ApiError("this image is not analyzed yet", 404)
+        folder = self.results_folder()
+        if not folder:
+            raise ApiError("there is no results folder: add images on the Experiment page first")
+        try:
+            pts = [(float(x), float(y), int(z)) for x, y, z in body["points"]]
+            df, n = curation.set_removed(self.removed_table(), raw, image_id, t, pts, bool(body.get("remove", True)))
+        except (KeyError, TypeError, ValueError) as e:
+            raise ApiError(str(e)) from e
+        curation.save(folder, df)
+        self._removed = (folder, df)
+        self.removed_version += 1
+        out = self._payload(self.last_result(image_id, t), stored=False)
+        out["changed"] = n
+        return out
+
     def activity(self) -> dict:
         """What the analysis of the shown image is doing now (for the status bar)."""
         now = self.cache.now
@@ -577,7 +605,7 @@ class App:
                 c["foci"] = int((r.foci["channel"] == c["channel"]).sum())
         cells = len(r.cells) if "cell" in r.cells else int(r.labels.max())
         return {"key": r.key, "cells": cells, "channels": channels, "removed": r.removed,
-                "outside": self.settings.foci_general.outside_distance,
+                "outside": 0 if self.settings.foci_general.whole_image else self.settings.foci_general.outside_distance,
                 "remarks": r.remarks, "pixel_size": r.cal.pixel_size, "binning": r.binning, "border": r.border,
                 "table": _columns(r.cells), "coloc": coloc, "dimension": self.settings.foci_general.dimension, "offset": list(r.offset),
                 "stored": stored,
@@ -662,7 +690,7 @@ class App:
         r = self.shown(q.get("path", ""), t)
         kind = q.get("kind", "cells")
         if kind == "reach":
-            q = {**q, "d": self.settings.foci_general.outside_distance}
+            q = {**q, "d": an.reach(self.settings.foci_general)}
         key = (r.key, kind, q.get("ch"), q.get("d"), z)
         with self.lock:
             out = self._contours.get(key)
@@ -863,8 +891,11 @@ class App:
         config.save(self.settings, Path(path))
         return {"path": path}
 
-    def open_results_folder(self) -> dict:
+    def open_results_folder(self, body: dict | None = None) -> dict:
         folder = self.results.meta.get("folder") or self.results_folder()
+        sub = str((body or {}).get("sub", ""))  # a folder inside it (pictures, images), for a file just saved
+        if folder and sub and sub.isidentifier() and (Path(folder) / sub).is_dir():
+            folder = str(Path(folder) / sub)
         if not folder or not Path(folder).is_dir():
             raise ApiError("there is no results folder yet")
         if sys.platform == "win32":
@@ -991,10 +1022,11 @@ def make_handler(app: App):
                 "/api/update/choice": lambda: app.update_choice(body),
                 "/api/update/start": lambda: app.start_update(),
                 "/api/cells/toggle": lambda: app.toggle_cell(body),
+                "/api/cells/set": lambda: app.set_cells(body),
                 "/api/batch/start": lambda: app.start_batch(body),
                 "/api/batch/stop": stop,
                 "/api/stats": lambda: app.compare(body),
-                "/api/results/open": app.open_results_folder,
+                "/api/results/open": lambda: app.open_results_folder(body),
                 "/api/results/save": lambda: app.save_text(body),
                 "/api/export/view": lambda: app.save_view(body),
                 "/api/export/rgb": lambda: app.save_rgb(body),
