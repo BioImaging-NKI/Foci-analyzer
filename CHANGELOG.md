@@ -2,17 +2,6 @@
 
 Every entry says whether results change.
 
-## 2.0.0b2 (in development)
-
-- **Estimate** per foci channel: the foci size and threshold from the shown image, as a starting point
-  (threshold where the number of foci levels off, else Otsu on the peak heights).
-- Saturated foci are reported once per image (This image, and the Images table of the Results page) instead of
-  for almost every cell. An open window that lost its program (restart, reinstall, update) reloads itself.
-- Viewer: **Raw** / **Filtered** (key R) shows the foci channels after the filter, in percent of the threshold.
-- *Cells to check*: also cells much larger or smaller than the others in their frame (merged nuclei, debris)
-  and cells with far more foci than the others. Results (the numbers) do not change.
-- The Settings page shows the build date and commit next to the version (no time).
-
 ## 2.0.0b1 (2026-11-19)
 
 The first public version of Foci Analyzer in Python, the successor of the Fiji macro (1.x, now in
@@ -27,6 +16,10 @@ It does not reproduce the Fiji results exactly; it has its own methods.
 - Cells can be removed from the analysis by hand; tables, label images and images for Fiji with overlays.
 - Reads TIFF, CZI and LIF. Installers for Windows (setup.exe), macOS and Linux, with the neural networks of
   your choice; updates from within the program.
+- **Estimate** per foci channel: the foci size and threshold from the shown image, as a starting point.
+- The viewer can show the foci channels after the filter (**Filtered**, key R), in percent of the threshold.
+- *Cells to check* lists cells on the image edge, much larger or smaller than the others, or with far more foci;
+  images with many saturated foci get a remark.
 - Manual: https://bioimaging-nki.github.io/Foci-analyzer/
 
 ## Development before 2.0.0b1
