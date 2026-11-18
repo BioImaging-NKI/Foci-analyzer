@@ -1,8 +1,11 @@
-# The user manual on GitHub Pages. Run by hand only, until the repository has moved to BioImaging-NKI and
-# Pages is switched on (tools/manual/MAINTAINING.md, "Publish"). Versions pinned: the ones built and checked locally.
+# The user manual on GitHub Pages: published on every push to main that changes it, or by hand.
+# Versions pinned: the ones built and checked locally (tools/manual/MAINTAINING.md, "Publish").
 name: manual
 
 on:
+  push:
+    branches: [main]
+    paths: ["manual/**", "mkdocs.yml", ".github/workflows/manual.yml"]
   workflow_dispatch:
 
 permissions:

@@ -1,8 +1,10 @@
 # Maintaining the user manual of Foci Analyzer
 
 Notes for whoever (person or Claude, with the `update-manual` skill) updates the manual after a change to the
-program. The manual: `manual/` (MkDocs Material, `mkdocs.yml` in the project root). **Not published yet**: it
-goes on GitHub Pages once the repository has moved to BioImaging-NKI (workflow `manual.yml`, run by hand).
+program. The manual: `manual/` (MkDocs Material, `mkdocs.yml` in the project root). Published on GitHub Pages
+(https://bioimaging-nki.github.io/Foci-analyzer/) by the workflow `manual.yml`, on every push to main that
+changes `manual/` or `mkdocs.yml` (also by hand). So a commit of the manual is a publication: build it locally
+with `--strict` first.
 Rule: every noticeable change to the window is checked against the manual in the same piece of work.
 
 ## Tools
@@ -91,8 +93,10 @@ about 2 minutes with StarDist), builds the site strictly and runs `tests/test_ma
 Then look at the changed images (`git status manual/images`) and browse the pages:
 `docs-env/Scripts/python.exe -m mkdocs serve`.
 
-## Publish (with the user's OK, after the move)
+## Publish
 
-1. Move the repository to BioImaging-NKI; set `repo_url` (and `site_url`) in `mkdocs.yml`.
-2. Settings → Pages → Source: GitHub Actions. Run the workflow `manual` by hand.
+1. Pushing to main publishes the manual when `manual/`, `mkdocs.yml` or the workflow changed (agreed with the
+   user on 2026-11-18). Other changes (for example a label in the code) need a commit of the manual too, or a
+   run of the workflow `manual` by hand.
+2. Pages: Settings → Pages → Source: GitHub Actions (done).
 3. Check the live page itself (`curl -s <url> | grep -c "<img"`), not only that it loads.
