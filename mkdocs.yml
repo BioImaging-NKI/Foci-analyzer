@@ -43,6 +43,7 @@ nav:
   - User guide:
       - The Experiment page: guide/experiment.md
       - Settings and runs: guide/analyze.md
+      - Foci detection: guide/foci.md
       - The viewer: guide/viewer.md
       - The Results page: guide/results.md
       - The Settings page: guide/settings-page.md

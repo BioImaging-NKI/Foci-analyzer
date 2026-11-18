@@ -238,7 +238,7 @@ function renderSettings() {
       list.push(g); renderSettings(); settingsChanged(); } })));
     list.forEach((g, i) => div.append(el("div", sec.key === "foci" ? { class: "group tinted", style: `--g:${hex(OUTLINE[i % OUTLINE.length])}` } : { class: "group" },
       el("div", { class: "group-head" }, `${sec.title} ${i + 1}`,
-        sec.key === "foci" && g.method === "watershed" ? el("button", { class: "small-btn", textContent: "Estimate", title: ESTIMATE_HELP, onclick: () => estimateFoci(i) }) : null,
+        sec.key === "foci" && g.method === "watershed" ? el("span", { class: "estimate" }, el("button", { class: "small-btn", textContent: "Estimate", onclick: () => estimateFoci(i) }), helpIcon(ESTIMATE_HELP)) : null,
         list.length > 1 ? el("button", { class: "link", textContent: "Remove", onclick: () => { list.splice(i, 1); renderSettings(); settingsChanged(); } }) : null),
       ...fieldsOf(sec, g, i).filter(Boolean),
       sec.key === "foci" && estimates[i] && estimates[i].size === g.size && estimates[i].sensitivity === g.sensitivity && estimates[i].fixed === g.fixed_threshold

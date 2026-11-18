@@ -35,6 +35,8 @@ same area) are removed, and with *Remove objects on the image edge* also objects
 
 ## 3. Foci
 
+What the settings do and how to tune them: [Foci detection](../guide/foci.md).
+
 Per foci channel, in the stack (*Detect foci in* `3D`) or in a projection (maximum, sum, or extended depth
 of focus, which takes every pixel from the slice where it is sharpest):
 

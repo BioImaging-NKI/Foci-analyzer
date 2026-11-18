@@ -26,24 +26,8 @@ Some things to know:
   **Browse…**. The **?** links to the documentation of the models. See [Models](../reference/models.md).
 - **Segment in** `3D` with **Detect foci in** a projection does not fit together (a focus on a projection
   has no slice); with 3D cells, the projections are grayed out and foci are detected in 3D.
-- **Threshold** of a foci channel is in units of the noise of the filtered image. The filter makes foci of
-  the chosen size stand out; between the foci, the filtered image still goes up and down a little by chance
-  (camera noise, uneven staining). The *noise* is the typical size of those random ups and downs inside the
-  cells. A threshold of 8 means: a focus must be eight times higher than that. Lower values find more and
-  fainter foci, but also more peaks that are only noise. The foci markers in the viewer follow the slider at
-  once.
-- **Estimate** (the button in the head of a foci channel, for the watershed method) fills in *Foci size* and *Threshold* from
-  the shown image, after **Analyze this image**, as a starting point. The size is the median width at half height
-  of the 300 brightest peaks in the cells. For the threshold, the foci are counted at many thresholds: where that
-  number levels off (a plateau between the many low peaks of the noise and the foci, as in TrueSpot), the
-  threshold is taken there; when there is no such plateau, Otsu's method splits the peak heights into a low
-  (noise) and a high (foci) group. The status bar says which of the two was used. Check the result in the image,
-  for example with **Filtered** (++r++); it works less well when there are many small, faint spots that should
-  not count (try a larger *Foci size* and estimate again).
-- **Cell border shift** (*Foci*, Advanced) moves the border within which foci count for a cell: a positive
-  value also counts foci just outside it, a negative value leaves out foci near its edge. **Foci in the whole
-  image** lets every focus count for the nearest cell, wherever it is; the shift is then grayed out. This also gives cells the foci of a cell that was left out (for example one on the image edge) when they are nearer to them. The cell
-  measurements (area, intensities) always use the outline as found.
+- **Foci channels** and the section **Foci**: how foci are found, what *Foci size*, *Threshold*, *Spotiflow
+  probability*, **Estimate** and the advanced settings do, and how to tune them: [Foci detection](foci.md).
 - **Foci channels**: **Add** adds a foci channel, **Remove** takes one away. Each foci channel has its own
   color in the panel and in the viewer.
 
