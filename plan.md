@@ -295,7 +295,9 @@ nuclear stain (`Hi-res 3D`). Default: Cellpose.
 
 ### Open, in order of use to you
 
-**When the repository goes public** (checklist; the repository is private since the move on 2026-11-18):
+**Gone public on 2026-11-19** (version 2.0.0b1; manual at https://bioimaging-nki.github.io/Foci-analyzer/).
+Done: the note in the Foci-analyzer-Fiji README, the notice on the imagej.net page, the manual, the release.
+The checklist as it was:
 - README of `BioImaging-NKI/Foci-analyzer-Fiji`: a note at the top that there is a new Foci Analyzer (Python),
   with a link to `BioImaging-NKI/Foci-analyzer` and its manual.
 - imagej.net page (`imagej/imagej.github.io`, `_pages/plugins/foci-analyzer.md`; BioImaging-NKI can push):
