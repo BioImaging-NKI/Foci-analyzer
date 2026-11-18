@@ -41,9 +41,10 @@ All p-values of a comparison are corrected for multiple testing (Holm).
 
 ## Images, and cells to check
 
-**Images** lists every image with its number of cells and mean foci per cell; click a row to open the
+**Images** lists every image with its number of cells and mean foci per cell (in a time-lapse the cells of
+all frames together: 9 cells in 12 frames count as 108); click a row to open the
 image. **Cells to check** lists cells with a remark in the `check` column of the table, for example a cell
-on the image edge or with saturated foci; click one to see it in the viewer, and remove it from the
+on the image edge or with many saturated foci; click one to see it in the viewer, and remove it from the
 analysis there if needed ([The viewer](viewer.md#removing-cells-from-the-analysis)).
 
 ## Saving

@@ -23,7 +23,7 @@ Intensities are in the grey values of the image. *N*, *A* and *B* stand for chan
 | `chance_chA_with_chB` | the same share when the B foci are placed at random places in the cell: the chance control (*Chance control repeats*) |
 | `manders_chA_in_chB` | Manders coefficient: the share of the foci intensity of A that lies inside B foci |
 | `track`, `parent` | in a tracked time-lapse: the track of the cell, and the track it divided from |
-| `check` | remarks that call for a look: *on edge* (the cell touches the image edge), *saturated foci in channel N* (a focus reaches the highest grey value) |
+| `check` | remarks that call for a look: *on edge* (the cell touches the image edge), *saturated foci in channel N* (more than a tenth of its foci reach the highest grey value) |
 | `path` | the image file (and series) the row belongs to |
 
 Cells removed by hand in the viewer are not in the table.
@@ -35,6 +35,7 @@ Cells removed by hand in the viewer are not in the table.
 | `condition`, `image`, `folder`, `frame` | where the focus comes from |
 | `cell` | the cell it belongs to (the `cell` of cells.tsv) |
 | `channel`, `focus` | its foci channel, and its number in that channel |
+| `track` | in a tracked time-lapse: the track of its cell |
 | `x`, `y`, `z` | its centre (µm; z 0 for foci found on a projection) |
 | `size`, `voxels` | its size (µm³ in 3D, µm² in 2D) and number of pixels or voxels |
 | `mean`, `peak` | its mean and highest intensity |

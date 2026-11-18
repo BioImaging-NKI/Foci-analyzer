@@ -109,13 +109,25 @@ $("quick-folder").onclick = () => quick("folder");
 
 // ---------------------------------------------------------------- settings form
 let changeTimer = 0;
+// The settings as the server checked them, copied into the objects the form controls write into: replacing
+// S.settings would leave the controls writing into the old objects, so later changes were lost.
+function adoptSettings(server) {
+  let redraw = false;
+  for (const [k, v] of Object.entries(server)) {
+    const old = S.settings[k];
+    if (Array.isArray(v) && Array.isArray(old) && old.length === v.length) v.forEach((g, i) => Object.assign(old[i], g));
+    else if (v && typeof v === "object" && !Array.isArray(v) && old && typeof old === "object") Object.assign(old, v);
+    else { S.settings[k] = v; redraw = true; }
+  }
+  if (redraw) renderSettings();
+}
 function settingsChanged(delay = 300) {
   clearTimeout(changeTimer);
   changeTimer = setTimeout(async () => {
     updateChannelColors(); renderOverlays(); syncMode();
     if (V.id && V.preview && $("live").checked) return runPreview();  // the preview request also saves the settings
     try {
-      S.settings = await (await api("/api/settings", { settings: S.settings })).json();
+      adoptSettings(await (await api("/api/settings", { settings: S.settings })).json());
       status(V.id ? "Settings saved · press Analyze this image (A) to see their effect" : "Settings saved");
       refreshAnalyzed();
     }
@@ -278,14 +290,15 @@ async function loadStored() {
   if (!id) return;
   try {
     const r = await (await api("/api/preview", { path: id, t, settings: S.settings, stored: true })).json();
-    if (!r.stored || id !== V.id || t !== V.t || V.preview) return;
+    if (!r.stored || id !== V.id || t !== V.t || V.preview) return false;
     const cand = await Promise.all(r.channels.map(async (ch) =>
       new Float32Array(await (await api(`/api/candidates?path=${encodeURIComponent(id)}&t=${t}&ch=${ch.channel}`)).arrayBuffer())));
     if (id !== V.id || t !== V.t || V.preview) return;
     V.preview = r; V.cand = cand;
     renderCellColor(); syncMode(); syncLayers(); previewInfo();
     status(`From the last run of Analyze all images (same settings) · ${r.cells} cells`);
-  } catch { /* nothing stored: the image waits for Analyze this image */ }
+    return true;
+  } catch { return false; /* nothing stored: the image waits for Analyze this image */ }
 }
 function syncLayers() {
   saveDisplay();
@@ -474,16 +487,23 @@ function liveThreshold(section, index, key, value) {
 // the numbers of a cell in groups: the cell itself, the foci per channel, colocalization, the rest
 function colourGroups(names) {
   const groups = new Map(), add = (g, n, text) => { if (!groups.has(g)) groups.set(g, []); groups.get(g).push([n, text]); };
-  const FOCI = { "": "number of foci", total_intensity: "total intensity", total_size: "total size", mean_size: "mean size", mean_intensity: "mean intensity" };
+  const FOCI = { "": "number of foci", total_intensity: "total foci intensity", total_size: "total foci size", mean_size: "mean focus size", mean_intensity: "mean focus intensity" };
+  const COLOC = [[/^pearson_ch(\d+)_ch(\d+)$/, "Pearson correlation ch$1 – ch$2"], [/^coloc_ch(\d+)_ch(\d+)$/, "colocalizing foci ch$1 – ch$2"],
+    [/^fraction_ch(\d+)_with_ch(\d+)$/, "share of ch$1 foci on a ch$2 focus"], [/^manders_ch(\d+)_in_ch(\d+)$/, "Manders ch$1 in ch$2"],
+    [/^chance_ch(\d+)_with_ch(\d+)$/, "chance level ch$1 on ch$2"]];
+  groups.set("Cell", []);
+  for (const n of names) if ((n.match(/^foci_ch(\d+)/) || [])[1]) groups.set(`Foci in channel ${n.match(/^foci_ch(\d+)/)[1]}`, []);
+  groups.set("Colocalization", []);
   for (const n of names) {
     let m;
+    const co = COLOC.find(([re]) => re.test(n));
     if (n === "area") add("Cell", n, "area");
-    else if ((m = n.match(/^mean_ch(\d+)$/))) add("Cell", n, `mean intensity, channel ${m[1]}`);
-    else if ((m = n.match(/^foci_ch(\d+)_?(.*)$/))) add(`Foci in channel ${m[1]}`, n, FOCI[m[2]] || m[2].replaceAll("_", " "));
-    else if (/^(coloc|fraction|manders|pearson)_/.test(n)) add("Colocalization", n, n.replace(/_ch(\d+)/g, " ch$1").replaceAll("_", " "));
+    else if ((m = n.match(/^mean_ch(\d+)$/))) add("Cell", n, `mean intensity ch${m[1]}`);
+    else if ((m = n.match(/^foci_ch(\d+)_?(.*)$/))) add(`Foci in channel ${m[1]}`, n, `ch${m[1]}: ${FOCI[m[2]] || m[2].replaceAll("_", " ")}`);
+    else if (co) add("Colocalization", n, n.replace(co[0], co[1]));
     else add("Other", n, n.replaceAll("_", " "));
   }
-  return [...groups];
+  return [...groups].filter(([, items]) => items.length);
 }
 function renderCellColor() {
   const p = V.preview, sel = $("cell-color"), keep = sel.value;
@@ -529,7 +549,17 @@ viewer.onclick = (x, y, e) => {
 };
 // several cells at once: Ctrl + click adds or drops one, Shift + drag a box adds those whose centre is in it
 function cellCentres() {
-  const p = V.preview, k = p.binning / p.pixel_size;
+  const p = V.preview, k = p.binning / p.pixel_size, cells = polys("cells");
+  if (cells) {  // the outlines hold every cell, also the removed ones (the table leaves those out)
+    const seen = new Map();
+    for (const q of cells) {
+      if (seen.has(q.id)) continue;
+      let sx = 0, sy = 0; const n = q.pts.length / 2;
+      for (let i = 0; i < q.pts.length; i += 2) { sx += q.pts[i]; sy += q.pts[i + 1]; }
+      seen.set(q.id, [sx / n, sy / n]);
+    }
+    return [...seen];
+  }
   return p.table.cell.map((c, i) => [c, [p.table.x[i] * k + p.border + p.offset[0], p.table.y[i] * k + p.border + p.offset[1]]]);
 }
 function pickCells(list, toggle) {
@@ -625,7 +655,9 @@ function setT(t) {
   t = Math.min(V.info.frames - 1, Math.max(0, t)); if (t === V.t) return;
   const had = !!V.preview;
   V.t = t; $("t").value = t; V.preview = null; V.cand = []; V.sel = 0; V.multi.clear(); renderCellColor(); syncMode(); syncLayers(); previewInfo(); selectCell(0, null);
-  if (had && $("live").checked) runPreview(); else loadStored();
+  // with Live on, a frame of an image that was analyzed in the viewer is analyzed too (unless a batch run has it)
+  if (had && $("live").checked) runPreview();
+  else loadStored().then((ok) => { if (!ok && t === V.t && !V.preview && $("live").checked && viewed[V.id]) runPreview(); });
 }
 $("mode").addEventListener("click", (e) => { if (e.target.dataset.mode) setMode(e.target.dataset.mode); });
 $("z").addEventListener("input", (e) => setZ(+e.target.value));

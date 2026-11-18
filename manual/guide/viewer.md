@@ -15,6 +15,9 @@ resolution that the zoom needs.
   **T** slider (++bracket-left++ and ++bracket-right++) for the time frame, with a play button that steps
   through the frames (four per second, round and round; press it again to stop). In an image without frames
   ++bracket-left++ and ++bracket-right++ step through the slices. The Z slider is dimmed in a projection.
+  Each time frame is analyzed on its own: with **Live** on, a frame you move to is analyzed as soon as the
+  image has been analyzed in the viewer (or it is shown from the last **Analyze all images**); otherwise
+  press **Analyze this image** (++a++) for it.
 - The image list above the viewer chooses the image. A ✓ marks analyzed images: green, in the results
   folder with the current settings; blue, analyzed in the viewer with the current settings; grey, analyzed
   with other settings.
@@ -49,7 +52,7 @@ image with the same channels.
 - **Colour cells by**: fills every cell with a colour for one of its numbers (for example the number of
   foci), from dark blue (lowest) to yellow (highest). The numbers are grouped: *Cell* (area, mean intensity
   per channel), *Foci in channel N* (number of foci, their total and mean intensity and size), and
-  *Colocalization*. Drag the two ends of the slider below the colour
+  *Colocalization* (Pearson correlation, colocalizing foci, shares, Manders coefficients, chance level). Drag the two ends of the slider below the colour
   scale to change its range. *label* gives every cell its own colour, which shows where one cell ends and
   the next begins; useful to judge a 3D segmentation slice by slice.
 

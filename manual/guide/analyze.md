@@ -34,7 +34,7 @@ Some things to know:
   once.
 - **Cell border shift** (*Foci*, Advanced) moves the border within which foci count for a cell: a positive
   value also counts foci just outside it, a negative value leaves out foci near its edge. **Foci in the whole
-  image** lets every focus count for the nearest cell, wherever it is; the shift is then greyed out. The cell
+  image** lets every focus count for the nearest cell, wherever it is; the shift is then greyed out. This also gives cells the foci of a cell that was left out (for example one on the image edge) when they are nearer to them. The cell
   measurements (area, intensities) always use the outline as found.
 - **Foci channels**: **Add** adds a foci channel, **Remove** takes one away. Each foci channel has its own
   colour in the panel and in the viewer.

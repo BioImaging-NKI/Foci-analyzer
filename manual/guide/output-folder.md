@@ -24,8 +24,9 @@ with `read.delim("cells.tsv")` and in Python with `pandas.read_csv("cells.tsv", 
 ## Label images
 
 The label images are in the grid of the analysis: after *XY binning* and without the *Remove border*
-pixels (the pixel size in the file says so). Every cell has its own number, the same as in `cells.tsv`. In
-a tracked time-lapse a cell keeps one number over time: the number of its track. Foci are numbered per
+pixels (the pixel size in the file says so). Every cell has its own number: the `cell` of `cells.tsv`, or, in
+a tracked time-lapse, the number of its track (the `track` of `cells.tsv`), so a cell keeps one number over
+time while `cell` is counted per frame. Foci are numbered per
 frame, as in `foci.tsv`. They open in Fiji and napari.
 
 ## Images for Fiji

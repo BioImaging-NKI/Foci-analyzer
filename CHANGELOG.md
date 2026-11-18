@@ -125,3 +125,8 @@ First working version. There are no earlier results to compare with.
 - Settings page: installing a network no longer asks the other networks for their version while it runs (red
   errors) and hides its messages when it succeeded.
 - Setup: networks taken from your own environment are remembered and shown as such.
+- Fixed: before the first analysis (or with Live off) only the first change of a setting was kept; later
+  changes went into an old copy and were lost. Removed cells can be selected with a Shift box again (to put
+  them back). With Live on, another time frame of an image analyzed in the viewer is analyzed too.
+- *Cells to check*: a cell is flagged for saturated foci only when more than a tenth of its foci are saturated.
+  *Colour cells by*: clearer names, and the channel in every foci entry.
