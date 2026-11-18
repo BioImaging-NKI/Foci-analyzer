@@ -24,7 +24,19 @@ from pathlib import Path
 
 import numpy as np
 
-from . import __version__, batch, config, curation, experiment, export, models, pipeline, stats, updates
+from . import (
+    __version__,
+    batch,
+    build,
+    config,
+    curation,
+    experiment,
+    export,
+    models,
+    pipeline,
+    stats,
+    updates,
+)
 from . import analysis as an
 from .imagestore import ImageStore
 from .stages import StageCache
@@ -60,7 +72,7 @@ class ApiError(Exception):
 
 
 def _wrap16(labels: np.ndarray) -> np.ndarray:
-    """Labels as 16-bit for the viewer (it only needs neighbours to differ)."""
+    """Labels as 16-bit for the viewer (it only needs neighbors to differ)."""
     if labels.max(initial=0) < 65536:
         return labels.astype("<u2")
     return np.where(labels > 0, (labels - 1) % 65535 + 1, 0).astype("<u2")
@@ -191,7 +203,7 @@ class App:
         if busy:
             rows = self._rows
         self._rows = rows
-        return {"version": __version__, "app_python": sys.version.split()[0], "home": str(home()),
+        return {"version": __version__, "build": build(), "app_python": sys.version.split()[0], "home": str(home()),
                 "default_python": models.default_python(), **self.program, "networks": rows, "installed": models.installed(), "gpu_ready": models.gpu_ready(),
                 "can_install": bool(self._installer()), "install": self.install}
 
@@ -338,7 +350,7 @@ class App:
 
     def cancel(self) -> dict:
         """Stop what is being analyzed: before its next stage, and at once when a network is running."""
-        self.cache.cancelled = True
+        self.cache.canceled = True
         if self.progress.running:
             self.progress.stop = True
         models.stop_all()
@@ -461,7 +473,7 @@ class App:
             with self.compute_lock:
                 r = pipeline.analyze_frame(self.cache, key, data, im.info, settings, only_candidates)
         except ValueError as e:
-            raise ApiError("stopped" if self.cache.cancelled else str(e)) from e
+            raise ApiError("stopped" if self.cache.canceled else str(e)) from e
         r.offset = offset
         if not only_candidates:
             with self.lock:
@@ -572,7 +584,7 @@ class App:
     def preview(self, body: dict) -> dict:
         if "settings" in body:
             self.set_settings(body["settings"])
-        self.cache.cancelled = False
+        self.cache.canceled = False
         image_id, t = body.get("path", ""), int(body.get("t", 0))
         if body.get("stored"):  # show what the last batch run found, without analyzing again
             self.image(image_id)
@@ -639,7 +651,7 @@ class App:
 
         cells, foci (of channel `ch`); coloc: only the foci that colocalize with a focus of another channel;
         overlap: 1 where foci of two channels lie on top of each other; value: the cells, numbered 1 to 65535
-        by the measure `col` (lowest to highest), for the colour map; reach: the cells grown by the distance
+        by the measure `col` (lowest to highest), for the color map; reach: the cells grown by the distance
         outside cells.
         """
         if kind == "cells":
@@ -827,14 +839,14 @@ class App:
             zi = z if isinstance(z, int) else None
             H, W = im.info.height, im.info.width
             if o.get("cells"):
-                overlays.append({"labels": export.full_plane(r, r.labels, zi, H, W), "colour": (255, 255, 255)})
+                overlays.append({"labels": export.full_plane(r, r.labels, zi, H, W), "color": (255, 255, 255)})
             for k, ch in enumerate(r.channels):
                 if ch.channel in (o.get("foci") or []) and ch.labels is not None:
                     overlays.append({"labels": export.full_plane(r, ch.labels, zi, H, W),
-                                     "colour": export.OUTLINE[k % len(export.OUTLINE)], "fill": 0.35})
+                                     "color": export.OUTLINE[k % len(export.OUTLINE)], "fill": 0.35})
             if o.get("coloc"):
                 lab = self._overlay_labels(r, "coloc", {})
-                overlays.append({"labels": export.full_plane(r, lab, zi, H, W), "colour": (255, 255, 255), "halo": True})
+                overlays.append({"labels": export.full_plane(r, lab, zi, H, W), "color": (255, 255, 255), "halo": True})
         rgb = export.render_rgb(planes, display, overlays)
         name = export.safe_name(f"{self.entry(image_id).name}" + (f"_t{t + 1}" if im.info.frames > 1 else "")
                                 + ("" if z is None else f"_{z}" if isinstance(z, str) else f"_z{z + 1}"))
@@ -859,23 +871,23 @@ class App:
                 frames[t] = r
         if not frames:
             raise ApiError("analyze the image first (Analyze this image), then save it")
-        colours = [tuple(round(255 * v) for v in c) for c in (body.get("colours") or [])]
-        if len(colours) != im.info.channels:
+        colors = [tuple(round(255 * v) for v in c) for c in (body.get("colors") or [])]
+        if len(colors) != im.info.channels:
             s = self.settings
-            colours = export.default_colours(im.info.channels, s.image.nuclei_channel, s.image.cell_channel,
+            colors = export.default_colours(im.info.channels, s.image.nuclei_channel, s.image.cell_channel,
                                              [f.channel for f in s.foci])
         ranges = body.get("ranges")
         if ranges and len(ranges) == im.info.channels and im.scale != 1.0:
             ranges = [[v / im.scale for v in lohi] for lohi in ranges]
         e = self.entry(image_id)
         path = self.output_folder("images") / f"{export.safe_name(f'{e.condition}_{e.name}')}.zip"
-        n = export.write_imagej(path, im.data, im.info, frames, colours, ranges if ranges and len(ranges) == im.info.channels else None)
+        n = export.write_imagej(path, im.data, im.info, frames, colors, ranges if ranges and len(ranges) == im.info.channels else None)
         return {"path": str(path), "outlines": n, "frames": len(frames), "of": im.info.frames}
 
     def load_settings(self, body: dict) -> dict:
         path = body.get("path") or next(iter(pick("open-settings", self.results.meta.get("folder") or self.results_folder())), "")
         if not path:
-            return {"cancelled": True}
+            return {"canceled": True}
         try:
             s = config.load(Path(path))
         except (OSError, ValueError, TypeError) as e:
@@ -887,7 +899,7 @@ class App:
             self.set_settings(body["settings"])
         path = body.get("path") or next(iter(pick("save-settings", self.results.meta.get("folder") or self.results_folder())), "")
         if not path:
-            return {"cancelled": True}
+            return {"canceled": True}
         config.save(self.settings, Path(path))
         return {"path": path}
 

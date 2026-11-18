@@ -17,7 +17,7 @@ def test_shrink_grow_and_whole_image():
     area = lambda x, i: int((x == i).sum())
     small = an.expand(lab, _cal(), -3)
     assert area(small, 1) < area(lab, 1) and area(small, 2) < area(lab, 2)
-    # shrunk away from the neighbour too: a gap between the two cells
+    # shrunk away from the neighbor too: a gap between the two cells
     assert not small[0, 20, 27:33].any()
     big = an.expand(lab, _cal(), 3)
     assert area(big, 1) > area(lab, 1)

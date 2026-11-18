@@ -65,7 +65,7 @@ function renderImages() {
   $("output").value = S.output || "";
 }
 // green: in the results folder with the current settings (Analyze all images); blue: analyzed in the viewer
-// with the current settings (Analyze this image); grey: analyzed, but with other settings
+// with the current settings (Analyze this image); gray: analyzed, but with other settings
 const viewed = {};  // image id: the settings it was analyzed with in the viewer (this session)
 function analyzedMark(id) {
   if (S.analyzed.ids.includes(id) && S.analyzed.current) return "done";
@@ -233,7 +233,7 @@ function channelColor(c) {
   if (saved) return unhex(saved);
   if (c + 1 === S.settings.image.nuclei_channel) return NUCLEI;
   if (c + 1 === S.settings.image.cell_channel) return CELLS;
-  // the foci channels first, then the rest, each the next colour: no two channels alike while colours last
+  // the foci channels first, then the rest, each the next color: no two channels alike while colors last
   const n = V.info ? V.info.channels : c + 1, special = [S.settings.image.nuclei_channel - 1, S.settings.image.cell_channel - 1];
   const foci = [...new Set(S.settings.foci.map((f) => f.channel - 1))].filter((x) => !special.includes(x));
   const rest = [...Array(n).keys()].filter((x) => !special.includes(x) && !foci.includes(x));
@@ -313,10 +313,10 @@ function syncLayers() {
   viewer.markers = [];
   if (V.preview) {
     const k = V.preview.key, by = $("cell-color").value, smooth = $("smooth").checked; let key;
-    if (by === "label") {  // every cell its own colour: where one cell ends and the next begins
+    if (by === "label") {  // every cell its own color: where one cell ends and the next begins
       key = `l|cells|${z}|${k}`;
       layers.push({ type: "value", key, prevKey: slot("value", key), url: region("/api/overlay?kind=cells"), alpha: 0.5, cat: true, on: true });
-    } else if (by) {  // under the outlines: every cell filled with the colour of one of its numbers
+    } else if (by) {  // under the outlines: every cell filled with the color of one of its numbers
       key = `v|${by}|${z}|${k}`;
       layers.push({ type: "value", key, prevKey: slot("value", key), url: region(`/api/overlay?kind=value&col=${encodeURIComponent(by)}`), alpha: 0.6, range: V.vr, on: true });
     }
@@ -483,7 +483,7 @@ function liveThreshold(section, index, key, value) {
     viewer.requestDraw(); previewInfo();
   }
 }
-// the choice "Colour cells by" and its legend, from the numbers of the analyzed image
+// the choice "Color cells by" and its legend, from the numbers of the analyzed image
 // the numbers of a cell in groups: the cell itself, the foci per channel, colocalization, the rest
 function colourGroups(names) {
   const groups = new Map(), add = (g, n, text) => { if (!groups.has(g)) groups.set(g, []); groups.get(g).push([n, text]); };
@@ -509,7 +509,7 @@ function renderCellColor() {
   const p = V.preview, sel = $("cell-color"), keep = sel.value;
   const names = p && p.table.cell ? Object.keys(p.table).filter((n) => !["cell", "x", "y"].includes(n) && p.table[n].some((v) => typeof v === "number")) : [];
   $("cell-color-wrap").hidden = !names.length; $("coloc-wrap").hidden = !(p && (p.coloc || []).length);
-  sel.replaceChildren(el("option", { value: "", textContent: "nothing" }), el("option", { value: "label", textContent: "label (a colour per cell)" }),
+  sel.replaceChildren(el("option", { value: "", textContent: "nothing" }), el("option", { value: "label", textContent: "label (a color per cell)" }),
     ...colourGroups(names).map(([group, items]) => el("optgroup", { label: group }, items.map(([n, text]) => el("option", { value: n, textContent: text })))));
   sel.value = names.includes(keep) || (keep === "label" && names.length) ? keep : "";
   cellLegend();
@@ -534,7 +534,7 @@ viewer.onclick = (x, y, e) => {
   const p = V.preview, ctrl = !!e && (e.ctrlKey || e.metaKey);
   if (!ctrl) V.multi.clear();
   if (!p || !p.table.cell) { selectCell(0, null); return; }
-  const cells = polys("cells");  // the cell under the click; else the nearest centre
+  const cells = polys("cells");  // the cell under the click; else the nearest center
   let id = 0;
   if (cells) id = (cells.find((poly) => inside(poly, x, y)) || {}).id || 0;
   else {
@@ -547,7 +547,7 @@ viewer.onclick = (x, y, e) => {
   if (ctrl) { if (id) pickCells([[id, [x, y]]], true); return; }
   selectCell(id, id ? [x, y] : null);
 };
-// several cells at once: Ctrl + click adds or drops one, Shift + drag a box adds those whose centre is in it
+// several cells at once: Ctrl + click adds or drops one, Shift + drag a box adds those whose center is in it
 function cellCentres() {
   const p = V.preview, k = p.binning / p.pixel_size, cells = polys("cells");
   if (cells) {  // the outlines hold every cell, also the removed ones (the table leaves those out)
@@ -572,11 +572,11 @@ viewer.onbox = (x0, y0, x1, y1) => {
   if (!V.preview || !V.preview.table.cell) return;
   const cells = polys("cells");
   const hit = cellCentres().filter(([, [x, y]]) => x >= x0 && x <= x1 && y >= y0 && y <= y1)
-    // a point that lies in the cell itself (the centre of a bent cell can lie outside it)
+    // a point that lies in the cell itself (the center of a bent cell can lie outside it)
     .map(([id, pt]) => { const poly = cells && cells.find((q) => q.id === id); return [id, poly && !inside(poly, ...pt) ? pointIn(poly, pt) : pt]; });
-  if (hit.length) pickCells(hit, false); else status("No cell has its centre in the box", true);
+  if (hit.length) pickCells(hit, false); else status("No cell has its center in the box", true);
 };
-function pointIn(poly, [cx, cy]) {  // a point just inside the outline, on the way from a corner to the centre
+function pointIn(poly, [cx, cy]) {  // a point just inside the outline, on the way from a corner to the center
   for (let i = 0; i < poly.pts.length; i += 2) {
     const x = poly.pts[i], y = poly.pts[i + 1], d = Math.hypot(cx - x, cy - y) || 1;
     for (const step of [0.5, 1, 2]) { const px = x + step * (cx - x) / d, py = y + step * (cy - y) / d; if (inside(poly, px, py)) return [px, py]; }
@@ -699,7 +699,7 @@ function renderChannels() {
     return el("div", { class: "channel" },
       el("div", { class: "channel-head" },
         el("input", { type: "checkbox", id: `ch${c}`, checked: ch.on, title: `Show channel ${c + 1} (key ${c + 1})`, onchange: (e) => { ch.on = e.target.checked; syncLayers(); } }),
-        el("input", { type: "color", value: hex(ch.color), title: "Colour of this channel", "aria-label": `Colour of channel ${c + 1}`,
+        el("input", { type: "color", value: hex(ch.color), title: "Color of this channel", "aria-label": `Color of channel ${c + 1}`,
           oninput: (e) => { ch.color = unhex(e.target.value); store("fa.colors", { ...(store("fa.colors") || {}), [c]: e.target.value }); syncLayers(); } }),
         el("label", { htmlFor: `ch${c}`, textContent: `Ch ${c + 1}` }), c < 9 ? el("kbd", { textContent: c + 1 }) : null, values,
         el("button", { textContent: "Auto", title: "Contrast from the image (0.1 to 99.9 percentile)",
@@ -773,8 +773,8 @@ async function saved(what, request, button) {
   if (button) button.disabled = true;
   try {
     const r = await (await request()).json();
-    status(r.cancelled ? "" : `Saved ${what}: ${r.path}`);
-    if (button && !r.cancelled) {
+    status(r.canceled ? "" : `Saved ${what}: ${r.path}`);
+    if (button && !r.canceled) {
       button.classList.add("saved"); button.textContent = "✓ Saved";
       setTimeout(() => { button.classList.remove("saved"); button.textContent = label; }, 1500);
       const file = String(r.path).split(/[\\/]/), sub = file.length > 1 ? file.at(-2) : "";
@@ -788,7 +788,7 @@ async function saved(what, request, button) {
 $("load-settings").onclick = async () => {
   try {
     const r = await (await api("/api/settings/load", {})).json();
-    if (r.cancelled) return;
+    if (r.canceled) return;
     S.settings = r.settings; renderSettings(); updateChannelColors();
     status(`Settings loaded from ${r.path}`);
     if (V.id && V.preview && $("live").checked) runPreview();
@@ -809,12 +809,12 @@ $("save-rgb").onclick = () => {
   const p = V.preview;
   const overlays = p ? { cells: $("show-cells").checked, coloc: $("show-coloc").checked && (p.coloc || []).length > 0,
     foci: $("show-foci").checked ? p.channels.map((c) => c.channel).filter((c) => V.fociOn[c] !== false) : [] } : {};
-  const display = V.ch.map((c) => ({ on: c.on, lo: c.lo, hi: c.hi, colour: c.color.map((v) => Math.round(255 * v)) }));
+  const display = V.ch.map((c) => ({ on: c.on, lo: c.lo, hi: c.hi, color: c.color.map((v) => Math.round(255 * v)) }));
   return saved("the full image", () => api("/api/export/rgb", { path: V.id, t: V.t, z: shownZ(), display, overlays }), $("save-rgb"));
 };
 $("save-imagej").onclick = () => {
   if (!V.info) return status("Choose an image first", true);
-  return saved("the image for Fiji", () => api("/api/export/imagej", { path: V.id, colours: V.ch.map((c) => c.color), ranges: V.ch.map((c) => [c.lo, c.hi]) }), $("save-imagej"));
+  return saved("the image for Fiji", () => api("/api/export/imagej", { path: V.id, colors: V.ch.map((c) => c.color), ranges: V.ch.map((c) => [c.lo, c.hi]) }), $("save-imagej"));
 };
 $("run").onclick = () => run(null);
 $("run-one").onclick = () => { if (V.id) run([V.id]); else status("Choose an image first", true); };
@@ -849,7 +849,8 @@ async function loadProgram(change) {
       el("div", { class: "row" }, el("label", { textContent: "Python of the networks" }), helpIcon("The python.exe of the environment that holds the networks, for example C:/PythonProjects/Cellpose4/Scripts/python.exe. Empty = the environment installed with Foci Analyzer. A conda environment works too (…/envs/name/python.exe). A network can have its own in the table above."),
         el("div", { style: "flex:1" }, general), el("button", { class: "primary", textContent: "Apply", onclick: apply })));
     general.style.width = "100%";
-    $("program-about").replaceChildren(`Foci Analyzer ${p.version} · Python ${p.app_python} · the window keeps its state in ${p.home}`);
+    $("program-about").replaceChildren(el("b", { textContent: `Foci Analyzer ${p.version}` }), p.build ? ` (${p.build})` : "",
+      ` · Python ${p.app_python} · the window keeps its state in ${p.home}`);
     status("");
   } catch (e) { status(e.message, true); }
 }

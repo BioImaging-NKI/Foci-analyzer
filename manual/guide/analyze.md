@@ -22,10 +22,10 @@ Some things to know:
 - **Nuclei channel** and **Cell channel**: with a cell channel (cytoplasm or membrane), whole cells are
   segmented and foci are counted per cell; otherwise per nucleus.
 - **Model**: the pretrained model of the network, from a list. Models of a network that is not installed
-  are greyed out. *Own model…* at the bottom of the list takes a model you trained yourself, with
+  are grayed out. *Own model…* at the bottom of the list takes a model you trained yourself, with
   **Browse…**. The **?** links to the documentation of the models. See [Models](../reference/models.md).
 - **Segment in** `3D` with **Detect foci in** a projection does not fit together (a focus on a projection
-  has no slice); with 3D cells, the projections are greyed out and foci are detected in 3D.
+  has no slice); with 3D cells, the projections are grayed out and foci are detected in 3D.
 - **Threshold** of a foci channel is in units of the noise of the filtered image. The filter makes foci of
   the chosen size stand out; between the foci, the filtered image still goes up and down a little by chance
   (camera noise, uneven staining). The *noise* is the typical size of those random ups and downs inside the
@@ -34,10 +34,10 @@ Some things to know:
   once.
 - **Cell border shift** (*Foci*, Advanced) moves the border within which foci count for a cell: a positive
   value also counts foci just outside it, a negative value leaves out foci near its edge. **Foci in the whole
-  image** lets every focus count for the nearest cell, wherever it is; the shift is then greyed out. This also gives cells the foci of a cell that was left out (for example one on the image edge) when they are nearer to them. The cell
+  image** lets every focus count for the nearest cell, wherever it is; the shift is then grayed out. This also gives cells the foci of a cell that was left out (for example one on the image edge) when they are nearer to them. The cell
   measurements (area, intensities) always use the outline as found.
 - **Foci channels**: **Add** adds a foci channel, **Remove** takes one away. Each foci channel has its own
-  colour in the panel and in the viewer.
+  color in the panel and in the viewer.
 
 The settings are remembered when you close the window.
 

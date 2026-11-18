@@ -35,7 +35,7 @@ def _off_when(f: dict, labels: dict) -> str:
     if not f.get("off_when"):
         return ""
     parts = [f"*{labels.get(k, k)}* is {' or '.join(f'`{_value(v)}`' for v in values)}" for k, values in f["off_when"].items()]
-    return " Greyed out (not used) when " + " and ".join(parts) + "."
+    return " Grayed out (not used) when " + " and ".join(parts) + "."
 
 
 def render() -> str:
@@ -74,7 +74,7 @@ def render_models() -> str:
              "# Models", "",
              ("The pretrained models that the **Model** lists offer, per network. A model needs its network to be "
              "installed (see [The Settings page](../guide/settings-page.md)); models of a network that is not "
-             "installed are greyed out. *Own model…*, at the bottom of every list, takes the folder or file of a "
+             "installed are grayed out. *Own model…*, at the bottom of every list, takes the folder or file of a "
              "model you trained yourself."), ""]
     names = {"stardist": "StarDist", "cellpose": "Cellpose", "instanseg": "InstanSeg", "spotiflow": "Spotiflow"}
     env = {"cellpose": "Cellpose 3", "cellpose4": "Cellpose 4"}

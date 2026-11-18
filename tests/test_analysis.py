@@ -221,7 +221,7 @@ def test_preview_overlays_parts_and_cancel(tmp_path, monkeypatch):
         raw, w, h = app.overlay({"path": image, "kind": kind, "z": "mip", **extra})
         plane = np.frombuffer(raw, "<u2").reshape(h, w)
         assert (w, h) == (160, 128) and plane.any(), kind
-        if kind == "value":  # the cell with 6 foci is the top of the colour scale, the one with 3 the bottom
+        if kind == "value":  # the cell with 6 foci is the top of the color scale, the one with 3 the bottom
             assert set(np.unique(plane)) == {0, 1, 65535}
     cand = np.frombuffer(app.candidates({"path": image, "ch": "2"}), "<f4").reshape(-1, 6)
     assert (cand[:, 5] == 2).sum() == 9  # every focus colocalizes
@@ -248,7 +248,7 @@ def test_preview_overlays_parts_and_cancel(tmp_path, monkeypatch):
     assert app.cancel() == {"stopped": True}
     s["foci"][0]["size"] = 0.7  # something new to compute: it is stopped before it starts
     app.set_settings(s)
-    app.cache.cancelled = True
+    app.cache.canceled = True
     with pytest.raises(ApiError, match="stopped"):
         app.frame(image, 0)
     assert app.preview({"path": image, "settings": s})["cells"] == 2  # a new request clears the stop

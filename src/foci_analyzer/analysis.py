@@ -145,7 +145,7 @@ def filter_labels(labels: np.ndarray, cal: Calibration, min_diameter: float, max
 
 def expand(labels: np.ndarray, cal: Calibration, distance: float) -> np.ndarray:
     """Labels grown by `distance` (in µm or px), or shrunk when it is negative (also away from a touching
-    neighbour); infinite gives every pixel to its nearest object."""
+    neighbor); infinite gives every pixel to its nearest object."""
     if distance == 0 or labels.max() == 0:
         return labels
     d = abs(distance) / cal.pixel_size
@@ -204,7 +204,7 @@ def spot_filter(img: np.ndarray, sigma: tuple[float, float, float], method: str)
     """An image in which foci of the given size stand out and the background is close to zero.
 
     DoG: difference of two Gaussians around the focus size. LoG: Laplacian of Gaussian at the focus size.
-    wavelet: product of two neighbouring à trous wavelet planes, which suppresses noise that is in one
+    wavelet: product of two neighboring à trous wavelet planes, which suppresses noise that is in one
     plane only (Olivo-Marin 2002).
     """
     img = img.astype(np.float32, copy=False)
@@ -237,7 +237,7 @@ def spot_filter(img: np.ndarray, sigma: tuple[float, float, float], method: str)
 
 
 def background(img: np.ndarray, sigma: tuple[float, float, float]) -> np.ndarray:
-    """The image without its foci: a grey opening (in XY) with a window three focus diameters wide."""
+    """The image without its foci: a gray opening (in XY) with a window three focus diameters wide."""
     k = 2 * int(np.ceil(1.5 * FWHM * sigma[1])) + 1
     sm = ndi.gaussian_filter(img.astype(np.float32, copy=False), (0, 0.5 * sigma[1], 0.5 * sigma[1]))
     return ndi.grey_opening(sm, size=(1, k, k))
@@ -338,13 +338,13 @@ def measure_foci(labels: np.ndarray, raw: np.ndarray, bg: np.ndarray, cal: Calib
     w = np.maximum(above, 1e-6)
     wsum = np.bincount(li, weights=w, minlength=n + 1)[1:]
 
-    def centre(c):
+    def center(c):
         return np.bincount(li, weights=c * w, minlength=n + 1)[1:] / np.maximum(wsum, 1e-12)
 
     peak = np.zeros(n + 1)
     np.maximum.at(peak, li, r)
     px = cal.pixel_size
-    return {"x": centre(x) * px, "y": centre(y) * px, "z": centre(z) * (cal.z_spacing if raw.shape[0] > 1 else 0),
+    return {"x": center(x) * px, "y": center(y) * px, "z": center(z) * (cal.z_spacing if raw.shape[0] > 1 else 0),
             "voxels": count, "size": count * cal.voxel(raw.shape[0]),
             "mean": np.bincount(li, weights=r, minlength=n + 1)[1:] / np.maximum(count, 1), "peak": peak[1:],
             "integrated": np.bincount(li, weights=above, minlength=n + 1)[1:]}

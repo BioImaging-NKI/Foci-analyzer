@@ -53,7 +53,7 @@ Proposal: support both; extras by default, an "other Python" path under Advanced
 
 ```
 Experiment
- ├─ conditions[]          name, colour, folders[], file pattern, replicate rule
+ ├─ conditions[]          name, color, folders[], file pattern, replicate rule
  ├─ images[]              path, series, condition, replicate, status, per-image overrides
  ├─ settings              one Settings object for the whole experiment (§4)
  └─ results/              per image: labels, foci tables, QC; experiment tables
@@ -135,7 +135,7 @@ Points where I would deviate from the macro, with the reason:
 
 1. **Filter in physical units.** A difference of Gaussians with σ from the foci size in µm; in Z the σ follows
    from the Z spacing and a fixed axial elongation (default 3×), not from an empirical square root.
-2. **Background without the outlier filter.** The wide Gaussian is taken from a foci-suppressed image (grey
+2. **Background without the outlier filter.** The wide Gaussian is taken from a foci-suppressed image (gray
    opening with a radius of about one foci diameter, on a down-sampled copy for speed). Same intent as
    "remove outliers", fewer halos around bright foci, no dependence on integer rounding.
 3. **Threshold in noise units of the filtered image.** The macro measures the SD in the raw image and applies it
@@ -162,7 +162,7 @@ Points where I would deviate from the macro, with the reason:
 For every pair of foci channels (not only A and B):
 - **Object overlap**: a focus colocalizes when its overlap with a focus of the other channel is ≥ n voxels or
   ≥ a fraction of its own size. Per focus: partner id and overlap fraction.
-- **Centroid distance**: nearest neighbour in the other channel within d µm (anisotropy included); works for
+- **Centroid distance**: nearest neighbor in the other channel within d µm (anisotropy included); works for
   Spotiflow points.
 - **Per cell**: count and fraction colocalized for both directions, Manders M1/M2 on the foci masks
   (intensity-weighted), Pearson inside the cell as an extra.
@@ -198,7 +198,7 @@ Server
 - Large images: planes read lazily from the file and levels cached on disk.
 
 Browser
-- WebGL2: one texture per channel and tile, a fragment shader applies min/max, colour and additive mixing.
+- WebGL2: one texture per channel and tile, a fragment shader applies min/max, color and additive mixing.
 - Zoom glides to its target (exponential approach, as in FAST-HIPPOS); the coarser level stays on screen until
   the finer tiles have arrived.
 - Slice / max-projection switch; in projection mode the foci of all slices are shown, in slice mode the foci
@@ -355,7 +355,7 @@ Later that night: the repository moved to `BioImaging-NKI/Foci-analyzer` (privat
 `BioImaging-NKI/Foci-analyzer-Fiji`; imagej.net links to `.../Foci-analyzer/tree/main/QuPath`, which must become
 `Foci-analyzer-Fiji`). Window: Z/T sliders under the viewer with play, Ctrl/Alt + wheel, several cells removed at
 once (Ctrl + click, Shift + box), Cell border shift (negative shrinks) with *Foci in the whole image*, Save images
-feedback, grouped Colour cells by, progress bar that fills before it empties, starting page fixed (it reloaded
+feedback, grouped Color cells by, progress bar that fills before it empties, starting page fixed (it reloaded
 itself every 0.4 s). Synthetic time-lapse with Z in `TestData/Synthetic time-lapse` (12 frames, 5 slices).
 
 Auto-estimate of foci size and threshold, tried and left out: the size from the half-maximum width of the
@@ -365,7 +365,7 @@ count ranged from 2.4 to 16.5 × noise over the test images, and the estimate wa
 
 Updates from GitHub (`updates.py`, `install.py --update`; tested end to end with a fake release on a test
 installation: the tab followed the update and reloaded into the new version). Setup: existing installation
-page (update/add networks, remove), installed networks greyed and ticked, folder page skipped on update; the
+page (update/add networks, remove), installed networks grayed and ticked, folder page skipped on update; the
 window no longer freezes during the installation (own wait loop with PeekMessage instead of a waiting Exec,
 which disables the wizard). Conda environments tested with StarDist in a miniforge environment (needs the
 PATH of `env_for`; without it TensorFlow's process stops). Open: where the repository lives (proposal:
@@ -384,11 +384,11 @@ Done after the morning list: foci size below a pixel no longer fails (IndexError
 Experiment page stays put after opening images and updates its list by itself; ✓ marks for images in the
 results folder (green: current settings); the run box says it writes to the results folder; the status bar
 has a fixed progress bar that only moves forward; smooth outlines (marching squares, `/api/contours`), cell
-numbers, colour cells by label, a range slider for the colour scale, the selected cell in yellow, removed
-cells in red, a grey line at the distance outside cells; removing cells by hand (key X); model dropdowns per
+numbers, color cells by label, a range slider for the color scale, the selected cell in yellow, removed
+cells in red, a gray line at the distance outside cells; removing cells by hand (key X); model dropdowns per
 network with links in the help, own model with Browse; Cellpose 4 environment; threshold segmentation
 slider (× Otsu); foci no longer grow outside their cell (results change a little: extents are clipped at the
-cell edge in 2D as well); 3D cells force 3D foci detection (projections greyed out); Settings page: Install
+cell edge in 2D as well); 3D cells force 3D foci detection (projections grayed out); Settings page: Install
 buttons per network (install.py `--networks-only`), GPU on/off, images at a time.
 
 ### State on 2026-11-17 (for continuing elsewhere)

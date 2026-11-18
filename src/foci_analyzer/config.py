@@ -20,7 +20,7 @@ def opt(default: Any, label: str, help: str = "", *, advanced: bool = False, cho
     """A setting with what the window needs to show it. `help` is the context help (the ? in the form).
 
     `when` names settings of the same group and the values for which this one is shown; `off_when` those for
-    which it is shown but greyed out (not used). `catalog`: a model
+    which it is shown but grayed out (not used). `catalog`: a model
     name, chosen from the pretrained models of the network (models.CATALOG) or a model of your own.
     """
     meta = {"label": label, "help": help, "advanced": advanced, "choices": choices, "min": min, "max": max,
@@ -68,7 +68,7 @@ class SegmentationSettings:
                                  "edge has an incomplete foci count.", advanced=True)
     model: str = opt("", "Model", "The pretrained model of the network, or a model of your own (the last choice). "
                      "Cellpose 3 and Cellpose 4 models run in environments of their own; models of a network that is "
-                     "not installed are greyed out (install it on the Settings page).", catalog=True,
+                     "not installed are grayed out (install it on the Settings page).", catalog=True,
                      when={"method": ["cellpose", "instanseg", "stardist"]})
     diameter: float = opt(0.0, "Expected diameter", "The typical diameter of the nuclei or cells. 0 = automatic: Cellpose "
                           "estimates it; StarDist is given the image at 0.25 µm per pixel and, when the nuclei then "
@@ -156,13 +156,13 @@ class ColocalizationSettings:
     enabled: bool = opt(True, "Colocalize foci channels", "Used when there are two or more foci channels; "
                         "every pair of channels is compared.")
     method: str = opt("overlap", "Method", "overlap: two foci colocalize when they share voxels. centroid "
-                      "distance: when their centres are closer than the largest distance.",
+                      "distance: when their centers are closer than the largest distance.",
                       choices=["overlap", "centroid distance"])
     min_overlap: int = opt(1, "Smallest overlap", advanced=True, min=1, unit="voxels", when={"method": ["overlap"]})
     max_distance: float = opt(0.3, "Largest distance", advanced=True, min=0, step=0.05, unit="µm", when={"method": ["centroid distance"]})
     chance_repeats: int = opt(10, "Chance control repeats", "The colocalization expected by chance: the foci of "
                               "the second channel are placed at random positions in the cell this many times "
-                              "(0 = off). The Results page shows it in grey next to the measured colocalization.", advanced=True, min=0)
+                              "(0 = off). The Results page shows it in gray next to the measured colocalization.", advanced=True, min=0)
 
 
 @dataclass

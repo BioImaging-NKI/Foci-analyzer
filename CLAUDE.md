@@ -90,7 +90,7 @@ reproduce the Fiji results. Design, state per milestone and open items: `plan.md
 - Inspiration (same author, both readable with `gh`; Microirradiation is private):
   Jalink-lab/FAST-HIPPOS-Python and Jalink-lab/Microirradiation-recruitment-analysis.
 - gh CLI: `"C:/Program Files/GitHub CLI/gh.exe"` (not on PATH in Git Bash).
-- Organization default: metric units.
+- Organization default: metric units. American spelling (color, gray, center, canceled) in code, window and manual.
 - Test data: `TestData/` (channels as far as known): `3-channel` and `1-channel`
   (nuclei 1, foci 2 and 3), `Hi-res 3D` (no nuclear stain; nuclei from channel 2), `Deconvolved with
   cytoplasm` (float32, no Z spacing), `Multi-series` (LIF, 5 series), `Organoid` (CZI stack),

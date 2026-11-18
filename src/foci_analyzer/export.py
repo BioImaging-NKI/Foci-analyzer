@@ -33,7 +33,7 @@ def safe_name(text: str) -> str:
 
 
 def default_colours(n_channels: int, nuclei: int, cell: int, foci: list[int]) -> list[tuple[int, int, int]]:
-    """The channel colours of the viewer when the user did not choose any."""
+    """The channel colors of the viewer when the user did not choose any."""
     special = [nuclei - 1, cell - 1]
     order = [c - 1 for c in dict.fromkeys(foci) if c - 1 not in special]
     order += [c for c in range(n_channels) if c not in special and c not in order]
@@ -156,8 +156,8 @@ def edges(lab: np.ndarray) -> np.ndarray:
 
 
 def render_rgb(planes: list[np.ndarray], display: list[dict], overlays: list[dict]) -> np.ndarray:
-    """An RGB picture (uint8) as the viewer shows it: channels added in their colours with their contrast,
-    then overlays: {"labels", "colour": (r, g, b), "fill": 0..1, "outline": True, "halo": False}."""
+    """An RGB picture (uint8) as the viewer shows it: channels added in their colors with their contrast,
+    then overlays: {"labels", "color": (r, g, b), "fill": 0..1, "outline": True, "halo": False}."""
     h, w = planes[0].shape
     rgb = np.zeros((h, w, 3), np.float32)
     for plane, d in zip(planes, display, strict=True):
@@ -165,25 +165,25 @@ def render_rgb(planes: list[np.ndarray], display: list[dict], overlays: list[dic
             continue
         lo, hi = float(d["lo"]), float(d["hi"])
         v = np.clip((plane.astype(np.float32) - lo) / max(hi - lo, 1.0), 0, 1)
-        rgb += v[..., None] * (np.asarray(d["colour"], np.float32) / 255)
+        rgb += v[..., None] * (np.asarray(d["color"], np.float32) / 255)
     rgb = np.clip(rgb, 0, 1)
     for o in overlays:
-        lab, colour = o["labels"], np.asarray(o["colour"], np.float32) / 255
+        lab, color = o["labels"], np.asarray(o["color"], np.float32) / 255
         if o.get("fill"):
             m = lab > 0
-            rgb[m] = rgb[m] * (1 - o["fill"]) + colour * o["fill"]
+            rgb[m] = rgb[m] * (1 - o["fill"]) + color * o["fill"]
         if o.get("outline", True):
             e = edges(lab)
-            if o.get("halo"):  # a dark edge around the line, so it shows on any colour
+            if o.get("halo"):  # a dark edge around the line, so it shows on any color
                 halo = ndi.binary_dilation(e, iterations=1) & ~e
                 rgb[halo] = 0
-            rgb[e] = colour
+            rgb[e] = color
     return (rgb * 255 + 0.5).astype(np.uint8)
 
 
 # ---------------------------------------------------------------- ImageJ TIFF with overlays
 def _contours(lab2d: np.ndarray, ids: np.ndarray | None = None):
-    """Per label: the longest outline as (n, 2) x, y points in pixel centres of this plane."""
+    """Per label: the longest outline as (n, 2) x, y points in pixel centers of this plane."""
     for i, sl in enumerate(ndi.find_objects(lab2d), start=1):
         if sl is None or (ids is not None and i not in ids):
             continue
@@ -196,7 +196,7 @@ def _contours(lab2d: np.ndarray, ids: np.ndarray | None = None):
 
 
 def frame_rois(r: FrameResult, t: int, frames: int, slices: int, colocalizing: dict | None = None) -> list:
-    """ImageJ overlay outlines of one frame: the cells (white) and the foci per channel (their colour).
+    """ImageJ overlay outlines of one frame: the cells (white) and the foci per channel (their color).
 
     2D labels (2D segmentation, or foci found on a projection) are shown in every slice; 3D labels slice by
     slice. Positions are 1-based; 0 means all.
@@ -207,14 +207,14 @@ def frame_rois(r: FrameResult, t: int, frames: int, slices: int, colocalizing: d
     out = []
     tpos = t + 1 if frames > 1 else 0
 
-    def add(lab, name, colour):
+    def add(lab, name, color):
         for z in range(lab.shape[0]):
             zpos = z + 1 if lab.shape[0] > 1 and slices > 1 else 0
             for i, pts in _contours(lab[z]):
                 pts = (pts + 0.5) * r.binning + r.border + np.asarray(r.offset)  # to image pixels (corners)
                 roi = ImagejRoi.frompoints(pts, name=name(i))
                 roi.position, roi.c_position, roi.z_position, roi.t_position = 0, 0, zpos, tpos  # 0 = all
-                roi.stroke_color = bytes((255, *colour))  # no ROI group: ImageJ would colour by group instead
+                roi.stroke_color = bytes((255, *color))  # no ROI group: ImageJ would color by group instead
                 roi.options &= no_labels  # no number or name drawn at every outline
                 out.append(roi)
 
@@ -239,9 +239,9 @@ def colocalizing_foci(r: FrameResult) -> dict[int, set]:
     return out
 
 
-def write_imagej(path: Path, data: np.ndarray, info, frames: dict[int, FrameResult], colours: list, ranges=None) -> int:
+def write_imagej(path: Path, data: np.ndarray, info, frames: dict[int, FrameResult], colors: list, ranges=None) -> int:
     """The image (T, C, Z, Y, X) as an ImageJ hyperstack TIFF with the outlines of the analysis as overlay
-    (only for the frames in `frames`) and the channel colours. Returns the number of outlines.
+    (only for the frames in `frames`) and the channel colors. Returns the number of outlines.
 
     The TIFF itself is not compressed: ImageJ and Fiji drop the overlay of a compressed TIFF. With a `.zip`
     path it goes into a zip file (deflate) instead, which Fiji opens directly with the overlay, at about a
@@ -255,7 +255,7 @@ def write_imagej(path: Path, data: np.ndarray, info, frames: dict[int, FrameResu
     if stack.dtype not in (np.uint8, np.uint16, np.float32):
         stack = stack.astype(np.float32)
     luts = []
-    for col in colours:
+    for col in colors:
         ramp = np.arange(256, dtype=np.float64) / 255
         luts.append(np.stack([(ramp * c).astype(np.uint8) for c in col]))
     meta = {"axes": "TZCYX", "mode": "composite", "LUTs": luts, "unit": "micron" if info.unit == "µm" else info.unit}

@@ -2,11 +2,27 @@
 
 Every entry says whether results change.
 
-## 0.1.0 (in development)
+## 2.0.0b1 (2026-11-19)
 
-First working version. There are no earlier results to compare with.
+The first public version of Foci Analyzer in Python, the successor of the Fiji macro (1.x, now in
+[Foci-analyzer-Fiji](https://github.com/BioImaging-NKI/Foci-analyzer-Fiji)). A beta: please report problems.
+It does not reproduce the Fiji results exactly; it has its own methods.
 
-- Viewer: WebGL, tiles per pyramid level, smooth zoom, slice or max projection, contrast and colour per
+- A window in the browser on your own computer: experiments with conditions, a live preview of the analysis
+  in a viewer for large 2D and 3D images and time-lapses, and a Results page with graphs and statistics.
+- Nuclei and cells with StarDist, Cellpose 3 or 4, InstanSeg, a threshold, or labels from file; 2D or 3D.
+- Foci with a seeded watershed on a filtered image (threshold in units of the image noise) or Spotiflow;
+  colocalization between foci channels with a chance control; tracking of cells in time-lapses.
+- Cells can be removed from the analysis by hand; tables, label images and images for Fiji with overlays.
+- Reads TIFF, CZI and LIF. Installers for Windows (setup.exe), macOS and Linux, with the neural networks of
+  your choice; updates from within the program.
+- Manual: https://bioimaging-nki.github.io/Foci-analyzer/
+
+## Development before 2.0.0b1
+
+First working version (0.1.0 in development). There are no earlier results to compare with.
+
+- Viewer: WebGL, tiles per pyramid level, smooth zoom, slice or max projection, contrast and color per
   channel, outlines of cells and foci, markers that follow the threshold slider.
 - Nuclei and cells: Cellpose, InstanSeg, StarDist, threshold, or labels from file; 2D or 3D.
 - Foci: seeded watershed on a DoG, LoG or wavelet filtered image, or Spotiflow; extent at half maximum;
@@ -28,8 +44,8 @@ First working version. There are no earlier results to compare with.
   Python; `Python of the models` moved there and can differ per network.
 - Colocalization: a map in the viewer (white outline = colocalizing focus, white fill = overlap; key O),
   the share per pair of channels next to the image, and a Colocalization graph on the Results page with the
-  chance control in grey. The chance control is now on by default (10 repeats) and in both directions: the
-  cell table gets `chance_...` columns. `Colour cells by` fills the cells with a colour for any of their numbers.
+  chance control in gray. The chance control is now on by default (10 repeats) and in both directions: the
+  cell table gets `chance_...` columns. `Color cells by` fills the cells with a color for any of their numbers.
 - Large images (from 6 megapixels): `Visible part only` analyzes just what the viewer shows; a dashed frame
   marks that part. `Analyze all images` always uses whole images.
 - StarDist is the default segmentation (it found the nuclei in all test sets and is the fastest). StarDist
@@ -50,11 +66,11 @@ First working version. There are no earlier results to compare with.
   `installer/check.py` checks an installation. Results do not change.
 - Foci no longer extend outside their cell (or outside the distance outside cells); in 3D this removed foci
   pixels above and below the cells. **Results change a little**: foci at a cell edge are a bit smaller.
-- Cells segmented in 3D: foci are detected in 3D too (projections are greyed out); before, a projection
+- Cells segmented in 3D: foci are detected in 3D too (projections are grayed out); before, a projection
   could put foci where no cell is in that slice.
 - A foci size smaller than a pixel no longer stops the analysis (IndexError).
-- Smooth outlines, cell numbers, colour cells by label, an adjustable range for the colour scale, the
-  selected cell highlighted, the distance outside cells as a grey line.
+- Smooth outlines, cell numbers, color cells by label, an adjustable range for the color scale, the
+  selected cell highlighted, the distance outside cells as a gray line.
 - Cells can be removed from the analysis by hand (key X); remembered in `removed_cells.tsv` in the results
   folder as points, so they stay out after a new analysis.
 - Models chosen from a list per network (Cellpose 3: nuclei, cyto3, tissuenet_cp3; Cellpose 4: cpsam_v2,
@@ -72,13 +88,13 @@ First working version. There are no earlier results to compare with.
 - Fixed: the dashed line at the distance outside cells was drawn around one group of cells only.
 - Images analyzed in the viewer get a blue ✓; the progress bar sits left in the status bar.
 - Fixed: an own Cellpose 4 environment given for Cellpose was reported as not installed, and its models
-  greyed out. The automatic Cellpose model works with Cellpose 3 and 4.
+  grayed out. The automatic Cellpose model works with Cellpose 3 and 4.
 - Windows: `Foci Analyzer.exe` in the installation folder, with the logo as icon (also for the shortcuts);
   Linux: the icon is also put in the icon theme.
 - **Files named** matches with or without the extension (`*.tif` found nothing before).
 - A user manual (`manual/`, not online yet).
 - Logo in the window, the browser tab, the setup and the shortcuts.
-- Colocalization map: a white line with a black edge, and overlap hatched black and white, visible on any colour.
+- Colocalization map: a white line with a black edge, and overlap hatched black and white, visible on any color.
 - After `Analyze all images` the viewer shows the stored result of an image at once (same settings), also
   when it is opened from the Results page; contrast and channels shown stay when another image is opened.
 - `Load settings…` and `Save settings…` (a results folder's settings.toml can be loaded too).
@@ -119,7 +135,7 @@ First working version. There are no earlier results to compare with.
 - Viewer: the Z and T sliders are under the image, with a play button for time-lapses; Ctrl + wheel steps
   through Z, Alt + wheel through time. An image opened while the Analyze page was hidden no longer stays black.
 - Overlays *Foci outlines* and *Foci markers* (were Foci and Markers); *Save images* with View, Full image and
-  For Fiji, a green tick and Show in folder; *Colour cells by* in groups; the Threshold help explains the noise.
+  For Fiji, a green tick and Show in folder; *Color cells by* in groups; the Threshold help explains the noise.
 - The progress bar fills up when a task ends and then empties at once (it slid back); it no longer jumps back
   during an analysis. The starting page no longer reloads itself all the time (the logo blinked).
 - Settings page: installing a network no longer asks the other networks for their version while it runs (red
@@ -128,5 +144,5 @@ First working version. There are no earlier results to compare with.
 - Fixed: before the first analysis (or with Live off) only the first change of a setting was kept; later
   changes went into an old copy and were lost. Removed cells can be selected with a Shift box again (to put
   them back). With Live on, another time frame of an image analyzed in the viewer is analyzed too.
-- *Cells to check*: a cell is flagged for saturated foci only when more than a tenth of its foci are saturated.
-  *Colour cells by*: clearer names, and the channel in every foci entry.
+- *Cells to check*: a cell is flagged for saturated foci only when more than a fifth of its foci are saturated.
+  *Color cells by*: clearer names, and the channel in every foci entry.

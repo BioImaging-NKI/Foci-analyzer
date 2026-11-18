@@ -70,7 +70,7 @@ print(c.groupby("image").size().to_dict(), c.groupby("image")[["foci_ch2", "foci
 | `analyze.png` | the whole Analyze page after **Analyze this image** on foci_1 |
 | `analyze_empty.png` | the viewer with foci_1 before analysis (not used in a page yet) |
 | `settings_panel.png`, `display_panel.png` | the left and right panels of the Analyze page |
-| `viewer_cells.png` | zoomed in on the largest nucleus (selected, yellow), its nearest neighbour removed (red), Numbers and Smooth outlines on |
+| `viewer_cells.png` | zoomed in on the largest nucleus (selected, yellow), its nearest neighbor removed (red), Numbers and Smooth outlines on |
 | `selected_cell.png` | the Selected cell section of that nucleus |
 | `results.png` | the Results page after **Analyze all images** |
 | `settings_page.png` | the Settings page (lists this computer's graphics card and paths) |

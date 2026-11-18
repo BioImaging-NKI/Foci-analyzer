@@ -1,5 +1,5 @@
 // The image viewer: WebGL2, tiles from a pyramid, channels composed in the shader (plan.md, section 6).
-// Layers are images (16-bit tiles, contrast and colour applied in the shader, so they change without a
+// Layers are images (16-bit tiles, contrast and color applied in the shader, so they change without a
 // request) and label images (drawn as outlines). Markers and the scale bar are drawn on a 2D canvas on top.
 
 const TILE = 512, MAX_TILES = 320, MAX_REQUESTS = 6;
@@ -23,7 +23,7 @@ void main() {
   bool edge = texture(tex, uv + vec2(d.x, 0.0)).r != c || texture(tex, uv - vec2(d.x, 0.0)).r != c
            || texture(tex, uv + vec2(0.0, d.y)).r != c || texture(tex, uv - vec2(0.0, d.y)).r != c;
   if (!edge && fill <= 0.0) discard;
-  if (!edge && hatch > 0.0) {  // black and white stripes: visible on any colour
+  if (!edge && hatch > 0.0) {  // black and white stripes: visible on any color
     float s = mod(floor((gl_FragCoord.x + gl_FragCoord.y) / hatch), 2.0);
     o = vec4(vec3(s), fill);
     return;
@@ -31,8 +31,8 @@ void main() {
   o = edge ? color : vec4(color.rgb, color.a * fill);  // the inside lightly filled, the outline solid
 }`;
 
-// cells coloured by a measure: values 1..65535 through a colour map (dark blue, teal, yellow), stretched
-// between `vrange` (0..1 of the values); or, with `cat`, every label its own colour (neighbours differ)
+// cells colored by a measure: values 1..65535 through a color map (dark blue, teal, yellow), stretched
+// between `vrange` (0..1 of the values); or, with `cat`, every label its own color (neighbors differ)
 const FS_VALUE = `#version 300 es
 precision highp float; precision highp usampler2D;
 uniform usampler2D tex; uniform float alpha; uniform vec2 vrange; uniform float cat; in vec2 uv; out vec4 o;

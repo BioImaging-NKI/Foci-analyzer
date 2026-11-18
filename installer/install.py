@@ -283,9 +283,9 @@ def branded_launcher(src: Path, dst: Path, ico: Path) -> bool:
             raise OSError(ctypes.get_last_error())
         group = struct.pack("<HHH", 0, 1, count)
         for i in range(count):
-            w, hh, colours, res, planes, bits, size, offset = struct.unpack_from("<BBBBHHII", icon, 6 + 16 * i)
+            w, hh, colors, res, planes, bits, size, offset = struct.unpack_from("<BBBBHHII", icon, 6 + 16 * i)
             k32.UpdateResourceW(h, 3, 100 + i, 0, icon[offset:offset + size], size)  # RT_ICON
-            group += struct.pack("<BBBBHHIH", w, hh, colours, res, planes, bits, size, 100 + i)
+            group += struct.pack("<BBBBHHIH", w, hh, colors, res, planes, bits, size, 100 + i)
         for name in (1, 101):  # the group icon that Windows shows: the first one, by number
             k32.UpdateResourceW(h, 14, name, 0, group, len(group))  # RT_GROUP_ICON
         if not k32.EndUpdateResourceW(h, False):
@@ -559,8 +559,10 @@ def main(argv: list[str] | None = None) -> None:
         if (target / ".venv").exists() and not healthy(target / ".venv"):
             say("Removing the incomplete program environment")
             shutil.rmtree(target / ".venv", ignore_errors=True)
+        # the program itself is always built again: uv keeps a built package of the same version number, so a
+        # newer copy with an unchanged version (a development version) was not installed
         run(args.uv, "sync", "--project", str(source), "--no-dev", "--frozen", "--no-editable", "--python", "3.12",
-            env={**env, "UV_PROJECT_ENVIRONMENT": str(target / ".venv")})
+            "--reinstall-package", "foci-analyzer", env={**env, "UV_PROJECT_ENVIRONMENT": str(target / ".venv")})
     index = [] if MAC else ["--index-url", "https://download.pytorch.org/whl/" + ("cu124" if gpu else "cpu"),
                             "--extra-index-url", "https://pypi.org/simple", "--index-strategy", "unsafe-best-match"]
 

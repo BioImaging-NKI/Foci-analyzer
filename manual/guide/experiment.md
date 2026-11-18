@@ -40,7 +40,7 @@ the list (for example *DKO-2-11_0hR_Olap · Series008*). They are analyzed as se
 
 One row per image, with its condition and folder. A green ✓ means that **Analyze all images** analyzed
 the image with the current settings, so its result is in the results folder; a blue ✓ that it was
-analyzed in the viewer (**Analyze this image**) with the current settings, which writes nothing; a grey ✓
+analyzed in the viewer (**Analyze this image**) with the current settings, which writes nothing; a gray ✓
 that it was analyzed with other settings. Click a row to open the image on the Analyze page.
 
 ## Results folder

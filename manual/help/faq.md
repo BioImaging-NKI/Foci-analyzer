@@ -22,7 +22,7 @@ use the graphics card is a hundred times slower there).
 - Try another method or model: StarDist is robust for nuclei; Cellpose and InstanSeg for cells and tissue.
 - *Smallest diameter* and *Largest diameter* remove objects outside that range: check that your nuclei fit.
 - For Cellpose, give the *Expected diameter* (under **Advanced**) when the automatic one is off.
-- Use **Colour cells by** *label* to see where one object ends and the next begins.
+- Use **Color cells by** *label* to see where one object ends and the next begins.
 - Single wrong nuclei can be [removed from the analysis](../guide/viewer.md#removing-cells-from-the-analysis).
 
 ## Too many or too few foci

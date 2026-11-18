@@ -27,7 +27,7 @@ The nuclei channel, or the cell channel when one is set, is segmented:
 
 *Segment in* `2D` segments the maximum projection; the outlines hold for every slice. `3D` segments the
 stack: Cellpose in real 3D for stacks of 20 slices or more; on thinner stacks, and always with StarDist and
-InstanSeg, every slice is segmented and objects in neighbouring slices are linked when they overlap by at
+InstanSeg, every slice is segmented and objects in neighboring slices are linked when they overlap by at
 least half of the smaller one ("2.5D").
 
 Objects smaller than *Smallest diameter* or larger than *Largest diameter* (diameter of a circle with the
@@ -40,7 +40,7 @@ of focus, which takes every pixel from the slice where it is sharpest):
 
 1. **Filter.** The image is filtered at the *Foci size* (taken as the full width at half maximum of a
    focus; in Z times the *Axial elongation*): *DoG*, the difference of two Gaussians around that size;
-   *LoG*, the Laplacian of Gaussian; or *wavelet*, the product of two neighbouring à trous wavelet planes
+   *LoG*, the Laplacian of Gaussian; or *wavelet*, the product of two neighboring à trous wavelet planes
    (Olivo-Marin, 2002). Spots of about the foci size stand out; smooth background disappears.
 2. **Noise.** The noise is 1.4826 × the median absolute deviation of the filtered values inside the cells:
    a robust standard deviation that the foci themselves hardly affect. It is the typical size of the random
@@ -62,12 +62,12 @@ With **spotiflow**, the network Spotiflow finds the spots and gives each a proba
 model on a stack finds the spots in the maximum projection and takes the slice of the brightest value.
 
 Each focus is measured: position, size, mean and peak intensity, and the intensity summed above the local
-background (the image without its foci: a grey-value opening with a window three focus diameters wide).
+background (the image without its foci: a gray-value opening with a window three focus diameters wide).
 
 ## 4. Colocalization
 
 For every pair of foci channels, a focus of channel A colocalizes with channel B when it shares at least
-*Smallest overlap* voxels with a B focus (`overlap`), or when the centres are closer than *Largest
+*Smallest overlap* voxels with a B focus (`overlap`), or when the centers are closer than *Largest
 distance* (`centroid distance`). Per cell this gives the number and share of colocalizing foci.
 
 The **chance control** places the B foci at random positions inside the same cell, *Chance control

@@ -276,10 +276,10 @@ def _tables(data, base, labels, n, cal, channels: list[ChannelResult], s: Settin
         cells[f"foci_ch{c}_mean_size"] = np.where(cnt > 0, cells[f"foci_ch{c}_total_size"] / np.maximum(cnt, 1), np.nan)
         cells[f"foci_ch{c}_mean_intensity"] = np.where(cnt > 0, cells[f"foci_ch{c}_total_intensity"] / np.maximum(cnt, 1), np.nan)
         if top is not None and len(t["peak"]):
-            # a cell is worth a look when more than a tenth of its foci are saturated (8-bit images often have
+            # a cell is worth a look when more than a fifth of its foci are saturated (8-bit images often have
             # a few saturated foci in almost every cell; flagging those all made the list useless)
             n_sat = np.bincount(t["cell"][t["peak"] >= top], minlength=n + 1)
-            sat = n_sat > 0.1 * np.maximum(np.bincount(t["cell"], minlength=n + 1), 1)
+            sat = n_sat > 0.2 * np.maximum(np.bincount(t["cell"], minlength=n + 1), 1)
             for i in np.flatnonzero(sat[1:]):
                 flags[i].append(f"saturated foci in channel {c}")
         df = pd.DataFrame({"cell": t["cell"], "channel": c, "focus": np.arange(1, len(t["cell"]) + 1)})

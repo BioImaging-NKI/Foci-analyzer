@@ -23,11 +23,11 @@ def nuclei_image() -> tuple[np.ndarray, list]:
     rng = np.random.default_rng(1)
     y, x = np.mgrid[:512, :512]
     img = np.zeros((512, 512), np.float32)
-    centres = [(64 + 128 * (i % 4), 85 + 170 * (i // 4)) for i in range(12)]
-    for cx, cy in centres:
+    centers = [(64 + 128 * (i % 4), 85 + 170 * (i // 4)) for i in range(12)]
+    for cx, cy in centers:
         img += 900 * (((x - cx) / 22) ** 2 + ((y - cy) / 19) ** 2 < 1)
     spots = img * 0
-    for cx, cy in centres:
+    for cx, cy in centers:
         for _ in range(5):
             sx, sy = cx + rng.integers(-12, 12), cy + rng.integers(-10, 10)
             spots += 1500 * np.exp(-((x - sx) ** 2 + (y - sy) ** 2) / (2 * 1.3**2))

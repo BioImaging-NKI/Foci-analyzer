@@ -3,6 +3,7 @@
 # Not published yet: it goes on GitHub Pages after the repository has moved to BioImaging-NKI.
 site_name: Foci Analyzer manual
 site_description: User manual of Foci Analyzer, detection and quantification of foci in nuclei and cells in 2D and 3D microscopy images
+site_url: https://bioimaging-nki.github.io/Foci-analyzer/
 repo_url: https://github.com/BioImaging-NKI/Foci-analyzer
 repo_name: Foci-analyzer
 docs_dir: manual

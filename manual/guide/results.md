@@ -19,8 +19,8 @@ run, a banner says so: the results then belong to the earlier settings.
     - *Over time*: the mean per frame of a time-lapse.
     - *Tracks*: one line per tracked cell, with the mean per condition (needs tracking).
     - *Colocalization*: per pair of foci channels, the share of the foci of one channel that lie on a
-      focus of the other, per cell, with in grey the share expected by chance. A share clearly above the
-      grey box means real colocalization.
+      focus of the other, per cell, with in gray the share expected by chance. A share clearly above the
+      gray box means real colocalization.
 - **logarithmic axis** for measures that span orders of magnitude.
 - **Conditions**: switch conditions on or off.
 

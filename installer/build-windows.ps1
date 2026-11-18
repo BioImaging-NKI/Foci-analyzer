@@ -12,6 +12,10 @@ New-Item -ItemType Directory -Force (Join-Path $payload "installer") | Out-Null
 # the program as the setup carries it: sources, lock file and the install script (no tests, no test data)
 Copy-Item -Recurse (Join-Path $root "src") (Join-Path $payload "src")
 Get-ChildItem -Recurse -Directory -Filter "__pycache__" (Join-Path $payload "src") | Remove-Item -Recurse -Force
+# when and from which commit: shown on the Settings page, so two copies with the same version can be told apart
+$commit = try { (git -C $root rev-parse --short HEAD 2>$null) } catch { "" }
+$stamp = "built $(Get-Date -Format 'yyyy-MM-dd HH:mm')" + $(if ($commit) { ", commit $commit" } else { "" })
+Set-Content -Encoding utf8 -Path (Join-Path $payload "src\foci_analyzer\BUILD.txt") -Value $stamp
 foreach ($f in "pyproject.toml", "uv.lock", "README.md", "CHANGELOG.md") { Copy-Item (Join-Path $root $f) $payload }
 foreach ($f in "install.py", "check.py", "run-install.cmd", "FociAnalyzer.ico", "FociAnalyzer.icns", "logo-512.png") { Copy-Item (Join-Path $here $f) (Join-Path $payload "installer") }
 

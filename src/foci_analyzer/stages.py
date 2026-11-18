@@ -21,7 +21,7 @@ def stage_key(name: str, params: dict, *inputs: str) -> str:
     return hashlib.sha1(text.encode()).hexdigest()[:16]
 
 
-class Cancelled(ValueError):
+class Canceled(ValueError):
     """The user stopped the analysis."""
 
 
@@ -32,7 +32,7 @@ class StageCache:
         self._lock = threading.Lock()
         self.computed: list[str] = []  # names of the stages that really ran (for tests)
         self.seconds: dict[str, float] = {}  # time spent per stage name
-        self.cancelled = False  # set to stop the analysis before its next stage
+        self.canceled = False  # set to stop the analysis before its next stage
         self.now: tuple | None = None  # the stage being computed: name, note, step, of steps, start time
 
     def run(self, name: str, params: dict, inputs: tuple[str, ...], compute: Callable[[], Any],
@@ -47,8 +47,8 @@ class StageCache:
             if key in self._items:
                 self._items.move_to_end(key)
                 return key, self._items[key]
-        if self.cancelled:
-            raise Cancelled("stopped")
+        if self.canceled:
+            raise Canceled("stopped")
         start = time.perf_counter()
         self.now = (name, note or name, step[0], step[1], time.time())
         try:

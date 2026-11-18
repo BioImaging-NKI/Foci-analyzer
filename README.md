@@ -29,7 +29,7 @@ and Linux `.venv/bin/python`) runs every installed network on a made-up image.
 1. **Experiment**: open images or a folder, or make one condition per group you want to compare.
 2. **Analyze**: choose the channels, press `Analyze this image` and move the threshold slider while you look
    at the image. The `?` next to every setting explains it. The panel on the right has the channels, the
-   overlays (cells, foci outlines, foci markers, the colocalization map, a colour per cell for any of its numbers) and the
+   overlays (cells, foci outlines, foci markers, the colocalization map, a color per cell for any of its numbers) and the
    numbers of the image and of a clicked cell. `Analyze all images` writes the tables to the results folder.
 3. **Results**: graphs per condition with tests (also colocalization against chance, and tracks of a
    time-lapse), a list per image and the cells to check. A click on a point opens that cell in the viewer.

@@ -97,9 +97,9 @@ def analyze_image(entry: ImageEntry, s: config.Settings, compute_lock: threading
             foci_rows = {t: foci[foci["frame"] == t + 1] for t in range(len(results))}
             for t, rr in enumerate(results):
                 rr.foci = foci_rows[t]
-            colours = export.default_colours(info.channels, s.image.nuclei_channel, s.image.cell_channel,
+            colors = export.default_colours(info.channels, s.image.nuclei_channel, s.image.cell_channel,
                                              [f.channel for f in s.foci])
-            export.write_imagej(Path(folder) / "images" / f"{base}.zip", data, info, dict(enumerate(results)), colours)
+            export.write_imagej(Path(folder) / "images" / f"{base}.zip", data, info, dict(enumerate(results)), colors)
     meta = {"unit": info.unit, "pixel_size": r.cal.pixel_size, "frames": info.frames, "slices": info.slices,
             "frame_interval": info.frame_interval, "remark": remark}
     return cells, foci, meta

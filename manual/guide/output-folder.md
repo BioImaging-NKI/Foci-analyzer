@@ -31,8 +31,8 @@ frame, as in `foci.tsv`. They open in Fiji and napari.
 
 ## Images for Fiji
 
-Each image becomes a hyperstack with all its channels, slices and frames, the channel colours and contrast,
-and the outlines as an overlay: cells in white, foci in the colour of their channel, each on its own slice
+Each image becomes a hyperstack with all its channels, slices and frames, the channel colors and contrast,
+and the outlines as an overlay: cells in white, foci in the color of their channel, each on its own slice
 and frame (cells found in 2D are shown in every slice). Each is a `.zip` holding one TIFF: open the `.zip`
 in Fiji directly (drag it onto Fiji, or *File → Open*). Zipped, the file is about four times smaller; a
 compressed TIFF would be small too, but Fiji drops the overlay of a compressed TIFF.

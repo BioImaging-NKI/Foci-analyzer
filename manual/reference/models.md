@@ -2,7 +2,7 @@
 
 # Models
 
-The pretrained models that the **Model** lists offer, per network. A model needs its network to be installed (see [The Settings page](../guide/settings-page.md)); models of a network that is not installed are greyed out. *Own model…*, at the bottom of every list, takes the folder or file of a model you trained yourself.
+The pretrained models that the **Model** lists offer, per network. A model needs its network to be installed (see [The Settings page](../guide/settings-page.md)); models of a network that is not installed are grayed out. *Own model…*, at the bottom of every list, takes the folder or file of a model you trained yourself.
 
 ## StarDist
 

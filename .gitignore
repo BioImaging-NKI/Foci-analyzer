@@ -12,3 +12,6 @@ LiFT/
 # installer builds
 installer/build/
 site/
+
+# written by the setup build
+src/foci_analyzer/BUILD.txt

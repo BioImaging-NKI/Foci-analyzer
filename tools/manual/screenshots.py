@@ -114,7 +114,7 @@ def main(want_prefixes: list[str]) -> None:
             page.check("#show-numbers")
             page.check("#smooth")
             page.wait_for_timeout(1500)
-            # the largest nucleus is selected; its nearest neighbour is removed (and put back afterwards)
+            # the largest nucleus is selected; its nearest neighbor is removed (and put back afterwards)
             sel, rem = page.evaluate("""() => { const ps = [...FA.viewer.numbers.polys], area = (p) => (p.bb[2] - p.bb[0]) * (p.bb[3] - p.bb[1]);
               const big = ps.sort((a, b) => area(b) - area(a))[0];
               const near = ps.filter((p) => p !== big).sort((a, b) => Math.hypot(a.cx - big.cx, a.cy - big.cy) - Math.hypot(b.cx - big.cx, b.cy - big.cy))[0];

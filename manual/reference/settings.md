@@ -26,7 +26,7 @@ In a settings file: `[segmentation]`.
 | **Smallest diameter**<br>`min_diameter` | 4 µm | Objects with a smaller diameter (of a circle with the same area) are removed. At least 0. |
 | **Largest diameter**<br>`max_diameter` | 50 µm | Objects with a larger diameter are removed. 0 = no limit. At least 0. |
 | **Remove objects on the image edge**<br>`exclude_on_edges`<br>*advanced* | on | A nucleus that is cut by the image edge has an incomplete foci count. |
-| **Model**<br>`model` | (empty) | The pretrained model of the network, or a model of your own (the last choice). Cellpose 3 and Cellpose 4 models run in environments of their own; models of a network that is not installed are greyed out (install it on the Settings page). The list of models is on [Models](models.md). Shown when *Method* is `cellpose` or `instanseg` or `stardist`. |
+| **Model**<br>`model` | (empty) | The pretrained model of the network, or a model of your own (the last choice). Cellpose 3 and Cellpose 4 models run in environments of their own; models of a network that is not installed are grayed out (install it on the Settings page). The list of models is on [Models](models.md). Shown when *Method* is `cellpose` or `instanseg` or `stardist`. |
 | **Expected diameter**<br>`diameter`<br>*advanced* | 0 µm | The typical diameter of the nuclei or cells. 0 = automatic: Cellpose estimates it; StarDist is given the image at 0.25 µm per pixel and, when the nuclei then come out smaller than 16 or larger than 120 pixels, at the scale where they are closest to 40 pixels. Set it when the automatic choice is off. At least 0. Shown when *Method* is `cellpose` or `instanseg` or `stardist`. |
 | **Probability threshold**<br>`probability`<br>*advanced* | 0.5 | Lower finds more and larger objects. Range: 0 to 1. Shown when *Method* is `cellpose` or `instanseg` or `stardist`. |
 | **Threshold**<br>`threshold_factor`<br>*advanced* | 1 × Otsu | For 'threshold': the Otsu threshold of the image times this factor. Higher makes the objects smaller and splits more of them; lower makes them larger. Range: 0.2 to 3. Shown when *Method* is `threshold`. |
@@ -39,7 +39,7 @@ In a settings file: `[foci_general]`.
 | Setting | Default | Description |
 |---|---|---|
 | **Detect foci in**<br>`dimension` | 3D | For stacks. 3D detects foci in the stack with filters that work in X, Y and Z. A projection detects them in one plane, which is often more reliable for thin samples and few slices. Ignored for 2D images. Choices: `3D`, `max projection`, `extended depth of focus`, `sum projection`. |
-| **Cell border shift**<br>`outside_distance`<br>*advanced* | 0 µm | Moves the border within which foci count for a nucleus or cell. Positive: foci up to this distance outside it still count. Negative: the border moves inwards, so foci near the edge are left out. 0: the outline as found. The cell measurements themselves always use the outline as found. Range: -50 to 50. Greyed out (not used) when *Foci in the whole image* is `on`. |
+| **Cell border shift**<br>`outside_distance`<br>*advanced* | 0 µm | Moves the border within which foci count for a nucleus or cell. Positive: foci up to this distance outside it still count. Negative: the border moves inwards, so foci near the edge are left out. 0: the outline as found. The cell measurements themselves always use the outline as found. Range: -50 to 50. Grayed out (not used) when *Foci in the whole image* is `on`. |
 | **Foci in the whole image**<br>`whole_image`<br>*advanced* | off | Every focus counts for the nearest nucleus or cell, wherever it is (the cell border shift is then not used). |
 | **Axial elongation**<br>`z_elongation`<br>*advanced* | 2 × | How much longer a focus is in Z than in XY because of the microscope optics. Used for the filter size in Z (3D detection). Range: 0.5 to 10. |
 
@@ -69,10 +69,10 @@ In a settings file: `[colocalization]`.
 | Setting | Default | Description |
 |---|---|---|
 | **Colocalize foci channels**<br>`enabled` | on | Used when there are two or more foci channels; every pair of channels is compared. |
-| **Method**<br>`method` | overlap | overlap: two foci colocalize when they share voxels. centroid distance: when their centres are closer than the largest distance. Choices: `overlap`, `centroid distance`. |
+| **Method**<br>`method` | overlap | overlap: two foci colocalize when they share voxels. centroid distance: when their centers are closer than the largest distance. Choices: `overlap`, `centroid distance`. |
 | **Smallest overlap**<br>`min_overlap`<br>*advanced* | 1 voxels | At least 1. Shown when *Method* is `overlap`. |
 | **Largest distance**<br>`max_distance`<br>*advanced* | 0.3 µm | At least 0. Shown when *Method* is `centroid distance`. |
-| **Chance control repeats**<br>`chance_repeats`<br>*advanced* | 10 | The colocalization expected by chance: the foci of the second channel are placed at random positions in the cell this many times (0 = off). The Results page shows it in grey next to the measured colocalization. At least 0. |
+| **Chance control repeats**<br>`chance_repeats`<br>*advanced* | 10 | The colocalization expected by chance: the foci of the second channel are placed at random positions in the cell this many times (0 = off). The Results page shows it in gray next to the measured colocalization. At least 0. |
 
 ## Time-lapse
 
