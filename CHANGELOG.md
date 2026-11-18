@@ -2,6 +2,12 @@
 
 Every entry says whether results change.
 
+## Unreleased
+
+- Spotiflow works with any *Foci size* and with the 3D models: the image is now resized by Foci Analyzer
+  itself (Spotiflow's own resizing refused 3D models and most sizes, with *3D scaling is not supported yet*
+  or *Invalid scale factor*). Results change only where these errors occurred.
+
 ## 2.0.0b1 (2026-11-18)
 
 The first public version of Foci Analyzer in Python, the successor of the Fiji macro (1.x, now in

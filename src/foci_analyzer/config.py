@@ -115,7 +115,9 @@ class FociChannelSettings:
                       "probability; the extents are found in the same way.",
                       choices=["watershed", "spotiflow"])
     size: float = opt(0.5, "Foci size", "Expected diameter of a focus (full width at half maximum). It sets "
-                      "the filter scale and the smallest distance between two foci.", min=0.05, step=0.05,
+                      "the filter scale and the smallest distance between two foci. With Spotiflow the image is "
+                      "resized for the network so that foci are about 3 pixels wide (as it was trained), and "
+                      "the size of each focus is measured at this scale.", min=0.05, step=0.05,
                       unit="µm")
     sensitivity: float = opt(8.0, "Threshold", "A local maximum is a focus when its height in the filtered "
                              "image is this many times the noise. The noise is how much the filtered image "

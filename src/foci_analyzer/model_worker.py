@@ -168,16 +168,23 @@ def spotiflow(arrays, p):
     model = _models[("spotiflow", name)]
     img = arrays["img"].astype(np.float32)
     kw = {"prob_thresh": float(p.get("floor", 0.1)), "verbose": False, "device": _device()}
-    if p.get("scale") and abs(p["scale"] - 1) > 0.05:
-        kw["scale"] = float(p["scale"])
-        kw["subpix"] = False  # Spotiflow has no sub-pixel positions for a rescaled image; whole pixels are enough here
+    # The spots should be about 3 px wide for the model: the image is resized here (in y and x) rather than by
+    # Spotiflow's own `scale`, which refuses 3D models and accepts only 1/2, 1/3, ... of a divisible size.
+    s = float(p.get("scale") or 1.0)
+    work = img
+    if abs(s - 1) > 0.05:
+        from scipy.ndimage import zoom
+        work = zoom(img, (1.0, s, s), order=1)
+    else:
+        s = 1.0
     if getattr(model.config, "is_3d", False):
-        pts, details = model.predict(img, **kw)
-        pos = np.round(pts).astype(np.int32).reshape(-1, 3)
+        pts, details = model.predict(work, **kw)
+        zyx = np.asarray(pts, float).reshape(-1, 3) / np.array([1.0, s, s])
+        pos = np.clip(np.round(zyx).astype(np.int32), 0, np.array(img.shape) - 1)
     else:
         flat = img.max(0)  # a 2D model: spots from the projection, their slice from the brightest value
-        pts, details = model.predict(flat, **kw)
-        yx = np.clip(np.round(pts).astype(np.int32).reshape(-1, 2), 0, np.array(flat.shape) - 1)
+        pts, details = model.predict(work.max(0), **kw)
+        yx = np.clip(np.round(np.asarray(pts, float).reshape(-1, 2) / s).astype(np.int32), 0, np.array(flat.shape) - 1)
         z = img[:, yx[:, 0], yx[:, 1]].argmax(0) if len(yx) else np.zeros(0, np.int64)
         pos = np.column_stack([z, yx]).astype(np.int32)
     prob = np.asarray(details.prob, np.float32).reshape(-1)
