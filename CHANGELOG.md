@@ -2,6 +2,13 @@
 
 Every entry says whether results change.
 
+## 2.0.0b2 (in development)
+
+- Viewer: **Raw** / **Filtered** (key R) shows the foci channels after the filter, in percent of the threshold.
+- *Cells to check*: also cells much larger or smaller than the others in their frame (merged nuclei, debris)
+  and cells with far more foci than the others. Results (the numbers) do not change.
+- The Settings page shows the build date and commit next to the version (no time).
+
 ## 2.0.0b1 (2026-11-19)
 
 The first public version of Foci Analyzer in Python, the successor of the Fiji macro (1.x, now in

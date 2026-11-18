@@ -661,6 +661,12 @@ class App:
             if ch is None:
                 raise ApiError("no such foci channel")
             return ch.labels
+        if kind == "filtered":  # the filtered image as a percentage of the threshold (100 = at the threshold)
+            ch = next((c for c in r.channels if str(c.channel) == q.get("ch")), None)
+            if ch is None or ch.filtered is None:
+                raise ApiError("no filtered image for this channel: press Analyze this image")
+            F, div = ch.filtered
+            return np.clip(F / div / max(ch.threshold, 1e-12) * 100, 0, 65535).astype(np.uint16)
         if kind == "overlap":
             n = sum((c.labels > 0).astype(np.uint8) for c in r.channels)
             return (n >= 2).astype(np.uint16)
@@ -742,7 +748,7 @@ class App:
             plane = np.zeros((im.info.height, im.info.width), "<u2")
             oy, ox = r.offset[1] + r.border, r.offset[0] + r.border
             plane[oy:oy + small.shape[0], ox:ox + small.shape[1]] = (
-                small if kind in ("value", "overlap") else _wrap16(small))
+                small if kind in ("value", "overlap", "filtered") else _wrap16(small))
             with self.lock:
                 self._planes[key] = plane
                 while len(self._planes) > 12:

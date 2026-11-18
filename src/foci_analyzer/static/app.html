@@ -78,8 +78,11 @@
       <span id="mode-wrap" hidden title="Slice: one Z slice. Max projection: the brightest value over Z. A third choice appears when the foci are detected on another projection (key P)">
         <span class="seg" id="mode"><button data-mode="slice">Slice</button><button data-mode="mip" class="on">Max projection</button><button data-mode="det" hidden></button></span> <kbd>P</kbd>
       </span>
+      <span id="filter-wrap" title="Raw: the image as recorded. Filtered: the foci channels as the foci are found in them, after the filter, as a percentage of the threshold (100 = exactly at the threshold), with a contrast of their own. Needs Analyze this image (key R)">
+        <span class="seg" id="filter-mode"><button data-f="raw" class="on">Raw</button><button data-f="filtered">Filtered</button></span> <kbd>R</kbd>
+      </span>
       <button id="fit" title="Show the whole image (key 0)">Fit <kbd>0</kbd></button>
-      <span class="help" data-help="Wheel: zoom. Ctrl + wheel: Z slice. Alt + wheel: time frame. Drag: move. Click a cell: its numbers on the right. Keys: A analyze this image, L live, 1-9 channels on/off, C cells, F foci, M foci markers, P slice or projection, , and . previous and next slice, [ and ] previous and next frame (or slice, when there is no time-lapse), 0 fit. The viewer loads large images in tiles at the resolution that is needed."></span>
+      <span class="help" data-help="Wheel: zoom. Ctrl + wheel: Z slice. Alt + wheel: time frame. Drag: move. Click a cell: its numbers on the right. Keys: A analyze this image, L live, 1-9 channels on/off, C cells, F foci, M foci markers, P slice or projection, R raw or filtered image, , and . previous and next slice, [ and ] previous and next frame (or slice, when there is no time-lapse), 0 fit. The viewer loads large images in tiles at the resolution that is needed."></span>
     </div>
     <div id="canvas-wrap">
       <canvas id="canvas"></canvas><canvas id="markers"></canvas>

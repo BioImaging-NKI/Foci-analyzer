@@ -18,6 +18,11 @@ resolution that the zoom needs.
   Each time frame is analyzed on its own: with **Live** on, a frame you move to is analyzed as soon as the
   image has been analyzed in the viewer (or it is shown from the last **Analyze all images**); otherwise
   press **Analyze this image** (++a++) for it.
+- **Raw** and **Filtered** (++r++ switches): after **Analyze this image**, *Filtered* shows the foci channels as
+  the foci are found in them: the image after the filter, in percent of the threshold (100 = exactly at the
+  threshold). A focus is a peak above 100. The filtered channels have a contrast of their own (0 to 300 % to
+  start with); the other channels stay as recorded. Useful to choose the *Foci size* and the *Threshold*. A
+  channel with Spotiflow has no filtered image.
 - The image list above the viewer chooses the image. A ✓ marks analyzed images: green, in the results
   folder with the current settings; blue, analyzed in the viewer with the current settings; gray, analyzed
   with other settings.

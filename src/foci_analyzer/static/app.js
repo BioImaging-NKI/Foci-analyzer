@@ -249,7 +249,8 @@ async function openImage(id, analyze = false) {
     status("Reading the image…", false, -1);
     const info = await (await api(`/api/image/info?path=${encodeURIComponent(id)}`)).json();
     if (load !== V.load) return;
-    play(false);
+    play(false); V.filtered = false;
+    for (const b of $("filter-mode").children) b.classList.toggle("on", b.dataset.f === "raw");
     Object.assign(V, { id, info, z: Math.floor(info.slices / 2), t: 0, preview: null, cand: [], slots: {}, lastDim: "", polys: {}, polysPrev: {}, sel: 0, selPt: null });
     V.multi.clear();
     const top = info.dtype === "uint8" ? 255 : 65535;
@@ -295,7 +296,7 @@ async function loadStored() {
       new Float32Array(await (await api(`/api/candidates?path=${encodeURIComponent(id)}&t=${t}&ch=${ch.channel}`)).arrayBuffer())));
     if (id !== V.id || t !== V.t || V.preview) return;
     V.preview = r; V.cand = cand;
-    renderCellColor(); syncMode(); syncLayers(); previewInfo();
+    if (V.filtered) renderChannels(); renderCellColor(); syncMode(); syncLayers(); previewInfo();
     status(`From the last run of Analyze all images (same settings) · ${r.cells} cells`);
     return true;
   } catch { return false; /* nothing stored: the image waits for Analyze this image */ }
@@ -307,6 +308,11 @@ function syncLayers() {
   const z = V.mode === "slice" ? V.z : V.mode === "det" && det ? det[0] : "mip", base = `path=${encodeURIComponent(V.id)}&t=${V.t}&z=${z}`;
   const region = (extra) => (level, x, y, w, h) => `${extra}&${base}&level=${level}&x=${x}&y=${y}&w=${w}&h=${h}`;
   const layers = V.ch.map((ch, c) => {
+    const d = shownDisplay(ch, c);
+    if (d !== ch) {
+      const key = `f|${V.preview.key}|${c}|${z}`;
+      return { type: "image", key, prevKey: slot(`i${c}`, key), url: region(`/api/overlay?kind=filtered&ch=${c + 1}`), lo: d.lo, hi: d.hi, color: ch.color, on: ch.on };
+    }
     const key = `i|${V.id}|${V.t}|${c}|${z}`;
     return { type: "image", key, prevKey: slot(`i${c}`, key), url: region(`/api/image/region?c=${c}`), lo: ch.lo, hi: ch.hi, color: ch.color, on: ch.on };
   });
@@ -429,7 +435,7 @@ async function runPreview() {
       // foci found on a projection: show that projection (once, so a later choice of the user stays)
       if (V.info.slices > 1 && r.dimension !== "3D" && r.dimension !== V.lastDim) V.mode = DET[r.dimension] ? "det" : "mip";
       V.lastDim = r.dimension;
-      renderCellColor(); syncMode(); syncLayers(); previewInfo(); selectCell(V.sel, V.selPt);
+      if (V.filtered) renderChannels(); renderCellColor(); syncMode(); syncLayers(); previewInfo(); selectCell(V.sel, V.selPt);
       const secs = (performance.now() - start) / 1000;
       status(`Ready · ${r.cells} ${r.cells === 1 ? "cell" : "cells"}, ${r.channels.map((c) => `${c.foci} foci in channel ${c.channel}`).join(", ")}`
         + ` · analyzed in ${secs < 10 ? secs.toFixed(1) : Math.round(secs)} s`);
@@ -654,7 +660,7 @@ function setT(t) {
   if (!V.info) return;
   t = Math.min(V.info.frames - 1, Math.max(0, t)); if (t === V.t) return;
   const had = !!V.preview;
-  V.t = t; $("t").value = t; V.preview = null; V.cand = []; V.sel = 0; V.multi.clear(); renderCellColor(); syncMode(); syncLayers(); previewInfo(); selectCell(0, null);
+  V.t = t; $("t").value = t; V.preview = null; V.cand = []; V.sel = 0; V.multi.clear(); if (V.filtered) renderChannels(); renderCellColor(); syncMode(); syncLayers(); previewInfo(); selectCell(0, null);
   // with Live on, a frame of an image that was analyzed in the viewer is analyzed too (unless a batch run has it)
   if (had && $("live").checked) runPreview();
   else loadStored().then((ok) => { if (!ok && t === V.t && !V.preview && $("live").checked && viewed[V.id]) runPreview(); });
@@ -684,11 +690,30 @@ for (const id of ["show-numbers", "smooth"]) {
 $("live").checked = store("fa.live") !== false;
 $("live").onchange = (e) => store("fa.live", e.target.checked);
 
+// Filtered: the foci channels show their filtered image (percent of the threshold) with a contrast of its own
+function filteredOf(c) {
+  const p = V.preview;
+  return V.filtered && p ? (p.channels || []).find((x) => x.channel === c + 1 && x.filtered) : null;
+}
+function shownDisplay(ch, c) {
+  if (!filteredOf(c)) return ch;
+  if (!ch.f) ch.f = { lo: 0, hi: 300, top: 2000, auto: [0, 300] };
+  return ch.f;
+}
+function setFiltered(on) {
+  const can = !!(V.preview && (V.preview.channels || []).some((x) => x.filtered));
+  if (on && !can) { status("Press Analyze this image first: the filtered image comes from the analysis", true); on = false; }
+  V.filtered = on;
+  for (const b of $("filter-mode").children) b.classList.toggle("on", (b.dataset.f === "filtered") === on);
+  renderChannels(); syncLayers();
+}
+$("filter-mode").addEventListener("click", (e) => { if (e.target.dataset.f) setFiltered(e.target.dataset.f === "filtered"); });
 function renderChannels() {
-  $("channels").replaceChildren(...V.ch.map((ch, c) => {
-    const values = el("span", { class: "values" }), fill = el("div", { class: "fill" });
+  $("channels").replaceChildren(...V.ch.map((raw, c) => {
+    const ch = shownDisplay(raw, c), pct = ch !== raw;
+    const values = el("span", { class: "values", title: pct ? "Filtered image: percent of the threshold" : "" }), fill = el("div", { class: "fill" });
     const show = () => {
-      values.textContent = `${ch.lo} – ${ch.hi}`;
+      values.textContent = pct ? `${ch.lo} – ${ch.hi} %` : `${ch.lo} – ${ch.hi}`;
       fill.style.left = `${100 * ch.lo / ch.top}%`; fill.style.right = `${100 - 100 * Math.min(ch.hi, ch.top) / ch.top}%`;
     };
     const lo = el("input", { type: "range", min: 0, max: ch.top, value: ch.lo, title: "Darkest value shown", "aria-label": `Minimum of channel ${c + 1}`,
@@ -698,10 +723,10 @@ function renderChannels() {
     show();
     return el("div", { class: "channel" },
       el("div", { class: "channel-head" },
-        el("input", { type: "checkbox", id: `ch${c}`, checked: ch.on, title: `Show channel ${c + 1} (key ${c + 1})`, onchange: (e) => { ch.on = e.target.checked; syncLayers(); } }),
-        el("input", { type: "color", value: hex(ch.color), title: "Color of this channel", "aria-label": `Color of channel ${c + 1}`,
-          oninput: (e) => { ch.color = unhex(e.target.value); store("fa.colors", { ...(store("fa.colors") || {}), [c]: e.target.value }); syncLayers(); } }),
-        el("label", { htmlFor: `ch${c}`, textContent: `Ch ${c + 1}` }), c < 9 ? el("kbd", { textContent: c + 1 }) : null, values,
+        el("input", { type: "checkbox", id: `ch${c}`, checked: raw.on, title: `Show channel ${c + 1} (key ${c + 1})`, onchange: (e) => { raw.on = e.target.checked; syncLayers(); } }),
+        el("input", { type: "color", value: hex(raw.color), title: "Color of this channel", "aria-label": `Color of channel ${c + 1}`,
+          oninput: (e) => { raw.color = unhex(e.target.value); store("fa.colors", { ...(store("fa.colors") || {}), [c]: e.target.value }); syncLayers(); } }),
+        el("label", { htmlFor: `ch${c}`, textContent: pct ? `Ch ${c + 1} filtered` : `Ch ${c + 1}` }), c < 9 ? el("kbd", { textContent: c + 1 }) : null, values,
         el("button", { textContent: "Auto", title: "Contrast from the image (0.1 to 99.9 percentile)",
           onclick: () => { [ch.lo, ch.hi] = ch.auto; lo.value = ch.lo; hi.value = ch.hi; show(); syncLayers(); } })),
       el("div", { class: "dual" }, el("div", { class: "track" }), fill, lo, hi));
@@ -725,6 +750,7 @@ document.addEventListener("keydown", (e) => {
   if (k >= "1" && k <= "9" && V.ch[+k - 1]) { V.ch[+k - 1].on = !V.ch[+k - 1].on; renderChannels(); syncLayers(); }
   else if (k === "c") toggle("show-cells"); else if (k === "f") toggle("show-foci"); else if (k === "m") toggle("show-markers");
   else if (k === "o") toggle("show-coloc"); else if (k === "l") toggle("live"); else if (k === "p") nextMode(); else if (k === "a") runPreview();
+  else if (k === "r") setFiltered(!V.filtered);
   else if (k === "n") toggle("show-numbers"); else if (k === "s") toggle("smooth"); else if (k === "x") toggleCell();
   else if (k === "," || (k === "[" && !frames)) stepZ(-1); else if (k === "." || (k === "]" && !frames)) stepZ(1);
   else if (k === "[") setT(V.t - 1); else if (k === "]") setT(V.t + 1); else if (k === "0") viewer.fit();

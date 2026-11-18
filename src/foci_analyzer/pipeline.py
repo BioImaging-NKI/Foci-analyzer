@@ -38,11 +38,12 @@ class ChannelResult:
     labels: np.ndarray | None = None
     table: dict = field(default_factory=dict)
     raw: np.ndarray | None = None  # the image the foci were detected in (a stack or a projection)
+    filtered: tuple | None = None  # (filtered image, divisor): filtered / divisor is in the units of `height`
 
     def summary(self) -> dict:
         return {"channel": self.channel, "method": self.method, "noise": self.noise, "threshold": self.threshold,
                 "floor": self.floor, "height_unit": self.height_unit, "candidates": len(self.height),
-                "foci": len(self.kept)}
+                "foci": len(self.kept), "filtered": self.filtered is not None}
 
 
 @dataclass
@@ -183,6 +184,8 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
             threshold, height_unit = fc.sensitivity, "× noise"
         res = ChannelResult(fc.channel, fc.method, noise, threshold, floor, height_unit, pos, height, cell)
         res.raw = raw
+        if fc.method != "spotiflow":  # for the viewer (Filtered): no copy, the cache holds the filtered image anyway
+            res.filtered = (F, 1.0 if fc.threshold_scope == "fixed value" else unit)
         if only_candidates:
             return res, None
 
@@ -264,6 +267,14 @@ def _tables(data, base, labels, n, cal, channels: list[ChannelResult], s: Settin
     """The table per cell and the table per focus of one frame."""
     cells = base[0].copy()
     flags = [["on edge"] if e else [] for e in base[1]]
+    # size much off the typical cell of this frame (from 5 cells on): two nuclei found as one, or debris
+    area = cells["area"].to_numpy()
+    if n >= 5:
+        med = np.median(area)
+        for i in np.flatnonzero(area > 2 * med):
+            flags[i].append("much larger than the others (merged?)")
+        for i in np.flatnonzero(area < 0.4 * med):
+            flags[i].append("much smaller than the others (debris?)")
     top = np.iinfo(data.dtype).max if np.issubdtype(data.dtype, np.integer) else None
 
     parts = []
@@ -275,6 +286,11 @@ def _tables(data, base, labels, n, cal, channels: list[ChannelResult], s: Settin
             cells[f"foci_ch{c}_total_{name}"] = np.bincount(t["cell"], weights=t[col], minlength=n + 1)[1:n + 1]
         cells[f"foci_ch{c}_mean_size"] = np.where(cnt > 0, cells[f"foci_ch{c}_total_size"] / np.maximum(cnt, 1), np.nan)
         cells[f"foci_ch{c}_mean_intensity"] = np.where(cnt > 0, cells[f"foci_ch{c}_total_intensity"] / np.maximum(cnt, 1), np.nan)
+        if n >= 5:  # far more foci than the typical cell: robustly above the rest, and at least twice the median
+            med = np.median(cnt)
+            mad = 1.4826 * np.median(np.abs(cnt - med))
+            for i in np.flatnonzero((cnt > 2 * med) & (cnt > med + 4 * max(mad, 1.0))):
+                flags[i].append(f"many foci in channel {c}")
         if top is not None and len(t["peak"]):
             # a cell is worth a look when more than a fifth of its foci are saturated (8-bit images often have
             # a few saturated foci in almost every cell; flagging those all made the list useless)

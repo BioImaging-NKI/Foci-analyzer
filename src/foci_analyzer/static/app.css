@@ -119,7 +119,7 @@ details.advanced > summary { cursor: pointer; color: var(--muted); font-size: 12
 
 #viewer { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 #viewer-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-#viewer-bar label, #mode-wrap { white-space: nowrap; }
+#viewer-bar label, #mode-wrap, #filter-wrap { white-space: nowrap; }
 #viewer-bar .primary kbd { color: inherit; background: none; border-color: currentColor; opacity: .8; }
 /* the Z and T sliders under the viewer (as in napari): a plain track, no 'filled' part */
 #dims { display: flex; flex-direction: column; gap: 2px; }

@@ -14,6 +14,7 @@ On the **Analyze** page, when no text box has the focus. The keys are also shown
 | ++s++ | Smooth outlines |
 | ++o++ | Colocalization map |
 | ++p++ | Slice, Max projection (and the projection the foci are detected on) |
+| ++r++ | Raw or Filtered image of the foci channels |
 | ++comma++ ++period++ | previous and next slice |
 | ++bracket-left++ ++bracket-right++ | previous and next time frame; in an image without frames, previous and next slice |
 | ++x++ | remove the selected cell (or cells) from the analysis, or put them back |
