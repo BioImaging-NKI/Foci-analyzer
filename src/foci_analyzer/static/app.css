@@ -217,3 +217,5 @@ details.advanced > summary { cursor: pointer; color: var(--muted); font-size: 12
 .dialog-box .notes { white-space: pre-wrap; overflow: auto; flex: 1; min-height: 60px; border: 1px solid var(--line); border-radius: 8px;
   padding: 10px 12px; font-size: 13px; background: var(--bg); }
 .dialog-box .row { flex-wrap: wrap; gap: 8px; }
+
+#upd-info .links { margin-top: 6px; }

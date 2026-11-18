@@ -51,3 +51,6 @@ A newer version is offered in a window with its release notes:
 
 A copy that was not installed with the setup or `install.sh` (a developer's copy) shows the release notes and
 a link instead; update it with `git pull`.
+
+Under the buttons are links to Foci Analyzer on GitHub (releases, and where to report problems or ask
+questions) and to this manual.

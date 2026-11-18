@@ -935,7 +935,10 @@ function renderUpdate(u) {
   const when = u.last_check ? new Date(u.last_check * 1000).toLocaleString() : "not yet";
   const what = u.newer ? `Version ${u.latest.version} is available.` : u.latest ? "This is the newest version." : u.last_check ? "No release was found on GitHub." : "";
   $("upd-info").replaceChildren(`You have Foci Analyzer ${u.current}. Last check: ${when}. ${what} `,
-    u.newer ? el("button", { textContent: "Show the new version…", onclick: () => showUpdate(true) }) : "");
+    u.newer ? el("button", { textContent: "Show the new version…", onclick: () => showUpdate(true) }) : "",
+    el("div", { class: "links" }, el("a", { href: `https://github.com/${u.repository || "BioImaging-NKI/Foci-analyzer"}`, target: "_blank", rel: "noopener", textContent: "Foci Analyzer on GitHub" }),
+      " (releases, questions and problems) · ",
+      el("a", { href: "https://bioimaging-nki.github.io/Foci-analyzer/", target: "_blank", rel: "noopener", textContent: "Manual" })));
 }
 function showUpdate(asked) {
   if (!U || !U.newer || (!asked && (!U.show || updateLater))) return;
