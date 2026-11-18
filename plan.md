@@ -295,6 +295,14 @@ nuclear stain (`Hi-res 3D`). Default: Cellpose.
 
 ### Open, in order of use to you
 
+**When the repository goes public** (checklist; the repository is private since the move on 2026-11-18):
+- README of `BioImaging-NKI/Foci-analyzer-Fiji`: a note at the top that there is a new Foci Analyzer (Python),
+  with a link to `BioImaging-NKI/Foci-analyzer` and its manual.
+- imagej.net page (`imagej/imagej.github.io`, `_pages/plugins/foci-analyzer.md`; BioImaging-NKI can push):
+  mention the Python version and link to it; its `source-url` points to Foci-analyzer-Fiji since 2026-11-18.
+- Publish the manual (GitHub Pages, workflow `manual`; `site_url` in `mkdocs.yml`), and the first release with
+  the setup attached (the update check only finds releases with `FociAnalyzer-Setup-*.exe`).
+
 1. **Speed**. Done: filters and foci channels in parallel threads (foci part of a 1024² × 8 image with two
    channels 2.9 → 1.9 s), batch with networks three images at a time, networks started when the window
    opens, faster threshold segmentation (1.7 → 0.7 s); the whole 3D test image 4.5 → 2.8 s, as max
