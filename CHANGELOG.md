@@ -4,6 +4,10 @@ Every entry says whether results change.
 
 ## 2.0.0b2 (in development)
 
+- **Estimate** per foci channel: the foci size and threshold from the shown image, as a starting point
+  (threshold where the number of foci levels off, else Otsu on the peak heights).
+- Saturated foci are reported once per image (This image, and the Images table of the Results page) instead of
+  for almost every cell. An open window that lost its program (restart, reinstall, update) reloads itself.
 - Viewer: **Raw** / **Filtered** (key R) shows the foci channels after the filter, in percent of the threshold.
 - *Cells to check*: also cells much larger or smaller than the others in their frame (merged nuclei, debris)
   and cells with far more foci than the others. Results (the numbers) do not change.

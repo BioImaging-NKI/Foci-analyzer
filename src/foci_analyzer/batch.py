@@ -79,6 +79,7 @@ def analyze_image(entry: ImageEntry, s: config.Settings, compute_lock: threading
     cells, foci = pd.concat(cells, ignore_index=True), pd.concat(foci, ignore_index=True)
     if info.frames > 1 and s.timelapse.tracking != "off":
         remark = tracking.add_tracks(cells, foci, cell_labels, s.timelapse, frames or None)
+    remark = "; ".join(x for x in [remark, *pipeline.saturation_notes(foci, data.dtype)] if x)
     for df in (cells, foci):
         for i, (col, value) in enumerate((("condition", entry.condition), ("image", entry.name),
                                           ("folder", entry.folder))):

@@ -554,6 +554,31 @@ class App:
         out["changed"] = n
         return out
 
+    def estimate(self, body: dict) -> dict:
+        """Foci size and threshold for one foci channel, in the cells of the last analysis of the shown frame."""
+        image_id, t = body.get("path", ""), int(body.get("t", 0))
+        r = self.shown(image_id, t)
+        with self.lock:
+            s = self.settings
+        try:
+            fc = s.foci[int(body["index"])]
+        except (KeyError, ValueError, IndexError) as e:
+            raise ApiError("no such foci channel") from e
+        if fc.method != "watershed":
+            raise ApiError("the estimate is for the watershed method only")
+        im = self.image(image_id)
+        data = im.data[t]
+        if r.offset != (0, 0) or r.labels.shape[1] * r.binning + 2 * r.border < im.info.height - r.binning:
+            x0, y0 = r.offset  # the analyzed part of a large image
+            data = data[:, :, y0:y0 + r.labels.shape[1] * r.binning + 2 * r.border, x0:x0 + r.labels.shape[2] * r.binning + 2 * r.border]
+        prepared, cal, _ = pipeline._prepare(data, im.info, s)
+        if prepared.shape[-2:] != r.labels.shape[-2:]:
+            raise ApiError("the analysis does not fit this image any more: press Analyze this image")
+        try:
+            return an.estimate_foci(prepared[fc.channel - 1], r.labels, cal, s.foci_general, fc)
+        except ValueError as e:
+            raise ApiError(f"no estimate: {e}") from e
+
     def activity(self) -> dict:
         """What the analysis of the shown image is doing now (for the status bar)."""
         now = self.cache.now
@@ -1041,6 +1066,7 @@ def make_handler(app: App):
                 "/api/update/start": lambda: app.start_update(),
                 "/api/cells/toggle": lambda: app.toggle_cell(body),
                 "/api/cells/set": lambda: app.set_cells(body),
+                "/api/estimate": lambda: app.estimate(body),
                 "/api/batch/start": lambda: app.start_batch(body),
                 "/api/batch/stop": stop,
                 "/api/stats": lambda: app.compare(body),

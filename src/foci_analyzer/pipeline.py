@@ -230,7 +230,23 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
 
     key, (cells, foci) = cache.run("tables", asdict(s.colocalization), tuple(keys), tables,
                                   "Making the tables", (steps, steps))
+    remarks = remarks + saturation_notes(foci, data.dtype)
     return FrameResult(key, cal, s.image.xy_binning, border, labels, channels, cells, foci, remarks)
+
+
+def saturation_notes(foci: pd.DataFrame, dtype) -> list[str]:
+    """Per foci channel of an image: a note when more than a fifth of its foci reach the highest gray value
+    (once per image rather than per cell: in 8-bit images that is often almost every cell)."""
+    if not np.issubdtype(dtype, np.integer) or not len(foci) or "peak" not in foci:
+        return []
+    top = np.iinfo(dtype).max
+    out = []
+    for c, g in foci.groupby("channel"):
+        share = float((g["peak"] >= top).mean())
+        if share > 0.2:
+            out.append(f"saturated foci in channel {int(c)}: {round(100 * share)} % reach the highest gray value "
+                       "(the counts are fine, their intensities are not)")
+    return out
 
 
 def _cell_base(data, labels, n, cal, channels: list[ChannelResult], pairs: list[int]):
@@ -275,7 +291,6 @@ def _tables(data, base, labels, n, cal, channels: list[ChannelResult], s: Settin
             flags[i].append("much larger than the others (merged?)")
         for i in np.flatnonzero(area < 0.4 * med):
             flags[i].append("much smaller than the others (debris?)")
-    top = np.iinfo(data.dtype).max if np.issubdtype(data.dtype, np.integer) else None
 
     parts = []
     for res in channels:
@@ -291,13 +306,6 @@ def _tables(data, base, labels, n, cal, channels: list[ChannelResult], s: Settin
             mad = 1.4826 * np.median(np.abs(cnt - med))
             for i in np.flatnonzero((cnt > 2 * med) & (cnt > med + 4 * max(mad, 1.0))):
                 flags[i].append(f"many foci in channel {c}")
-        if top is not None and len(t["peak"]):
-            # a cell is worth a look when more than a fifth of its foci are saturated (8-bit images often have
-            # a few saturated foci in almost every cell; flagging those all made the list useless)
-            n_sat = np.bincount(t["cell"][t["peak"] >= top], minlength=n + 1)
-            sat = n_sat > 0.2 * np.maximum(np.bincount(t["cell"], minlength=n + 1), 1)
-            for i in np.flatnonzero(sat[1:]):
-                flags[i].append(f"saturated foci in channel {c}")
         df = pd.DataFrame({"cell": t["cell"], "channel": c, "focus": np.arange(1, len(t["cell"]) + 1)})
         for col in ("x", "y", "z", "size", "voxels", "mean", "peak", "integrated", "height"):
             df[col] = t[col]

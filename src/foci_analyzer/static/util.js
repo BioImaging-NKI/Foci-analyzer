@@ -19,8 +19,18 @@ export async function api(path, body) {
     headers: { "X-Token": window.TOKEN, ...(body ? { "Content-Type": "application/json" } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
+  if (r.status === 403) reloadOnce();
   if (!r.ok) { let m = r.statusText; try { m = (await r.json()).error; } catch { /* not JSON */ } throw new Error(m); }
   return r;
+}
+// The program was started again (reinstalled, updated, restarted) while this tab stayed open: the tab's key no
+// longer fits, so it loads the window again (at most once a minute, so a real problem cannot make it loop).
+function reloadOnce() {
+  let last = 0;
+  try { last = +sessionStorage.getItem("fa.reloaded") || 0; } catch { /* storage blocked */ }
+  if (Date.now() - last < 60000) return;
+  try { sessionStorage.setItem("fa.reloaded", String(Date.now())); } catch { /* storage blocked */ }
+  location.reload();
 }
 // The status bar at the bottom. `progress`: undefined = not busy, -1 = busy for an unknown time, 0..1 = how far.
 // The bar only grows while one task runs; when it ends it fills up and then empties at once (no sliding back).

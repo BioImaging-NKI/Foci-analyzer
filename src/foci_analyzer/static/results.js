@@ -251,11 +251,12 @@ function drawImages() {
     const m = per.get(c.path[i]) || { i, n: 0, sum: counts.map(() => 0) };
     m.n++; counts.forEach((k, j) => { m.sum[j] += c[k][i] || 0; }); per.set(c.path[i], m);
   }
-  $("images-card").replaceChildren(el("h2", {}, "Images ", helpIcon("One row per image: the number of cells and the mean number of foci per cell. Click a row to open the image in the viewer.")),
-    el("table", {}, el("thead", {}, el("tr", {}, ["Condition", "Image", "Cells", ...counts.map((k) => `${nice(k)} per cell`)].map((h, j) => el("th", { class: j > 1 ? "num" : "", textContent: h })))),
+  const remark = (path) => ((R.meta.images || {})[path] || {}).remark || "", any = [...per.keys()].some(remark);
+  $("images-card").replaceChildren(el("h2", {}, "Images ", helpIcon("One row per image: the number of cells and the mean number of foci per cell, and remarks on the whole image (for example many saturated foci, or tracking). Click a row to open the image in the viewer.")),
+    el("table", {}, el("thead", {}, el("tr", {}, ["Condition", "Image", "Cells", ...counts.map((k) => `${nice(k)} per cell`), ...(any ? ["Remarks"] : [])].map((h, j) => el("th", { class: j > 1 && h !== "Remarks" ? "num" : "", textContent: h })))),
       el("tbody", {}, [...per.entries()].map(([path, m]) => el("tr", { class: "click", onclick: () => hooks.openCell(path) },
         el("td", { textContent: c.condition[m.i] }), el("td", { textContent: c.image[m.i] }), el("td", { class: "num", textContent: m.n }),
-        m.sum.map((s) => el("td", { class: "num", textContent: fmt(s / m.n) })))))));
+        m.sum.map((s) => el("td", { class: "num", textContent: fmt(s / m.n) })), any ? el("td", { class: "small", textContent: remark(path) }) : null)))));
 }
 function drawCheck() {
   const c = R.cells, list = [];

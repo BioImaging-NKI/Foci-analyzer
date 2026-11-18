@@ -23,7 +23,7 @@ Intensities are in the gray values of the image. *N*, *A* and *B* stand for chan
 | `chance_chA_with_chB` | the same share when the B foci are placed at random places in the cell: the chance control (*Chance control repeats*) |
 | `manders_chA_in_chB` | Manders coefficient: the share of the foci intensity of A that lies inside B foci |
 | `track`, `parent` | in a tracked time-lapse: the track of the cell, and the track it divided from |
-| `check` | remarks that call for a look: *on edge* (the cell touches the image edge), *much larger than the others (merged?)* (more than twice the median area of the cells in its frame), *much smaller than the others (debris?)* (less than 0.4 times it), *many foci in channel N* (at least twice the median count and far above the spread of the others), *saturated foci in channel N* (more than a fifth of its foci reach the highest gray value; the counts are fine, their intensities are not) |
+| `check` | remarks that call for a look: *on edge* (the cell touches the image edge), *much larger than the others (merged?)* (more than twice the median area of the cells in its frame), *much smaller than the others (debris?)* (less than 0.4 times it), *many foci in channel N* (at least twice the median count and far above the spread of the others). Saturated foci are reported once per image instead: under **This image** in the viewer and in the Images table of the Results page, when more than a fifth of the foci of a channel reach the highest gray value (the counts are fine, their intensities are not) |
 | `path` | the image file (and series) the row belongs to |
 
 Cells removed by hand in the viewer are not in the table.

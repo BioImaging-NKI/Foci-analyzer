@@ -408,3 +408,82 @@ def chance_colocalization(xyz_a: np.ndarray, radius: np.ndarray, n_b: int, cell_
         d, _ = cKDTree(b).query(xyz_a)
         hits += int((d <= radius).sum())
     return hits / (repeats * len(xyz_a))
+
+
+# ---------------------------------------------------------------- estimating the foci size and threshold
+def estimate_size(img2d: np.ndarray, mask: np.ndarray, pixel_size: float, n: int = 300) -> float:
+    """The typical foci diameter (FWHM, µm): the median width at half height (above the local background) of
+    the n brightest peaks in the mask, measured in 8 directions, corrected for the light smoothing used."""
+    sm = ndi.gaussian_filter(img2d.astype(np.float32), 1.0)
+    bg = ndi.minimum_filter(sm, 15)
+    peaks = (sm == ndi.maximum_filter(sm, 7)) & mask
+    ys, xs = np.nonzero(peaks)
+    order = np.argsort(sm[ys, xs] - bg[ys, xs])[::-1][:n]
+    R, widths = 10, []
+    for y, x in zip(ys[order], xs[order], strict=True):
+        if y < R or x < R or y >= img2d.shape[0] - R or x >= img2d.shape[1] - R:
+            continue
+        half = bg[y, x] + (sm[y, x] - bg[y, x]) / 2
+        reach = []
+        for dy, dx in ((0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (-1, -1), (1, -1), (-1, 1)):
+            step = np.hypot(dy, dx)
+            for k in range(1, R):
+                v = sm[y + k * dy, x + k * dx]
+                if v <= half:
+                    prev = sm[y + (k - 1) * dy, x + (k - 1) * dx]
+                    reach.append((k - 1 + ((prev - half) / (prev - v) if prev > v else 0)) * step)
+                    break
+        if len(reach) >= 6:
+            widths.append(2 * np.median(reach))
+    if not widths:
+        return float("nan")
+    s = np.median(widths) / FWHM
+    return float(np.sqrt(max(s * s - 1.0, 0.25)) * FWHM * pixel_size)
+
+
+def estimate_threshold(heights: np.ndarray) -> tuple[float, str]:
+    """A threshold (in the units of the heights) and how it was found.
+
+    plateau: the number of foci against the threshold (on a log scale) flattens between the many low peaks of
+    the noise and the foci (as TrueSpot does); the flattest point is taken. otsu: when there is no such plateau,
+    Otsu's method on the logarithm of the heights splits them into a low (noise) and a high (foci) group."""
+    h = np.asarray(heights, float)
+    h = h[h > 0]
+    if len(h) < 10:
+        return float("nan"), "too few peaks"
+    ts = np.geomspace(1.5, max(h.max(), 3.0), 120)
+    n = np.array([(h >= t).sum() for t in ts], float)
+    ok = n >= 5
+    if ok.sum() >= 10:
+        slope = ndi.gaussian_filter1d(np.gradient(np.log(n[ok]), np.log(ts[ok])), 3)
+        start = int(np.argmax(slope > slope[0] / 2)) if slope[0] < 0 else 0
+        t = float(ts[ok][start + int(np.argmax(slope[start:]))])
+        if t > 2.5:  # a plateau at the very bottom is the end of the noise, not a plateau
+            return t, "plateau"
+    lh = np.log(h[h > 1.5])
+    if len(lh) < 10 or lh.max() - lh.min() < 1e-6:
+        return float("nan"), "too few peaks"
+    return float(np.exp(filters.threshold_otsu(lh))), "otsu"
+
+
+def estimate_foci(stack: np.ndarray, labels: np.ndarray, cal: Calibration, general, fc) -> dict:
+    """Foci size and threshold for one foci channel (`stack`: Z, Y, X of the prepared image) in its cells."""
+    raw = project(stack, general.dimension)
+    cellmap = match_z(expand(labels, cal, reach(general)), raw.shape[0])
+    mask = cellmap.max(0) > 0
+    if not mask.any():
+        raise ValueError("no cells to estimate in")
+    size = estimate_size(raw.max(0), mask, cal.pixel_size)
+    if not np.isfinite(size):
+        raise ValueError("no clear foci to measure the size of")
+    size = max(0.05, round(size / 0.05) * 0.05)
+    sigma = sigma_px(size, cal, raw.shape[0], general.z_elongation)
+    F = spot_filter(raw, sigma, fc.filter)
+    scope = "per image" if fc.threshold_scope == "fixed value" else fc.threshold_scope
+    unit, noise = noise_unit(F, cellmap, scope)
+    _, h, _ = find_candidates(F / unit, sigma, 1.0, cellmap, True)
+    t, how = estimate_threshold(h)
+    if not np.isfinite(t):
+        raise ValueError("too few peaks to estimate a threshold")
+    t = float(min(50.0, max(1.0, round(t, 1))))
+    return {"size": round(size, 2), "threshold": t, "how": how, "noise": float(noise), "foci": int((h >= t).sum())}

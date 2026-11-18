@@ -197,6 +197,27 @@ function fieldsOf(section, group, index) {
     adv.length ? el("details", { class: "advanced", open: !!open, ontoggle: (e) => store(`fa.adv.${section.key}`, e.target.open) },
       el("summary", { textContent: "Advanced" }), adv.map((f) => control(f, group, section.key, index))) : null];
 }
+const ESTIMATE_HELP = "Estimate the foci size and threshold of this channel from the shown image (after Analyze this image), "
+  + "as a starting point. Size: the median width at half height of the 300 brightest peaks in the cells. Threshold: the number "
+  + "of foci is counted at many thresholds; where that number levels off (a plateau between the noise and the foci) the "
+  + "threshold is taken there; without such a plateau, Otsu's method splits the peak heights into a low (noise) and a high "
+  + "(foci) group. Check the result in the image, for example with Filtered (key R).";
+const estimates = {};
+async function estimateFoci(i) {
+  if (!V.id || !V.preview) { status("Press Analyze this image first: the estimate uses the cells it found", true); return; }
+  status(`Estimating the foci size and threshold of foci channel ${i + 1}…`, false, -1);
+  try {
+    const r = await (await api("/api/estimate", { path: V.id, t: V.t, index: i })).json();
+    const g = S.settings.foci[i];
+    g.size = r.size;
+    if (g.threshold_scope === "fixed value") g.fixed_threshold = Math.round(r.threshold * r.noise * 100) / 100; else g.sensitivity = r.threshold;
+    // the note under the channel stays while these values are kept (the status bar is taken by the analysis)
+    estimates[i] = { size: g.size, sensitivity: g.sensitivity, fixed: g.fixed_threshold,
+      text: `Estimated: ${r.size} µm, threshold ${r.threshold} × noise (${r.how === "plateau" ? "where the number of foci levels off" : "Otsu: no plateau in the number of foci"}), about ${r.foci} foci. A starting point: check it in the image.` };
+    renderSettings(); settingsChanged(0);
+    status(estimates[i].text);
+  } catch (e) { status(e.message, true); }
+}
 function renderSettings() {
   const box = $("settings"); box.replaceChildren();
   for (const sec of S.schema) {
@@ -209,8 +230,11 @@ function renderSettings() {
       list.push(g); renderSettings(); settingsChanged(); } })));
     list.forEach((g, i) => div.append(el("div", sec.key === "foci" ? { class: "group tinted", style: `--g:${hex(OUTLINE[i % OUTLINE.length])}` } : { class: "group" },
       el("div", { class: "group-head" }, `${sec.title} ${i + 1}`,
+        sec.key === "foci" && g.method === "watershed" ? el("button", { class: "link", textContent: "Estimate", title: ESTIMATE_HELP, onclick: () => estimateFoci(i) }) : null,
         list.length > 1 ? el("button", { class: "link", textContent: "Remove", onclick: () => { list.splice(i, 1); renderSettings(); settingsChanged(); } }) : null),
-      ...fieldsOf(sec, g, i).filter(Boolean))));
+      ...fieldsOf(sec, g, i).filter(Boolean),
+      sec.key === "foci" && estimates[i] && estimates[i].size === g.size && estimates[i].sensitivity === g.sensitivity && estimates[i].fixed === g.fixed_threshold
+        ? el("div", { class: "sub", textContent: estimates[i].text }) : null)));
     box.append(div);
   }
   renderOverlays();
