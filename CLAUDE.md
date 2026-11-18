@@ -23,7 +23,8 @@ reproduce the Fiji results. Design, state per milestone and open items: `plan.md
   In the test window `window.FA = { viewer, V, S }` gives the state.
 - No Node, no conda. GPU: Quadro RTX 3000, 6 GB. The user's own environments: `C:/PythonProjects/Cellpose3`,
   `Cellpose4`, `Spotiflow`.
-- Git: private repository `bvandenbroek/Foci-Analyzer-Python` (to move to BioImaging-NKI); commit and push
+- Git: private repository `BioImaging-NKI/Foci-analyzer` (moved there on 2026-11-18; the Fiji macro is now
+  `BioImaging-NKI/Foci-analyzer-Fiji`; BioImaging-NKI is a user account, bvandenbroek has push rights); commit and push
   per milestone is agreed. `TestData/` and `LiFT/` stay out of it.
 - After every change in `static/*.js`: load the test window and check that `window.FA` exists before
   committing. A `//` comment put in the middle of a one-line statement swallows the rest of the line and

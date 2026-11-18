@@ -1,5 +1,9 @@
 # Foci Analyzer (Python)
 
+> **Looking for the Fiji macro?** Foci Analyzer for Fiji (versions 1.x) has moved to
+> [BioImaging-NKI/Foci-analyzer-Fiji](https://github.com/BioImaging-NKI/Foci-analyzer-Fiji), with its releases,
+> issues and the QuPath scripts. It is still supported. This repository holds its Python successor.
+
 Detection, quantification and colocalization of foci in nuclei and cells, in a browser window on your own
 computer. Python successor of the [Foci Analyzer](https://imagej.net/plugins/foci-analyzer) Fiji macro.
 Under construction: `plan.md` has the design and the state per milestone.

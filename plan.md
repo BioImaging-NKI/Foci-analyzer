@@ -390,8 +390,8 @@ Not done: the manual; foci tracking over time; a person trying macOS or Linux; a
   save reading.
 - `CHANGELOG.md`: every entry says whether results change.
 - Result files are saved atomically (write to a temporary file, then rename).
-- Commits per milestone, pushed to the private repository `bvandenbroek/Foci-Analyzer-Python` (to be moved
-  to BioImaging-NKI).
+- Commits per milestone, pushed to the private repository `BioImaging-NKI/Foci-analyzer` (moved from
+  `bvandenbroek/Foci-Analyzer-Python` on 2026-11-18; the Fiji macro moved to `BioImaging-NKI/Foci-analyzer-Fiji`).
 
 ## 11. Decisions
 
