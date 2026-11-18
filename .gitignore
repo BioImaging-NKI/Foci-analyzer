@@ -15,3 +15,8 @@ site/
 
 # written by the setup build
 src/foci_analyzer/BUILD.txt
+
+# notes for the developers (kept in the shared surfdrive folder, not on GitHub)
+plan.md
+CLAUDE.md
+.claude/

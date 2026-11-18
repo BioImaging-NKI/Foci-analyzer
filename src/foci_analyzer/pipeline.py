@@ -1,4 +1,4 @@
-"""The analysis of one frame of one image as a chain of cached stages (plan.md, section 5).
+"""The analysis of one frame of one image as a chain of cached stages.
 
 prepare → segment → per foci channel: filter → candidates → extents → measure → tables per cell and focus.
 A stage only runs again when its own settings or an earlier stage changed, so moving the threshold slider

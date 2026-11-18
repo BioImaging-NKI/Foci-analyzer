@@ -32,7 +32,7 @@ Some things to know:
   cells. A threshold of 8 means: a focus must be eight times higher than that. Lower values find more and
   fainter foci, but also more peaks that are only noise. The foci markers in the viewer follow the slider at
   once.
-- **Estimate** (in the head of a foci channel, for the watershed method) fills in *Foci size* and *Threshold* from
+- **Estimate** (the button in the head of a foci channel, for the watershed method) fills in *Foci size* and *Threshold* from
   the shown image, after **Analyze this image**, as a starting point. The size is the median width at half height
   of the 300 brightest peaks in the cells. For the threshold, the foci are counted at many thresholds: where that
   number levels off (a plateau between the many low peaks of the noise and the foci, as in TrueSpot), the

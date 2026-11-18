@@ -1,4 +1,4 @@
-"""Following cells over the frames of a time-lapse (plan.md, section 5.7).
+"""Following cells over the frames of a time-lapse.
 
 `overlap`: a cell continues the track of the cell in the previous frame that it overlaps most. When two
 cells claim the same earlier cell (a division, or a split in the segmentation) the larger overlap keeps the

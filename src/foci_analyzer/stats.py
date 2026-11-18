@@ -1,4 +1,4 @@
-"""Comparing conditions (plan.md, section 8).
+"""Comparing conditions.
 
 The unit of a test is a cell, an image or a folder (one folder = one experiment). Cells of one image are not
 independent, so the tests on image or folder means are the careful ones. Rank tests are used per cell

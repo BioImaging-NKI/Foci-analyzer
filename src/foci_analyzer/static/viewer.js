@@ -1,4 +1,4 @@
-// The image viewer: WebGL2, tiles from a pyramid, channels composed in the shader (plan.md, section 6).
+// The image viewer: WebGL2, tiles from a pyramid, channels composed in the shader.
 // Layers are images (16-bit tiles, contrast and color applied in the shader, so they change without a
 // request) and label images (drawn as outlines). Markers and the scale bar are drawn on a 2D canvas on top.
 

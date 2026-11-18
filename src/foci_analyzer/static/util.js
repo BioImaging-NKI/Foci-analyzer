@@ -25,7 +25,7 @@ export async function api(path, body) {
 }
 // The program was started again (reinstalled, updated, restarted) while this tab stayed open: the tab's key no
 // longer fits, so it loads the window again (at most once a minute, so a real problem cannot make it loop).
-function reloadOnce() {
+export function reloadOnce() {
   let last = 0;
   try { last = +sessionStorage.getItem("fa.reloaded") || 0; } catch { /* storage blocked */ }
   if (Date.now() - last < 60000) return;

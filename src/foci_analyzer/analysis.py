@@ -1,4 +1,4 @@
-"""The image analysis as plain functions on arrays (plan.md, section 5).
+"""The image analysis as plain functions on arrays.
 
 All arrays are Z, Y, X; a 2D image, a projection and 2D labels have Z = 1, so every step is written once.
 Sizes come in µm and are converted with the `Calibration`.

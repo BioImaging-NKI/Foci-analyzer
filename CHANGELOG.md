@@ -20,6 +20,9 @@ It does not reproduce the Fiji results exactly; it has its own methods.
 - The viewer can show the foci channels after the filter (**Filtered**, key R), in percent of the threshold.
 - *Cells to check* lists cells on the image edge, much larger or smaller than the others, or with far more foci;
   images with many saturated foci get a remark.
+- The Z and T sliders have a handle as wide as one slice or frame. A browser tab whose program stopped (for
+  example closed by the setup) says so, and comes back by itself when Foci Analyzer starts again.
+- License: GNU General Public License v3.0 or later.
 - Manual: https://bioimaging-nki.github.io/Foci-analyzer/
 
 ## Development before 2.0.0b1

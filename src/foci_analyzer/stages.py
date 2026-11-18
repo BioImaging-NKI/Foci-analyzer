@@ -1,4 +1,4 @@
-"""The analysis as a chain of cached stages (plan.md, section 5).
+"""The analysis as a chain of cached stages.
 
 A stage result is stored under a key made of the stage name, its own settings and the keys of its inputs.
 Changing a setting therefore recomputes that stage and what follows, and nothing before it: this is what

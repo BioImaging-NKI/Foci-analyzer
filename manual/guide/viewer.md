@@ -14,7 +14,7 @@ resolution that the zoom needs.
 - Under the viewer, a stack has a **Z** slider (++comma++ and ++period++) for the slice, and a time-lapse a
   **T** slider (++bracket-left++ and ++bracket-right++) for the time frame, with a play button that steps
   through the frames (four per second, round and round; press it again to stop). In an image without frames
-  ++bracket-left++ and ++bracket-right++ step through the slices. The Z slider is dimmed in a projection.
+  ++bracket-left++ and ++bracket-right++ step through the slices. The handle of each slider is one slice or frame wide. The Z slider is dimmed in a projection.
   Each time frame is analyzed on its own: with **Live** on, a frame you move to is analyzed as soon as the
   image has been analyzed in the viewer (or it is shown from the last **Analyze all images**); otherwise
   press **Analyze this image** (++a++) for it.

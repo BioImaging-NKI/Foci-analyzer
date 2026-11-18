@@ -1,7 +1,7 @@
 // Foci Analyzer window: pages, the experiment, the settings form (drawn from the schema), the viewer with
 // the live preview, and the batch run. The Results page is in results.js, the viewer in viewer.js.
 
-import { $, el, api, status, fmt, helpIcon, store } from "./util.js";
+import { $, el, api, status, fmt, helpIcon, store, reloadOnce } from "./util.js";
 import { Viewer, parsePolys, inside } from "./viewer.js";
 import { initResults, loadResults } from "./results.js";
 
@@ -218,6 +218,14 @@ async function estimateFoci(i) {
     status(estimates[i].text);
   } catch (e) { status(e.message, true); }
 }
+// The Z and T sliders: the thumb is as wide as one slice or frame of the bar (at least 14 px), as in napari.
+function sizeThumbs() {
+  for (const id of ["z", "t"]) {
+    const r = $(id), n = +r.max + 1;
+    if (r.clientWidth) r.style.setProperty("--thumb", `${Math.max(14, r.clientWidth / n)}px`);
+  }
+}
+new ResizeObserver(sizeThumbs).observe($("dims"));
 function renderSettings() {
   const box = $("settings"); box.replaceChildren();
   for (const sec of S.schema) {
@@ -230,7 +238,7 @@ function renderSettings() {
       list.push(g); renderSettings(); settingsChanged(); } })));
     list.forEach((g, i) => div.append(el("div", sec.key === "foci" ? { class: "group tinted", style: `--g:${hex(OUTLINE[i % OUTLINE.length])}` } : { class: "group" },
       el("div", { class: "group-head" }, `${sec.title} ${i + 1}`,
-        sec.key === "foci" && g.method === "watershed" ? el("button", { class: "link", textContent: "Estimate", title: ESTIMATE_HELP, onclick: () => estimateFoci(i) }) : null,
+        sec.key === "foci" && g.method === "watershed" ? el("button", { class: "small-btn", textContent: "Estimate", title: ESTIMATE_HELP, onclick: () => estimateFoci(i) }) : null,
         list.length > 1 ? el("button", { class: "link", textContent: "Remove", onclick: () => { list.splice(i, 1); renderSettings(); settingsChanged(); } }) : null),
       ...fieldsOf(sec, g, i).filter(Boolean),
       sec.key === "foci" && estimates[i] && estimates[i].size === g.size && estimates[i].sensitivity === g.sensitivity && estimates[i].fixed === g.fixed_threshold
@@ -284,7 +292,7 @@ async function openImage(id, analyze = false) {
       kept.ch.forEach((k, c) => { Object.assign(V.ch[c], { on: k.on, lo: k.lo, hi: k.hi }); V.ch[c].top = Math.min(top, Math.max(V.ch[c].top, k.hi + 1)); });
     }
     if (info.slices === 1) V.mode = "mip";
-    $("z").max = info.slices - 1; $("z").value = V.z; $("t").max = info.frames - 1; $("t").value = 0;
+    $("z").max = info.slices - 1; $("z").value = V.z; $("t").max = info.frames - 1; $("t").value = 0; sizeThumbs();
     $("viewer-empty").hidden = true; showCell(null);
     const large = info.width * info.height >= LARGE;
     $("part-wrap").hidden = !large; $("part").checked = large;
@@ -667,7 +675,7 @@ function syncMode() {
   // the Z slider keeps its place in a projection (only dimmed), so the bar and the image do not jump
   $("mode-wrap").hidden = !stack; $("z-wrap").hidden = !stack;
   $("z-wrap").classList.toggle("off", V.mode !== "slice"); $("z").disabled = V.mode !== "slice";
-  $("t-wrap").hidden = !i || i.frames === 1;
+  $("t-wrap").hidden = !i || i.frames === 1; sizeThumbs();
   $("z-label").textContent = i ? `${V.z + 1} / ${i.slices}` : ""; $("t-label").textContent = i ? `${V.t + 1} / ${i.frames}` : "";
 }
 function setMode(mode) { if (!V.info || V.info.slices === 1) return; V.mode = mode; syncMode(); syncLayers(); }
@@ -921,8 +929,27 @@ async function installNetwork(name, label) {
 }
 $("opt-apply").onclick = () => loadProgram({ gpu: $("opt-gpu").checked, workers: parseInt($("opt-workers").value, 10) || 0 });
 
+// The program stopped without this tab (closed by the setup, or ended otherwise): say so instead of a window
+// that no longer answers, and load the window again as soon as Foci Analyzer runs again.
+let leaving = false;
+setInterval(() => {
+  if (leaving) return;
+  fetch("/api/activity", { headers: { "X-Token": window.TOKEN }, cache: "no-store" }).then((r) => {
+    if (r.status === 403) reloadOnce();  /* another program by now: load its window */
+  }).catch(() => {
+    if (leaving) return;
+    leaving = true;
+    document.body.replaceChildren(el("div", { style: "margin:60px auto;max-width:560px;font-size:16px;line-height:1.5" },
+      el("p", { textContent: "Foci Analyzer has stopped (for example closed by its setup)." }),
+      el("p", { style: "color:var(--muted)", textContent: "This tab comes back by itself when Foci Analyzer starts again." })));
+    const back = () => fetch("/", { cache: "no-store" }).then((r) => { if (r.ok) location.reload(); else setTimeout(back, 1000); }).catch(() => setTimeout(back, 1000));
+    back();
+  });
+}, 3000);
+
 $("quit").onclick = async () => {
   if (S.batch.running && !window.confirm("An analysis is running. Stop Foci Analyzer anyway?")) return;
+  leaving = true;
   try { await api("/api/quit", {}); } catch { /* it is stopping */ }
   document.body.replaceChildren(el("p", { style: "margin:60px auto;font-size:16px", textContent: "Foci Analyzer has stopped. You can close this tab." }));
 };
@@ -969,6 +996,7 @@ async function startUpdate() {
   $("upd-dialog").hidden = true;
   if (S.batch.running) { status("An analysis of all images is running: wait for it or stop it, then update.", true); return; }
   try { await api("/api/update/start", {}); } catch (e) { status(e.message, true); return; }
+  leaving = true;  /* the update has its own waiting */
   const poll = async () => {
     let u;
     try { u = await (await api("/api/update")).json(); } catch { waitForUpdater(); return; }

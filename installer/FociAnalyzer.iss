@@ -52,7 +52,7 @@ Name: "{userdesktop}\Foci Analyzer"; Filename: "{app}\Foci Analyzer.exe"; Workin
 Type: filesandordirs; Name: "{app}"
 
 [Run]
-Filename: "{app}\Foci Analyzer.exe"; Description: "Start Foci Analyzer"; Flags: postinstall nowait skipifsilent unchecked
+Filename: "{app}\Foci Analyzer.exe"; Parameters: "--after-update"; Description: "Start Foci Analyzer"; Flags: postinstall nowait skipifsilent unchecked
 
 [Code]
 const
@@ -540,7 +540,7 @@ begin
   if not DirExists(Dir) or (RunningCount(Dir, False) = 0) then Exit;
   if not Silent then
     Result := MsgBox('Foci Analyzer is running from ' + Dir + '. Setup closes it first (your experiment and ' +
-                     'settings are kept).', mbConfirmation, MB_OKCANCEL) = IDOK;
+                     'settings are kept; its browser tab waits and comes back when Foci Analyzer starts again).', mbConfirmation, MB_OKCANCEL) = IDOK;
   if Result then
     RunningCount(Dir, True);
 end;

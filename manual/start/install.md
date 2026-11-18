@@ -10,9 +10,20 @@ takes 1.6 GB and Cellpose 4, with a PyTorch of its own, 4.5 GB. The setup shows 
 The PyTorch networks use an NVIDIA graphics card when there is one, or the graphics chip of an Apple Silicon
 Mac; StarDist runs on the processor.
 
+## Download
+
+Everything is on the [latest release](https://github.com/BioImaging-NKI/Foci-analyzer/releases/latest) page
+on GitHub. Under **Assets** at the bottom:
+
+- **Windows**: `FociAnalyzer-Setup-<version>.exe` (for example `FociAnalyzer-Setup-2.0.0b1.exe`).
+- **macOS and Linux**: **Source code (zip)** or **Source code (tar.gz)**; unpack it.
+
+Older versions are under **Releases** on the [GitHub page](https://github.com/BioImaging-NKI/Foci-analyzer).
+Once installed, Foci Analyzer looks for new versions itself: see [Updates](../guide/settings-page.md#updates).
+
 ## Windows
 
-1. Download `FociAnalyzer-Setup.exe` and run it.
+1. Download `FociAnalyzer-Setup-<version>.exe` (see above) and run it.
 2. Windows may warn that the publisher is unknown (the setup is not signed): choose **More info** and
    **Run anyway**.
 3. Choose the networks. StarDist is recommended for nuclei; Cellpose 4 is not selected by default
@@ -23,7 +34,8 @@ Mac; StarDist runs on the processor.
    unticked.
 5. The setup downloads Python and the networks, and shows what it is doing; this takes 5 to 20 minutes.
    Everything is also written to `install-output.log` in the installation folder. A Foci Analyzer that is
-   still running from that folder is closed first (your experiment and settings are kept).
+   still running from that folder is closed first (your experiment and settings are kept). Its browser tab
+   then says that Foci Analyzer has stopped, and comes back by itself when Foci Analyzer starts again.
 
 Start Foci Analyzer from the start menu, or with `Foci Analyzer.exe` in the installation folder
 (`%LOCALAPPDATA%\FociAnalyzer`). It opens in your web browser: first a page with the logo while the program
@@ -36,7 +48,7 @@ page shows their `python.exe` again. Ticking one installs it and uses that inste
 Analyzer itself: see [Updates](../guide/settings-page.md#updates).
 
 Silent installation, for example for several computers:
-`FociAnalyzer-Setup.exe /SILENT /NETWORKS=stardist,spotiflow`
+`FociAnalyzer-Setup-<version>.exe /SILENT /NETWORKS=stardist,spotiflow`
 (`all`, `none`, or a list of `stardist`, `cellpose`, `cellpose4`, `instanseg`, `spotiflow`, `trackastra`).
 
 ## macOS and Linux

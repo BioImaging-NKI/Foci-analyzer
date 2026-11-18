@@ -29,7 +29,7 @@ SOURCE = HERE.parent  # the program: pyproject.toml, uv.lock, src
 NETWORKS = ("stardist", "cellpose", "cellpose4", "instanseg", "spotiflow", "trackastra")
 TORCH_NETWORKS = ("cellpose", "instanseg", "spotiflow", "trackastra")
 WINDOWS, MAC = sys.platform == "win32", sys.platform == "darwin"
-# versions tested together (plan.md, section 9); a newer TensorFlow is a hundred times slower on Windows
+# versions tested together; a newer TensorFlow is a hundred times slower on Windows
 TORCH = ["torch==2.6.0", "torchvision==0.21.0"]
 PACKAGES = {"cellpose": ["cellpose==3.1.1.3"], "instanseg": ["instanseg-torch==0.1.2"],
             "spotiflow": ["spotiflow==0.6.5", "csbdeep"], "trackastra": ["trackastra==0.5.6"]}

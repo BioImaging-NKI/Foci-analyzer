@@ -1,4 +1,4 @@
-"""Analyze all images of the experiment and keep the tables (plan.md, section 7).
+"""Analyze all images of the experiment and keep the tables.
 
 The results folder holds `cells.csv` (one row per cell and frame), `foci.csv` (one row per focus),
 `settings.toml` and `run.json`. Files are written under a temporary name and then renamed, so an interrupted

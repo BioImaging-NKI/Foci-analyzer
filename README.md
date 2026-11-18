@@ -6,7 +6,17 @@
 
 Detection, quantification and colocalization of foci in nuclei and cells, in a browser window on your own
 computer. Python successor of the [Foci Analyzer](https://imagej.net/plugins/foci-analyzer) Fiji macro.
-Under construction: `plan.md` has the design and the state per milestone.
+The manual: <https://bioimaging-nki.github.io/Foci-analyzer/>.
+
+## Download
+
+Open the [latest release](https://github.com/BioImaging-NKI/Foci-analyzer/releases/latest) (also under
+*Releases* on the right of this page) and download, under *Assets*:
+
+- **Windows**: `FociAnalyzer-Setup-<version>.exe`
+- **macOS and Linux**: *Source code (zip)* or *Source code (tar.gz)*
+
+Once installed, Foci Analyzer checks for new versions itself (Settings page, *Updates*).
 
 ## Install
 
@@ -53,3 +63,8 @@ builds and tries the installers when run by hand or for a version tag.
 The networks live in separate environments next to the program environment: `models-env` (PyTorch: Cellpose,
 InstanSeg, Spotiflow, Trackastra) and `stardist-env` (TensorFlow 2.15: StarDist). Another Python can be given
 on the Settings page, or with `FOCI_ANALYZER_MODELS_PYTHON`.
+
+## License
+
+Foci Analyzer is free software under the [GNU General Public License v3.0](LICENSE) or (at your option) any
+later version. Questions and problems: [Issues](https://github.com/BioImaging-NKI/Foci-analyzer/issues).
