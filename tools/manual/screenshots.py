@@ -39,6 +39,14 @@ def save(target, name: str, **kw) -> None:
     print(f"{name}.png {im.size[0]}×{im.size[1]}")
 
 
+def home_crop(name: str, x0: int = 0) -> None:
+    """A 16:10 part of a window screenshot, from x0 below the bar: for the cards of the home page."""
+    im = Image.open(OUT / f"{name}.png")
+    w = min(im.size[0] - x0, 1400)
+    im.crop((x0, 80, x0 + w, 80 + w * 10 // 16)).save(OUT / f"home_{name}.png", optimize=True)
+    print(f"home_{name}.png")
+
+
 def call(page: Page, path: str, body: dict | None = None):
     """An API request from inside the page (it holds the token)."""
     return page.evaluate("""async ([path, body]) => {
@@ -94,6 +102,7 @@ def main(want_prefixes: list[str]) -> None:
             page.wait_for_function("window.FA && window.FA.S.images.length === 2")
             if want("experiment"):
                 save(page, "experiment")
+                home_crop("experiment", 240)  # the page is centered
 
             # Analyze: the first image, analyzed in the viewer
             page.click("[data-page=analyze]")
@@ -135,6 +144,48 @@ def main(want_prefixes: list[str]) -> None:
             page.uncheck("#show-numbers")
             page.uncheck("#smooth")
 
+            # Foci detection (guide/foci.md): a foci channel's settings, and a few nuclei raw, filtered and at a
+            # low threshold, with the foci markers
+            if want("foci_channel"):
+                group = page.locator(".group", has=page.locator(".estimate")).first
+                group.evaluate("(g) => g.scrollIntoView({ block: 'start' })")  # above the run panel at the bottom
+                page.wait_for_timeout(300)
+                save(group, "foci_channel")
+            if any(want(n) for n in ("foci_raw", "foci_filtered", "foci_low")):
+                # only foci channel 2 (channel 1 is the nuclei, channel 3 the other foci), on a nucleus near the
+                # middle of the image, without a selected cell
+                page.evaluate("() => FA.viewer.onclick(1, 1)")
+                page.uncheck("#ch0")
+                page.uncheck("#ch2")
+                page.uncheck("#show-foci")  # the markers only
+                page.uncheck("#show-coloc")
+                page.locator("#foci-toggles input").nth(1).uncheck()
+                page.evaluate("""() => { const W = FA.V.info.width / 2, H = FA.V.info.height / 2;
+                  const p = [...FA.viewer.numbers.polys].sort((a, b) => Math.hypot(a.cx - W, a.cy - H) - Math.hypot(b.cx - W, b.cy - H))[0];
+                  FA.viewer.centerOn(p.cx, p.cy, 220); }""")
+                page.wait_for_timeout(2500)
+                if want("foci_raw"):
+                    save(page.locator("#canvas-wrap"), "foci_raw")
+                page.click("#filter-mode [data-f=filtered]")
+                page.wait_for_timeout(2500)
+                if want("foci_filtered"):
+                    save(page.locator("#canvas-wrap"), "foci_filtered")
+                page.click("#filter-mode [data-f=raw]")
+                threshold = page.locator('input[type=range][aria-label="Threshold"]').first
+                threshold.evaluate("(r) => { r.value = 3; r.dispatchEvent(new Event('input', { bubbles: true })); }")
+                page.wait_for_timeout(1500)
+                wait_preview(page)
+                if want("foci_low"):
+                    save(page.locator("#canvas-wrap"), "foci_low")
+                threshold.evaluate("(r) => { r.value = 8; r.dispatchEvent(new Event('input', { bubbles: true })); }")
+                page.wait_for_timeout(1500)
+                wait_preview(page)
+                page.check("#ch0")
+                page.check("#ch2")
+                page.check("#show-foci")
+                page.check("#show-coloc")
+                page.locator("#foci-toggles input").nth(1).check()
+
             # Analyze all images, then the Results page
             page.click("#run")
             page.wait_for_function("document.querySelector('#page-results') && !document.querySelector('#page-results').hidden",
@@ -142,6 +193,7 @@ def main(want_prefixes: list[str]) -> None:
             page.wait_for_timeout(3000)
             if want("results"):
                 save(page, "results")
+                home_crop("results")
             if want("settings_page"):
                 page.click("[data-page=settings]")
                 page.wait_for_selector("#program table", timeout=120_000)

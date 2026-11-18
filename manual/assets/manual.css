@@ -1,0 +1,67 @@
+/* Foci Analyzer colors, as in the program: its green, with the blue and pink of the logo */
+:root, [data-md-color-scheme="default"] {
+  --md-primary-fg-color: #1f7a4d;
+  --md-primary-fg-color--light: #2f9463;
+  --md-primary-fg-color--dark: #17643e;
+  --md-accent-fg-color: #d81b7a;
+  --md-typeset-a-color: #17643e;
+  --fa-blue: #2f80c8;
+  --fa-pink: #d81b7a;
+}
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #1f7a4d;
+  --md-primary-fg-color--light: #4fb783;
+  --md-primary-fg-color--dark: #17643e;
+  --md-accent-fg-color: #ff5ca8;
+  --md-typeset-a-color: #6fcf9c;
+  --md-default-bg-color: #0f1214;
+  --md-code-bg-color: #171b1e;
+  --fa-blue: #6cb2ee;
+  --fa-pink: #ff5ca8;
+}
+[data-md-color-scheme="slate"] .md-header, [data-md-color-scheme="slate"] .md-tabs { background-color: #123d29; }
+
+.md-typeset figure { margin: 1.2em auto; }
+.md-typeset figcaption { max-width: 46rem; margin-top: .4em; color: var(--md-default-fg-color--light); }
+
+/* two figures side by side (one above the other on a phone) */
+.md-typeset .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+.md-typeset .grid-2 figure { margin: 0; }
+@media (max-width: 700px) { .md-typeset .grid-2 { grid-template-columns: 1fr; } }
+
+.md-grid { max-width: 72rem; }
+.md-typeset .grid.cards > ul > li { border-radius: 8px; }
+
+/* the home page: a hero with the window */
+.fa-hero { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 2.2rem; align-items: center;
+  margin: .4rem 0 1.8rem; }
+.md-typeset .fa-brand { display: flex; align-items: center; gap: 1rem; margin-bottom: .8rem; }
+.md-typeset .fa-brand img { width: clamp(4.5rem, 8vw, 6.5rem); height: auto; flex: none; }
+.md-typeset .fa-hero h1 { margin: 0; font-size: clamp(1.8rem, 3.6vw, 2.7rem); font-weight: 800; letter-spacing: -.02em;
+  line-height: 1.1; background: linear-gradient(90deg, var(--md-primary-fg-color--light), var(--fa-blue) 55%, var(--fa-pink));
+  -webkit-background-clip: text; background-clip: text; color: transparent; }
+.md-typeset .fa-hero h1 .headerlink { display: none; }
+.md-typeset .fa-tagline { font-size: 1.15rem; line-height: 1.4; font-weight: 600; margin: 0 0 .7rem; }
+.md-typeset .fa-hero p { max-width: 32rem; }
+.md-typeset .fa-hero .md-button { margin: .3rem .4rem .2rem 0; }
+.md-typeset .fa-shot { margin: 0; }
+.md-typeset .fa-shot img { width: 100%; height: auto; display: block; border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .25); border: 1px solid var(--md-default-fg-color--lightest); }
+.md-typeset .fa-shot figcaption { font-size: .62rem; max-width: none; }
+@media (max-width: 960px) { .fa-hero { grid-template-columns: 1fr; gap: 1rem; } }
+
+/* section heads of the home page */
+.md-typeset h2.fa-center { text-align: center; margin: 2.2rem 0 .3rem; font-size: 1.4rem; font-weight: 700; }
+.md-typeset .fa-lead { text-align: center; max-width: 36rem; margin: 0 auto 1.6rem; font-size: .85rem;
+  color: var(--md-default-fg-color--light); }
+
+/* the four steps */
+.md-typeset .fa-steps > ul { counter-reset: step; }
+.md-typeset .fa-steps > ul > li { position: relative; padding-top: 1rem; }
+.md-typeset .fa-steps .twemoji svg, .md-typeset .fa-steps .lg { color: var(--md-primary-fg-color); }
+
+/* the gallery: screenshots as card heads */
+.md-typeset .fa-gallery > ul > li > p:first-child { margin: -.8rem -.8rem .6rem; }
+.md-typeset .fa-gallery img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: center;
+  border-radius: 8px 8px 0 0; border-bottom: 1px solid var(--md-default-fg-color--lightest); }
+.md-typeset .fa-gallery > ul { grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }

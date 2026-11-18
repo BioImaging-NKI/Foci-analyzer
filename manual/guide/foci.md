@@ -6,6 +6,12 @@ channels are in the section **Foci** above them. This page explains what every s
 them; [How the analysis works](../reference/analysis.md#3-foci) has the steps in short, and
 [All settings](../reference/settings.md) the defaults and limits.
 
+<figure markdown>
+![A foci channel](../images/foci_channel.png){ width="320" }
+<figcaption>A foci channel with the watershed method: the <b>Estimate</b> button with its <b>?</b>, the foci size,
+and the threshold with its slider. The advanced settings are under <b>Advanced</b>.</figcaption>
+</figure>
+
 ## Two methods
 
 | | **watershed** | **spotiflow** |
@@ -51,6 +57,20 @@ downs. **This image** on the right of the viewer shows the noise and the thresho
 Because the threshold is relative to the noise, the same value works for images of different brightness or
 exposure. Lower values find more and fainter foci, but also more peaks that are only noise; higher values
 keep only the clear foci. The foci markers in the viewer follow the slider at once, without a new analysis.
+
+<div class="grid-2" markdown>
+<figure markdown>
+![Threshold 8](../images/foci_raw.png)
+<figcaption>Threshold 8 (the default): a marker on the clear foci.</figcaption>
+</figure>
+<figure markdown>
+![Threshold 3](../images/foci_low.png)
+<figcaption>Threshold 3: also many peaks of the noise.</figcaption>
+</figure>
+</div>
+
+Foci channel 2 of the example; a ring around a marker means that the focus colocalizes with a focus of
+another channel.
 
 ### Estimate
 
@@ -152,6 +172,11 @@ when they are nearer to them.
 2. Press **Estimate** in the foci channel for a starting point (watershed).
 3. **Check the size.** Switch to **Filtered** (++r++): foci should be round spots of about their own size.
    A focus that shows as two or three spots needs a larger *Foci size*; foci that run together, a smaller one.
+
+    <figure markdown>
+    ![Filtered](../images/foci_filtered.png){ width="520" }
+    <figcaption>The same nuclei as above, <b>Filtered</b>: the smooth background of the nucleus is gone, spots of the foci size stand out.</figcaption>
+    </figure>
 4. **Set the threshold.** In the filtered view, 100 % is exactly the threshold. Move the slider until the
    clear foci all have a marker and the background between them has none. Look at cells with few foci and
    at cells with many: both should look right.

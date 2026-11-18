@@ -256,16 +256,18 @@ def _pe_end(data: bytes) -> int:
 
 
 def branded_launcher(src: Path, dst: Path, ico: Path) -> bool:
-    """A copy of uv's launcher `src` with the icon of `ico` (Windows). uv's launcher finds its Python and script
-    in data appended after the program part, so that part is set aside while the icon is replaced, and appended
-    again. Returns False (and leaves a plain copy) when the icon cannot be set."""
+    """A copy of uv's launcher `src` with the icon of `ico` (Windows). Older uv launchers find their Python and
+    script in data appended after the program part: that part is set aside while the icon is replaced, and
+    appended again. Newer ones keep it in their resources, which stay (only the icon resources are added).
+    Returns False (and leaves a plain copy) when the icon cannot be set."""
     import ctypes
     import struct
     data = src.read_bytes()
     end = _pe_end(data)
     dst.write_bytes(data)
-    if not ico.is_file() or end >= len(data):
+    if not ico.is_file():
         return False
+    appended = data[end:] if end < len(data) else b""
     try:
         icon = ico.read_bytes()
         _, kind, count = struct.unpack_from("<HHH", icon, 0)
@@ -277,7 +279,7 @@ def branded_launcher(src: Path, dst: Path, ico: Path) -> bool:
         k32.UpdateResourceW.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ushort,
                                         ctypes.c_char_p, ctypes.c_uint]
         k32.EndUpdateResourceW.argtypes = [ctypes.c_void_p, ctypes.c_bool]
-        dst.write_bytes(data[:end])  # the program part only; the rest is appended again below
+        dst.write_bytes(data[:end] if appended else data)  # the program part only; the rest is appended below
         h = k32.BeginUpdateResourceW(str(dst), False)
         if not h:
             raise OSError(ctypes.get_last_error())
@@ -290,8 +292,9 @@ def branded_launcher(src: Path, dst: Path, ico: Path) -> bool:
             k32.UpdateResourceW(h, 14, name, 0, group, len(group))  # RT_GROUP_ICON
         if not k32.EndUpdateResourceW(h, False):
             raise OSError(ctypes.get_last_error())
-        with dst.open("ab") as f:
-            f.write(data[end:])
+        if appended:
+            with dst.open("ab") as f:
+                f.write(appended)
         return True
     except (OSError, ValueError, AttributeError, struct.error) as e:
         say(f"  (the program icon could not be set: {e})")

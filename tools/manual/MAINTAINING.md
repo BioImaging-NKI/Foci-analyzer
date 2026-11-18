@@ -77,6 +77,10 @@ print(c.groupby("image").size().to_dict(), c.groupby("image")[["foci_ch2", "foci
 | `results.png` | the Results page after **Analyze all images** |
 | `settings_page.png` | the Settings page (lists this computer's graphics card and paths) |
 | `logo.png` | copy of `src/foci_analyzer/static/logo.png` |
+| `logo-320.png` | `installer/logo-512.png` made smaller, for the home page |
+| `home_experiment.png`, `home_results.png` | 16:10 crops of `experiment.png` and `results.png` for the cards of the home page (`home_crop` in the script) |
+| `foci_channel.png` | foci channel 1 with **Estimate** and its **?** (`guide/foci.md`) |
+| `foci_raw.png`, `foci_filtered.png`, `foci_low.png` | foci channel 2 only, markers only, on the nucleus nearest the middle of foci_1: raw at threshold 8, Filtered, and raw at threshold 3 (`guide/foci.md`) |
 
 The removed cell is put back before **Analyze all images**, so `removed_cells.tsv` of the example is empty.
 

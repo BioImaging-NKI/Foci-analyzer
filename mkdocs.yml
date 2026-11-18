@@ -1,6 +1,6 @@
 # The user manual of Foci Analyzer. Preview: mkdocs serve   Build: mkdocs build --strict (into site/)
 # Made with the tools in docs-env (tools/manual/MAINTAINING.md); screenshots and reference pages by tools/manual.
-# Not published yet: it goes on GitHub Pages after the repository has moved to BioImaging-NKI.
+# Published on GitHub Pages by .github/workflows/manual.yml on every push to main that changes it.
 site_name: Foci Analyzer manual
 site_description: User manual of Foci Analyzer, detection and quantification of foci in nuclei and cells in 2D and 3D microscopy images
 site_url: https://bioimaging-nki.github.io/Foci-analyzer/
@@ -17,13 +17,13 @@ theme:
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: teal
-      accent: teal
+      primary: custom
+      accent: custom
       toggle: { icon: material/weather-night, name: Dark mode }
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: teal
-      accent: teal
+      primary: custom
+      accent: custom
       toggle: { icon: material/weather-sunny, name: Light mode }
   features:
     - navigation.tabs
@@ -71,5 +71,10 @@ markdown_extensions:
   - tables
   - toc: { permalink: true }
   - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.keys
   - pymdownx.superfences
+
+extra_css: [assets/manual.css]

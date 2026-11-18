@@ -7,6 +7,8 @@ Every entry says whether results change.
 - Spotiflow works with any *Foci size* and with the 3D models: the image is now resized by Foci Analyzer
   itself (Spotiflow's own resizing refused 3D models and most sizes, with *3D scaling is not supported yet*
   or *Invalid scale factor*). Results change only where these errors occurred.
+- Windows: `Foci Analyzer.exe` has the logo again (newer uv launchers keep their start data inside the program
+  file, which the setup did not expect).
 - **Estimate** has a **?** like the settings. Manual: a page *Foci detection* on the methods, every foci
   setting and how to tune them. Results do not change.
 
