@@ -73,3 +73,11 @@ def test_same_foci_as_watershed_on_even_foci(dimension, scope):
     assert sorted(r.cells["foci_ch2"]) == [3, 6]
     for _, sy, sx in spots:
         assert np.min(np.hypot(r.foci.x / PX0 - sx, r.foci.y / PX0 - sy)) < 1.0
+
+
+def test_round_only_removes_the_nucleus_edge_for_watershed():
+    data, info, truth = mixed()
+    edge = pipeline.analyze_frame(StageCache(), "m", data, info, settings(size=0.6)).foci
+    clean = pipeline.analyze_frame(StageCache(), "m", data, info, settings(size=0.6, round_only=True)).foci
+    assert len(edge) > 2 * len(truth)  # the edge of the bright nucleus stands out at this size
+    assert len(clean) == len(truth)

@@ -158,6 +158,12 @@ are about the same size, the watershed method is as good and faster.
 All three work in 3D for 3D detection. The threshold is relative to the noise of the chosen filter, so after
 changing the filter the same threshold value gives roughly comparable results, but check it.
 
+**Round foci only** (watershed; off by default): only peaks around which the image curves down in every
+direction in XY count. A focus does; the edge of a bright nucleus or nucleolus, or a bright streak, curves in
+one direction only, and so does a side peak on the flank of a larger focus. Foci more than about 2.4 times as
+long as wide are left out too, and sometimes one of two foci that touch. On test images it removed 1 to 8 % of
+the foci, mostly such side peaks and peaks on the rim of the nucleus. The multi-scale method always does this.
+
 **Focus extent** (watershed): where a focus ends, which sets its size and integrated intensity.
 
 - `half maximum` (default): every focus grows from its peak down to half of its own height. Its size then does
@@ -236,6 +242,7 @@ Some signs and what to do:
 | One large focus with two or more markers | a larger *Foci size*; when there are small foci too, the *multi-scale* method |
 | Two foci close together with one marker | a smaller *Foci size*, or `LoG` |
 | Foci counted in nucleoli or debris | a lower *Largest focus*, or a higher *Threshold* |
+| Markers in a row along the edge of the nucleus, or beside large foci | *Round foci only* |
 | Very different foci counts in cells that look alike, while the background differs | *Noise from* `per cell` |
 | One condition has far more foci and the threshold seems to shift with it | *Noise from* `fixed value` |
 | Foci at the edge of the nucleus missing | *Cell border shift* of 0.5 to 1 µm |

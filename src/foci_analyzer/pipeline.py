@@ -190,10 +190,15 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
                 return cellmap, noise, noise, 0.05, pos, prob, cellmap[pos[:, 0], pos[:, 1], pos[:, 2]]
             floor = noise if fc.threshold_scope == "fixed value" else 1.0
             S = F if fc.threshold_scope == "fixed value" else F / unit
-            return (cellmap, unit, noise, floor, *an.find_candidates(S, sigma, floor, cellmap, True))
+            pos, height, cell = an.find_candidates(S, sigma, floor, cellmap, True)
+            if fc.round_only and len(pos):  # not the edge of a bright nucleus or a streak
+                ok = an.roundness_map(raw, sigma)[pos[:, 0], pos[:, 1], pos[:, 2]] >= an.ROUND_MIN
+                pos, height, cell = pos[ok], height[ok], cell[ok]
+            return cellmap, unit, noise, floor, pos, height, cell
 
         k_cand, (cellmap, unit, noise, floor, pos, height, cell) = cache.run(
             "candidates", {"scope": fc.threshold_scope, "out": an.reach(general), "method": fc.method,
+                           "round": fc.round_only and fc.method == "watershed",
                            "model": fc.spotiflow_model if fc.method == "spotiflow" else ""}, (k_det, k_seg),
             candidates, f"Finding foci in channel {fc.channel}"
             + (" (Spotiflow)" if fc.method == "spotiflow" else ""), (4 + 3 * n, steps))

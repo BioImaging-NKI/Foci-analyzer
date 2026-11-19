@@ -145,6 +145,11 @@ class FociChannelSettings:
                       "product of two à trous wavelet planes; good for foci of mixed size on uneven "
                       "background. All work in 3D for 3D detection.", advanced=True,
                       choices=["DoG", "LoG", "wavelet"], when={"method": ["watershed"]})
+    round_only: bool = opt(False, "Round foci only", "Only peaks around which the image curves down in every "
+                           "direction (in XY) count. A focus does; the edge of a bright nucleus or nucleolus, or a "
+                           "bright streak, curves in one direction only. Foci more than about 2.4 times as long as "
+                           "wide are left out as well. The multi-scale method always does this.", advanced=True,
+                           when={"method": ["watershed"]})
     extent: str = opt("half maximum", "Focus extent", "Where a focus ends: at half of its own peak height "
                       "(size does not depend on the threshold), or at the threshold.", advanced=True,
                       choices=["half maximum", "threshold"], when={"method": ["watershed"]})

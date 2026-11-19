@@ -9,6 +9,9 @@ Every entry says whether results change.
   most, only round peaks, one focus per large focus. The size at which each focus was found is the new column
   `detected_size` of `foci.tsv`. **Estimate** proposes the size range too. Results of the other methods do not
   change.
+- Watershed: **Round foci only** (Advanced, off by default) leaves out peaks that are not round, such as the
+  edge of a bright nucleus or a side peak of a larger focus (1 to 8 % of the foci on test images). Results
+  change only when it is turned on.
 - The starting page shows how far the start is: a ring around the logo and the current step, timed as at the
   last start.
 - Spotiflow works with any *Foci size* and with the 3D models: the image is now resized by Foci Analyzer

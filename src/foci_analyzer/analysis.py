@@ -336,6 +336,23 @@ def _log_and_roundness_block(img: np.ndarray, sigma: tuple[float, float, float])
     return F.astype(np.float32, copy=False), planar.astype(np.float32, copy=False), roundness
 
 
+def roundness_map(img: np.ndarray, sigma: tuple[float, float, float]) -> np.ndarray:
+    """How round the image is around every voxel at one filter size (see `_log_and_roundness_block`), filtered
+    in strips side by side."""
+    img = img.astype(np.float32, copy=False)
+    out = np.empty(img.shape, np.float32)
+    rows, m = img.shape[1], int(np.ceil(4 * sigma[1])) + 2
+    parts = 1 if img.size < 2_000_000 else max(1, min(4 * _strips._max_workers, rows // max(64, 8 * m)))
+    edges = np.unique(np.linspace(0, rows, parts + 1).astype(int))
+
+    def strip(a, e):
+        lo, hi = max(0, a - m), min(rows, e + m)
+        out[:, a:e] = _log_and_roundness_block(img[:, lo:hi], sigma)[2][:, a - lo:e - lo]
+
+    list(_strips.map(lambda ab: strip(*ab), pairwise(edges)))
+    return out
+
+
 def multiscale_filter(img: np.ndarray, sizes: list[float], cal: Calibration, z_elongation: float,
                       cells: np.ndarray, per_cell: bool):
     """The Laplacian of Gaussian at every size, scale-normalized (Lindeberg) so that the sizes compare. The
