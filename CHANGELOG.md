@@ -2,7 +2,7 @@
 
 Every entry says whether results change.
 
-## Unreleased
+## 2.0.0b2 (2026-11-19)
 
 - New foci method **multi-scale**, for foci of very different sizes: the filter at several sizes between the
   smallest and the largest foci size (a slider with two ends), each focus at the size where it stands out
@@ -11,7 +11,6 @@ Every entry says whether results change.
   change.
 - The starting page shows how far the start is: a ring around the logo and the current step, timed as at the
   last start.
-
 - Spotiflow works with any *Foci size* and with the 3D models: the image is now resized by Foci Analyzer
   itself (Spotiflow's own resizing refused 3D models and most sizes, with *3D scaling is not supported yet*
   or *Invalid scale factor*). Results change only where these errors occurred.

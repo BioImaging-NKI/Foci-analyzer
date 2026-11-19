@@ -1,6 +1,6 @@
 [project]
 name = "foci-analyzer"
-version = "2.0.0b1"
+version = "2.0.0b2"
 description = "Detection, quantification and colocalization of foci in nuclei and cells (Python successor of the Foci Analyzer Fiji macro)"
 readme = "README.md"
 authors = [{ name = "Bram van den Broek" }]
