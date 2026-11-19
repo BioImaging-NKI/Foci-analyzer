@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from itertools import pairwise
 
 import numpy as np
 from scipy import ndimage as ndi
@@ -171,6 +172,10 @@ def reach(general) -> float:
 _pool = ThreadPoolExecutor(max(2, min(8, (os.cpu_count() or 2) // 2)), thread_name_prefix="filter")
 
 
+# strips of a large image filtered side by side (a pool of its own: these jobs are started from the filter pool)
+_strips = ThreadPoolExecutor(max(2, min(16, os.cpu_count() or 2)), thread_name_prefix="strip")
+
+
 def together(*jobs):
     """The results of functions that run at the same time (the filters of scipy release the interpreter)."""
     futures = [_pool.submit(j) for j in jobs[1:]]
@@ -236,11 +241,243 @@ def spot_filter(img: np.ndarray, sigma: tuple[float, float, float], method: str)
     raise ValueError(f"unknown filter '{method}'")
 
 
+# ---------------------------------------------------------------- multi-scale foci
+SCALE_STEP = 1.35  # each filter size this much larger than the previous one
+
+
+def scale_sizes(lo: float, hi: float) -> list[float]:
+    """The foci sizes (µm) to filter at: from the smallest to the largest, about SCALE_STEP apart, at most 8."""
+    lo, hi = min(lo, hi), max(lo, hi)
+    if hi < 1.1 * lo:
+        return [float(lo)]
+    n = min(8, int(np.ceil(np.log(hi / lo) / np.log(SCALE_STEP))) + 1)
+    return [float(x) for x in np.geomspace(lo, hi, n)]
+
+
+ROUND_MIN = 0.3  # a peak is a focus only when it curves down in both directions (not an edge or a ridge):
+# 0.3 keeps foci up to about 2.4 times as long as wide; an edge of a bright nucleus is far below it
+
+
+def _second(G: np.ndarray, axis: int) -> np.ndarray:
+    """Second difference along one axis (the edges repeated)."""
+    a = np.moveaxis(G, axis, 0)
+    out = np.empty_like(a)
+    out[1:-1] = a[2:] - 2 * a[1:-1] + a[:-2]
+    out[0], out[-1] = (a[1] - a[0], a[-2] - a[-1]) if len(a) > 1 else (0, 0)
+    return np.moveaxis(out, 0, axis)
+
+
+def _mixed_yx(G: np.ndarray) -> np.ndarray:
+    """The mixed second difference in Y and X (zero at the edges)."""
+    out = np.zeros_like(G)
+    out[:, 1:-1, 1:-1] = (G[:, 2:, 2:] - G[:, 2:, :-2] - G[:, :-2, 2:] + G[:, :-2, :-2]) / 4
+    return out
+
+
+def _bin_xy(img: np.ndarray, b: int) -> np.ndarray:
+    """The mean of b × b blocks in XY (the last rows and columns repeated to fill the blocks)."""
+    z, y, x = img.shape
+    yp, xp = -(-y // b) * b, -(-x // b) * b
+    p = np.pad(img, ((0, 0), (0, yp - y), (0, xp - x)), mode="edge")
+    return p.reshape(z, yp // b, b, xp // b, b).mean((2, 4), dtype=np.float32)
+
+
+def _linear_axis(x: np.ndarray, b: int, start: int, stop: int, axis: int) -> np.ndarray:
+    """Rows start..stop of an image b times larger along `axis`, by linear interpolation between the centers of
+    the binned pixels."""
+    c = (np.arange(start, stop) + 0.5) / b - 0.5
+    i0 = np.clip(np.floor(c).astype(int), 0, x.shape[axis] - 1)
+    i1 = np.minimum(i0 + 1, x.shape[axis] - 1)
+    w = np.clip(c - i0, 0, 1).astype(np.float32)
+    shape = [1] * x.ndim
+    shape[axis] = len(c)
+    w = w.reshape(shape)
+    return np.take(x, i0, axis=axis) * (1 - w) + np.take(x, i1, axis=axis) * w
+
+
+def _enlarge(x: np.ndarray, b: int, a: int, e: int, width: int) -> np.ndarray:
+    """Rows a..e (all columns up to `width`) of the binned image x enlarged b times in Y and X."""
+    return _linear_axis(_linear_axis(x, b, a, e, 1), b, 0, width, 2)
+
+
+def _log_and_roundness_block(img: np.ndarray, sigma: tuple[float, float, float]):
+    """The scale-normalized Laplacian of Gaussian (positive on a spot), its part in XY alone, and how round the
+    spot is in XY: the smaller over the larger curvature of the Hessian (1 for a round spot, about 0 for an edge
+    or a line). One Gaussian blur, then second differences: four times faster than four derivative filters."""
+    G = ndi.gaussian_filter(img, sigma)
+    yy = _second(G, 1)
+    yy *= -sigma[1] ** 2  # minus the second derivatives: positive where the image curves down
+    xx = _second(G, 2)
+    xx *= -sigma[2] ** 2
+    xy = _mixed_yx(G)
+    xy *= -sigma[1] * sigma[2]
+    planar = yy + xx
+    if sigma[0] >= 0.3 and G.shape[0] > 1:
+        F = _second(G, 0)
+        F *= -sigma[0] ** 2
+        F += planar
+    else:
+        F = planar.copy()
+    del G
+    # the two curvatures in XY: planar/2 ± d, d = sqrt(((yy - xx)/2)² + xy²); in place, to spare memory and time
+    yy -= xx
+    yy *= 0.5
+    np.square(yy, out=yy)
+    np.square(xy, out=xy)
+    yy += xy
+    d = np.sqrt(yy, out=yy)
+    del xx, xy
+    big = planar * 0.5
+    big += d
+    small = planar * 0.5
+    small -= d
+    roundness = np.full(planar.shape, -1.0, np.float32)
+    np.divide(small, big, out=roundness, where=big > 0)
+    return F.astype(np.float32, copy=False), planar.astype(np.float32, copy=False), roundness
+
+
+def multiscale_filter(img: np.ndarray, sizes: list[float], cal: Calibration, z_elongation: float,
+                      cells: np.ndarray, per_cell: bool):
+    """The Laplacian of Gaussian at every size, scale-normalized (Lindeberg) so that the sizes compare. The
+    sizes vary in XY only: in Z the filter keeps the width of the smallest size, because in Z foci are mostly as
+    large as the microscope makes them (a wider filter would average a thin focus away and favor the smallest
+    size). Per voxel the size with the highest response in XY, the full response at that size, the index of the
+    size and the roundness there; and the noise (robust SD inside the cells) of the full response per size, for
+    the image and, with `per_cell`, per cell (index 0: the image value). Only the running maximum is kept."""
+    img = img.astype(np.float32, copy=False)
+    inside = cells > 0
+    best = np.full(img.shape, -np.inf, np.float32)  # the XY response that chooses the size
+    response = np.zeros(img.shape, np.float32)
+    scale = np.zeros(img.shape, np.uint8)
+    roundness = np.zeros(img.shape, np.float32)
+    F = np.empty(img.shape, np.float32) if per_cell else None  # per cell: the whole response, for the noise per cell
+    n = int(cells.max())
+    objs = ndi.find_objects(cells) if per_cell and n else []
+    noise_image, noise_cell = [], []
+    sz = sigma_px(sizes[0], cal, img.shape[0], z_elongation)[0]
+    binned = {}
+    for k, size in enumerate(sizes):
+        sigma = (sz, *sigma_px(size, cal, img.shape[0], z_elongation)[1:])
+        # an image pyramid: a size whose filter is wider than 4 px is filtered on an image binned b × b in XY
+        # (the filter then at least 2 px), and its result enlarged again; the result is smooth at such a size,
+        # and the scale-normalized response does not depend on the binning
+        b = 1
+        while sigma[1] / (2 * b) >= 2 and img.shape[1] // (2 * b) >= 16 and img.shape[2] // (2 * b) >= 16:
+            b *= 2
+        small = None
+        if b > 1:
+            if b not in binned:
+                binned[b] = _bin_xy(img, b)
+            small = _log_and_roundness_block(binned[b], (sigma[0], sigma[1] / b, sigma[2] / b))
+
+        samples = []
+
+        def strip(a, e, sigma=sigma, k=k, samples=samples, b=b, small=small):  # one strip of rows a..e
+            if small is None:  # with a margin wide enough for the filter
+                m = int(np.ceil(4 * sigma[1])) + 2
+                lo, hi = max(0, a - m), min(img.shape[1], e + m)
+                f, xy, rnd = _log_and_roundness_block(img[:, lo:hi], sigma)
+                f, xy, rnd = (x[:, a - lo:e - lo] for x in (f, xy, rnd))
+            else:  # the binned result, enlarged
+                f, xy, rnd = (_enlarge(x, b, a, e, img.shape[2]) for x in small)
+            if F is not None:
+                F[:, a:e] = f
+            inner = inside[:, a:e]
+            samples.append(f[inner][::8] if inner.any() else f.ravel()[::64])  # for the noise of the image
+            up = xy > best[:, a:e]
+            best[:, a:e][up] = xy[up]
+            response[:, a:e][up] = f[up]
+            scale[:, a:e][up] = k
+            roundness[:, a:e][up] = rnd[up]
+
+        # many strips, as many at a time as there are workers: the extra memory stays a fraction of the image
+        rows = img.shape[1]
+        margin = int(np.ceil(4 * sigma[1] / b)) + 2
+        parts = 1 if img.size < 2_000_000 else max(1, min(4 * _strips._max_workers, rows // max(64, 8 * margin)))
+        edges = np.unique(np.linspace(0, rows, parts + 1).astype(int) // b * b)
+        edges[-1] = rows
+        list(_strips.map(lambda ab: strip(*ab), pairwise(edges)))
+        whole = robust_sd(np.concatenate(samples))
+        per = np.full(n + 1, whole, np.float32)
+        for i, sl in enumerate(objs, start=1):
+            if sl is not None:
+                per[i] = robust_sd(F[sl][cells[sl] == i])
+        noise_image.append(whole)
+        noise_cell.append(per)
+    return response, scale, roundness, np.asarray(noise_image, np.float32), np.stack(noise_cell)
+
+
+def suppress_nearby(pos: np.ndarray, height: np.ndarray, radius: np.ndarray, z_scale: float) -> np.ndarray:
+    """Which candidates remain when, from the highest down, every remaining candidate removes the lower ones
+    within its own radius (px; z counts `z_scale` px per slice). One focus per large focus, while small foci
+    side by side stay apart. Indices, in the order given."""
+    if len(pos) < 2:
+        return np.arange(len(pos))
+    pts = pos.astype(np.float64) * np.array([z_scale, 1.0, 1.0])
+    order = np.argsort(-height, kind="stable")
+    near = cKDTree(pts).query_ball_point(pts[order], radius[order])
+    gone = np.zeros(len(pos), bool)
+    for i, nb in zip(order, near, strict=True):
+        if gone[i]:
+            continue
+        for j in nb:
+            if j != i and height[j] <= height[i]:
+                gone[j] = True
+    return np.flatnonzero(~gone)
+
+
+def multiscale_candidates(F, sigma, sizes, scale, roundness, n_img, n_cell, cells, cellmap, cal: Calibration,
+                          z_elongation: float, scope: str):
+    """Candidates of the multi-scale method: (unit, noise, floor, positions, heights, cells). The height of a
+    voxel is its filter response divided by the noise at its own size. Only round peaks count (not the edge of
+    a bright nucleus), and lower peaks within the radius of a higher one's size are left out (one focus per
+    large focus)."""
+    noise = float(np.median(n_img))
+    if scope == "fixed value":
+        unit, floor = 1.0, noise
+    elif scope == "per cell":
+        unit, floor = n_cell[scale, cells], 1.0
+    else:
+        unit, floor = n_img[scale], 1.0
+    pos, height, cell = find_candidates(F / unit, sigma, floor, cellmap, True)
+    if len(pos):
+        ok = roundness[pos[:, 0], pos[:, 1], pos[:, 2]] >= ROUND_MIN
+        pos, height, cell = pos[ok], height[ok], cell[ok]
+    if len(pos):
+        radius = 0.5 * np.asarray(sizes)[scale[pos[:, 0], pos[:, 1], pos[:, 2]]] / cal.pixel_size
+        z_scale = cal.z_spacing / cal.pixel_size / z_elongation if F.shape[0] > 1 else 1.0
+        keep = suppress_nearby(pos, height, np.maximum(radius, 1.0), z_scale)
+        pos, height, cell = pos[keep], height[keep], cell[keep]
+    return unit, noise, floor, pos, height, cell
+
+
 def background(img: np.ndarray, sigma: tuple[float, float, float]) -> np.ndarray:
     """The image without its foci: a gray opening (in XY) with a window three focus diameters wide."""
     k = 2 * int(np.ceil(1.5 * FWHM * sigma[1])) + 1
     sm = ndi.gaussian_filter(img.astype(np.float32, copy=False), (0, 0.5 * sigma[1], 0.5 * sigma[1]))
     return ndi.grey_opening(sm, size=(1, k, k))
+
+
+def background_large(img: np.ndarray, sigma: tuple[float, float, float]) -> np.ndarray:
+    """As `background`, for a large focus size (multi-scale): on an image binned in XY so that the window is
+    about 16 pixels, then enlarged again. The background is smooth at that size; the full opening would take
+    tens of seconds on a large stack."""
+    k = 2 * int(np.ceil(1.5 * FWHM * sigma[1])) + 1
+    b = 1
+    while k / (2 * b) >= 16 and img.shape[1] // (2 * b) >= 16 and img.shape[2] // (2 * b) >= 16:
+        b *= 2
+    if b == 1:
+        return background(img, sigma)
+    small = background(_bin_xy(img.astype(np.float32, copy=False), b), (sigma[0], sigma[1] / b, sigma[2] / b))
+    out = np.empty(img.shape, np.float32)
+    rows = img.shape[1]
+    edges = np.unique(np.r_[np.arange(0, rows, max(64, rows // (2 * _strips._max_workers))), rows])
+
+    def strip(a, e):
+        out[:, a:e] = _enlarge(small, b, a, e, img.shape[2])
+
+    list(_strips.map(lambda ab: strip(*ab), pairwise(edges)))
+    return out
 
 
 def robust_sd(values: np.ndarray) -> float:
@@ -466,6 +703,32 @@ def estimate_threshold(heights: np.ndarray) -> tuple[float, str]:
     return float(np.exp(filters.threshold_otsu(lh))), "otsu"
 
 
+def estimate_multiscale(raw: np.ndarray, labels: np.ndarray, cellmap: np.ndarray, cal: Calibration, general) -> dict:
+    """Size range and threshold for the multi-scale method: the filter over a wide range of sizes (from 2.5
+    pixels to 60 pixels or 5 µm), the threshold from the peak heights as for one size, and the range from the
+    10th to the 90th percentile of the sizes of the foci above it, the upper end one filter step wider (the
+    lower end stays: below 2.5 pixels a size cannot be told apart from the pixels)."""
+    lo, hi = max(0.05, 2.5 * cal.pixel_size), min(5.0, 60 * cal.pixel_size)
+    sizes = scale_sizes(lo, hi)
+    cells = match_z(labels, raw.shape[0])
+    F, scale, rnd, n_img, n_cell = multiscale_filter(raw, sizes, cal, general.z_elongation, cells, False)
+    sigma = sigma_px(sizes[0], cal, raw.shape[0], general.z_elongation)
+    _, noise, _, pos, h, _ = multiscale_candidates(F, sigma, sizes, scale, rnd, n_img, n_cell, cells, cellmap, cal,
+                                                   general.z_elongation, "per image")
+    t, how = estimate_threshold(h)
+    if not np.isfinite(t):
+        raise ValueError("too few peaks to estimate a threshold")
+    t = float(min(50.0, max(1.0, round(t, 1))))
+    found = np.asarray(sizes)[scale[pos[:, 0], pos[:, 1], pos[:, 2]]][h >= t]
+    if len(found) < 3:
+        raise ValueError("too few foci to estimate the size range")
+    small = max(0.05, round(float(np.percentile(found, 10)) / 0.05) * 0.05)
+    large = max(small * SCALE_STEP, round(float(np.percentile(found, 90)) * SCALE_STEP / 0.05) * 0.05)
+    large = round(large / 0.05) * 0.05
+    return {"size": round(small, 2), "size_max": round(large, 2), "threshold": t, "how": how, "noise": noise,
+            "foci": int((h >= t).sum())}
+
+
 def estimate_foci(stack: np.ndarray, labels: np.ndarray, cal: Calibration, general, fc) -> dict:
     """Foci size and threshold for one foci channel (`stack`: Z, Y, X of the prepared image) in its cells."""
     raw = project(stack, general.dimension)
@@ -473,6 +736,8 @@ def estimate_foci(stack: np.ndarray, labels: np.ndarray, cal: Calibration, gener
     mask = cellmap.max(0) > 0
     if not mask.any():
         raise ValueError("no cells to estimate in")
+    if fc.method == "multi-scale":
+        return estimate_multiscale(raw, labels, cellmap, cal, general)
     size = estimate_size(raw.max(0), mask, cal.pixel_size)
     if not np.isfinite(size):
         raise ValueError("no clear foci to measure the size of")

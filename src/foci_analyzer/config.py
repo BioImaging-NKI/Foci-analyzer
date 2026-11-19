@@ -16,16 +16,19 @@ import tomli_w
 
 def opt(default: Any, label: str, help: str = "", *, advanced: bool = False, choices: list[str] | None = None,
         min: float | None = None, max: float | None = None, step: float | None = None, unit: str = "",
-        slider: bool = False, when: dict | None = None, off_when: dict | None = None, catalog: bool = False):
+        slider: bool = False, when: dict | None = None, off_when: dict | None = None, catalog: bool = False,
+        range_of: str | None = None):
     """A setting with what the window needs to show it. `help` is the context help (the ? in the form).
 
     `when` names settings of the same group and the values for which this one is shown; `off_when` those for
     which it is shown but grayed out (not used). `catalog`: a model
     name, chosen from the pretrained models of the network (models.CATALOG) or a model of your own.
+    `range_of`: this setting is the upper end of a range whose lower end is that setting; the form shows the
+    two as one slider with two ends when both are shown.
     """
     meta = {"label": label, "help": help, "advanced": advanced, "choices": choices, "min": min, "max": max,
             "step": step, "unit": unit, "slider": slider, "when": when, "off_when": off_when,
-            "catalog": catalog}
+            "catalog": catalog, "range_of": range_of}
     return field(default=default, metadata=meta)
 
 
@@ -111,14 +114,21 @@ class FociChannelSettings:
     channel: int = opt(2, "Channel", "The channel with the foci.", min=1)
     method: str = opt("watershed", "Method", "watershed: the image is filtered so that spots of the foci size "
                       "stand out, local maxima above the threshold become foci, and a seeded watershed gives "
-                      "every focus its extent. spotiflow: a neural network finds the spots and gives each a "
+                      "every focus its extent. multi-scale: the same at several sizes between the smallest and "
+                      "the largest foci size, each focus at the size where it stands out most; for foci that "
+                      "differ much in size. spotiflow: a neural network finds the spots and gives each a "
                       "probability; the extents are found in the same way.",
-                      choices=["watershed", "spotiflow"])
+                      choices=["watershed", "multi-scale", "spotiflow"])
     size: float = opt(0.5, "Foci size", "Expected diameter of a focus (full width at half maximum). It sets "
-                      "the filter scale and the smallest distance between two foci. With Spotiflow the image is "
+                      "the filter scale and the smallest distance between two foci. Multi-scale: the range of "
+                      "foci sizes, from the smallest to the largest. With Spotiflow the image is "
                       "resized for the network so that foci are about 3 pixels wide (as it was trained), and "
-                      "the size of each focus is measured at this scale.", min=0.05, step=0.05,
+                      "the size of each focus is measured at this scale.", min=0.05, max=10, step=0.05,
                       unit="µm")
+    size_max: float = opt(2.5, "Largest foci size", "Multi-scale: the diameter of the largest foci (full width at "
+                          "half maximum). The image is filtered at sizes from the foci size up to this one, each "
+                          "about 1.35 times the previous (at most 8).", min=0.05, max=10, step=0.05, unit="µm",
+                          when={"method": ["multi-scale"]}, range_of="size")
     sensitivity: float = opt(8.0, "Threshold", "A local maximum is a focus when its height in the filtered "
                              "image is this many times the noise. The noise is how much the filtered image "
                              "goes up and down by chance between the foci: the typical size of those "
@@ -126,7 +136,8 @@ class FociChannelSettings:
                              "absolute deviation, which equals the standard deviation for pure noise but is "
                              "hardly raised by the foci themselves. So 8 means: 8 times higher than the "
                              "usual ups and downs. Lower finds more and fainter foci, but also more chance "
-                             "peaks. The viewer follows this slider directly.", min=1, max=50, step=0.1, unit="× noise", slider=True, when={"method": ["watershed"]})
+                             "peaks. The viewer follows this slider directly.", min=1, max=50, step=0.1, unit="× noise", slider=True,
+                             when={"method": ["watershed", "multi-scale"]})
     probability: float = opt(0.5, "Spotiflow probability", "Spots below this probability are left out.",
                              min=0, max=1, step=0.01, slider=True, when={"method": ["spotiflow"]})
     filter: str = opt("DoG", "Filter", "DoG: difference of two Gaussians around the foci size. LoG: Laplacian "
@@ -143,10 +154,12 @@ class FociChannelSettings:
                                "image. per cell: every cell its own noise. fixed value: the same absolute "
                                "threshold for all images, which is the fair choice when conditions differ "
                                "strongly in foci numbers.", advanced=True,
-                               choices=["per image", "per cell", "fixed value"], when={"method": ["watershed"]})
+                               choices=["per image", "per cell", "fixed value"],
+                               when={"method": ["watershed", "multi-scale"]})
     fixed_threshold: float = opt(0.0, "Fixed threshold", "For 'fixed value': the threshold in units of the "
                                  "filtered image. The viewer shows the value that the current image uses.",
-                                 advanced=True, min=0, when={"method": ["watershed"], "threshold_scope": ["fixed value"]})
+                                 advanced=True, min=0,
+                                 when={"method": ["watershed", "multi-scale"], "threshold_scope": ["fixed value"]})
     spotiflow_model: str = opt("general", "Spotiflow model", "The pretrained Spotiflow model, or a model of your "
                                "own (the last choice: its folder). 3D models need a stack and 'Detect foci in' 3D.",
                                catalog=True, when={"method": ["spotiflow"]})

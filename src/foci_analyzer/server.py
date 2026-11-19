@@ -564,8 +564,8 @@ class App:
             fc = s.foci[int(body["index"])]
         except (KeyError, ValueError, IndexError) as e:
             raise ApiError("no such foci channel") from e
-        if fc.method != "watershed":
-            raise ApiError("the estimate is for the watershed method only")
+        if fc.method not in ("watershed", "multi-scale"):
+            raise ApiError("the estimate is for the watershed and multi-scale methods only")
         im = self.image(image_id)
         data = im.data[t]
         if r.offset != (0, 0) or r.labels.shape[1] * r.binning + 2 * r.border < im.info.height - r.binning:

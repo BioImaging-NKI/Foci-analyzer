@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import tifffile
+from scipy import ndimage as ndi
 
 from . import analysis as an
 from . import models
@@ -147,19 +148,40 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
 
     def one(n, fc):  # one foci channel; the channels are done at the same time
 
+        multi = fc.method == "multi-scale"
+
         def detect(fc=fc):
             raw = an.project(data[fc.channel - 1], general.dimension)
             sigma = an.sigma_px(fc.size, cal, raw.shape[0], general.z_elongation)
-            F, bg = an.together(lambda: an.spot_filter(raw, sigma, fc.filter), lambda: an.background(raw, sigma))
-            return raw, F, bg, sigma
+            if not multi:
+                F, bg = an.together(lambda: an.spot_filter(raw, sigma, fc.filter), lambda: an.background(raw, sigma))
+                return raw, F, bg, sigma, None
+            # multi-scale: the filter at every size; the noise per size needs the cells, so this stage follows
+            # the segmentation. `smooth` (the image lightly smoothed, without its background) gives the extents.
+            sizes = an.scale_sizes(fc.size, fc.size_max)
+            lo = an.sigma_px(sizes[0], cal, raw.shape[0], general.z_elongation)
+            hi = an.sigma_px(sizes[-1], cal, raw.shape[0], general.z_elongation)
+            (F, scale, rnd, n_img, n_cell), bg = an.together(
+                lambda: an.multiscale_filter(raw, sizes, cal, general.z_elongation, an.match_z(labels, raw.shape[0]),
+                                             fc.threshold_scope == "per cell"),
+                lambda: an.background_large(raw, hi))
+            smooth = ndi.gaussian_filter(raw.astype(np.float32), tuple(0.5 * x for x in lo)) - bg
+            return raw, F, bg, lo, (sizes, scale, n_img, n_cell, smooth, rnd)
 
-        k_det, (raw, F, bg, sigma) = cache.run(
+        k_det, (raw, F, bg, sigma, multi_data) = cache.run(
             "filter", {"ch": fc.channel, "dim": general.dimension, "size": fc.size, "filter": fc.filter,
-                       "ze": general.z_elongation}, (k_prep,), detect,
-            f"Filtering channel {fc.channel}", (3 + 3 * n, steps))
+                       "ze": general.z_elongation, "method": "multi-scale" if multi else "",
+                       **({"size_max": fc.size_max, "per_cell": fc.threshold_scope == "per cell"} if multi else {})},
+            (k_prep, k_seg) if multi else (k_prep,), detect,
+            f"Filtering channel {fc.channel}" + (" at several sizes" if multi else ""), (3 + 3 * n, steps))
 
-        def candidates(fc=fc, raw=raw, F=F, sigma=sigma):
+        def candidates(fc=fc, raw=raw, F=F, sigma=sigma, multi_data=multi_data):
             cellmap = an.match_z(an.expand(labels, cal, an.reach(general)), raw.shape[0])
+            if multi_data is not None:
+                sizes, scale, n_img, n_cell, _, rnd = multi_data
+                return (cellmap, *an.multiscale_candidates(F, sigma, sizes, scale, rnd, n_img, n_cell,
+                                                           an.match_z(labels, raw.shape[0]), cellmap, cal,
+                                                           general.z_elongation, fc.threshold_scope))
             unit, noise = an.noise_unit(F, an.match_z(labels, raw.shape[0]), fc.threshold_scope)
             if fc.method == "spotiflow":
                 pos, prob = models.spots(raw, cal, fc)
@@ -190,9 +212,11 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
             return res, None
 
         def extents(fc=fc, F=F, unit=unit, pos=pos, height=height, cell=cell, cellmap=cellmap, raw=raw, bg=bg,
-                    threshold=threshold):
+                    threshold=threshold, multi_data=multi_data):
             S = F / unit
-            if fc.method == "spotiflow":
+            if multi_data is not None:  # each focus down to half of its own height in the image itself
+                S, level, half = multi_data[4], 0.0, True
+            elif fc.method == "spotiflow":
                 level, half = 1.0, True
             else:
                 half = fc.extent == "half maximum"
@@ -201,6 +225,10 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
                                         fc.max_size)
             table = an.measure_foci(lab, raw, bg, cal)
             table["cell"], table["height"] = cell[kept], height[kept]
+            if multi_data is not None:  # the size at which each focus stood out most
+                sizes, scale = multi_data[0], multi_data[1]
+                p = pos[kept]
+                table["detected_size"] = np.asarray(sizes, float)[scale[p[:, 0], p[:, 1], p[:, 2]]] if len(p) else np.zeros(0)
             return lab, kept, table
 
         k_ext, (res.labels, res.kept, res.table) = cache.run(
@@ -307,8 +335,9 @@ def _tables(data, base, labels, n, cal, channels: list[ChannelResult], s: Settin
             for i in np.flatnonzero((cnt > 2 * med) & (cnt > med + 4 * max(mad, 1.0))):
                 flags[i].append(f"many foci in channel {c}")
         df = pd.DataFrame({"cell": t["cell"], "channel": c, "focus": np.arange(1, len(t["cell"]) + 1)})
-        for col in ("x", "y", "z", "size", "voxels", "mean", "peak", "integrated", "height"):
-            df[col] = t[col]
+        for col in ("x", "y", "z", "size", "detected_size", "voxels", "mean", "peak", "integrated", "height"):
+            if col in t:  # detected_size: multi-scale only
+                df[col] = t[col]
         parts.append(df)
 
     co = s.colocalization

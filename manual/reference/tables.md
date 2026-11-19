@@ -38,6 +38,7 @@ Cells removed by hand in the viewer are not in the table.
 | `track` | in a tracked time-lapse: the track of its cell |
 | `x`, `y`, `z` | its center (µm; z 0 for foci found on a projection) |
 | `size`, `voxels` | its size (µm³ in 3D, µm² in 2D) and number of pixels or voxels |
+| `detected_size` | multi-scale method only: the size (µm, full width at half maximum) at which it stood out most |
 | `mean`, `peak` | its mean and highest intensity |
 | `integrated` | its summed intensity above the local background |
 | `height` | the height of its peak in the filtered image, in units of the threshold (× noise), or the Spotiflow probability |

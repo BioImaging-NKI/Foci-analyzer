@@ -59,6 +59,12 @@ of focus, which takes every pixel from the slice where it is sharpest):
    never grows into another focus or outside its cell. Foci outside *Smallest focus* and *Largest focus*
    are removed.
 
+With **multi-scale**, steps 1 to 5 run over several foci sizes (from *Foci size* to *Largest foci size*): a
+scale-normalized Laplacian of Gaussian per size (Lindeberg, 1998), each point at the size where it stands out
+most in XY; the noise per size; only peaks that curve down in both directions in XY (not an edge); lower peaks
+within the radius of a higher one's size left out; and every focus grown down to half of its own height above
+the background. See [Foci detection](../guide/foci.md#the-multi-scale-method).
+
 With **spotiflow**, the network Spotiflow finds the spots and gives each a probability; spots above
 *Spotiflow probability* inside the cells are foci, and their extents are found as in step 5. A 2D Spotiflow
 model on a stack finds the spots in the maximum projection and takes the slice of the brightest value.

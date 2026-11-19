@@ -101,6 +101,10 @@ td.path { color: var(--muted); max-width: 420px; overflow: hidden; text-overflow
 .field.check { grid-template-columns: 1fr 16px auto; }
 .field.slider { grid-template-columns: 1fr 16px 132px; }
 .field.slider input[type=range] { grid-column: 1 / -1; width: 100%; margin: 0; }
+.field .dual { grid-column: 1 / -1; }
+.field.slider.range { grid-template-columns: 1fr 16px 160px; }
+.field.range .control { gap: 4px; }
+.field.range .control input[type=number] { width: 0; flex: 1; min-width: 0; }
 details.advanced { margin-top: 6px; border-top: 1px dashed var(--line); padding-top: 6px; }
 details.advanced > summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
 .group { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 8px; }

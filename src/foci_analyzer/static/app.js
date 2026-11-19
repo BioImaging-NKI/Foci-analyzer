@@ -189,19 +189,54 @@ function control(f, group, sectionKey, index) {
     el("div", { class: "control" }, input, f.unit ? el("span", { class: "unit", textContent: f.unit }) : null), range,
     lock3d ? el("div", { class: "sub", textContent: "The cells are segmented in 3D, so the foci are detected in 3D too. Set 'Segment in' to 2D to use a projection." }) : null);
 }
+// Two settings that are the ends of one range (`range_of` in config.py), for example the smallest and largest foci
+// size: two numbers and one slider with two ends, on a logarithmic scale.
+const RANGE_LO = Math.log(0.1), RANGE_HI = Math.log(5);
+const rangePos = (v) => Math.round(1000 * (Math.log(Math.min(5, Math.max(0.1, v))) - RANGE_LO) / (RANGE_HI - RANGE_LO));
+const rangeValue = (p) => Math.max(0.05, +(Math.round(Math.exp(RANGE_LO + (p / 1000) * (RANGE_HI - RANGE_LO)) / 0.05) * 0.05).toFixed(2));
+function rangeControl(f, g, group) {
+  const id = `f${Math.random().toString(36).slice(2)}`, fill = el("div", { class: "fill" });
+  const show = () => {
+    lo.value = rangePos(group[f.key]); hi.value = rangePos(group[g.key]);
+    fill.style.left = `${lo.value / 10}%`; fill.style.right = `${100 - hi.value / 10}%`;
+  };
+  const set = (key, v, delay) => { group[key] = v; show(); settingsChanged(delay); };
+  const number = (key, isLow) => el("input", { id: isLow ? id : undefined, type: "number", value: group[key], min: f.min ?? "", max: f.max ?? "", step: f.step ?? "any",
+    "aria-label": isLow ? f.label : g.label,
+    onchange: (e) => {
+      let n = parseFloat(e.target.value);
+      if (!Number.isFinite(n)) { e.target.value = group[key]; return; }
+      n = isLow ? Math.min(n, group[g.key]) : Math.max(n, group[f.key]);
+      e.target.value = n; set(key, n);
+    } });
+  const a = number(f.key, true), b = number(g.key, false);
+  const lo = el("input", { type: "range", min: 0, max: 1000, step: 1, "aria-label": f.label,
+    oninput: (e) => { const v = Math.min(rangeValue(+e.target.value), group[g.key]); a.value = v; set(f.key, v, 250); } });
+  const hi = el("input", { type: "range", min: 0, max: 1000, step: 1, "aria-label": g.label,
+    oninput: (e) => { const v = Math.max(rangeValue(+e.target.value), group[f.key]); b.value = v; set(g.key, v, 250); } });
+  show();
+  return el("div", { class: "field slider range" }, el("label", { htmlFor: id, textContent: `${f.label} range` }),
+    helpIcon(`From the smallest to the largest foci size. ${g.help}`),
+    el("div", { class: "control" }, a, el("span", { class: "unit", textContent: "–" }), b, f.unit ? el("span", { class: "unit", textContent: f.unit }) : null),
+    el("div", { class: "dual" }, el("div", { class: "track" }), fill, lo, hi));
+}
 function fieldsOf(section, group, index) {
   const shown = section.fields.filter((f) => !f.when || Object.entries(f.when).every(([k, values]) => values.includes(group[k])));
-  const basic = shown.filter((f) => !f.advanced), adv = shown.filter((f) => f.advanced);
+  const upper = (f) => shown.find((g) => g.range_of === f.key);  // f is the lower end of a range that is shown
+  const one = (f) => (upper(f) ? rangeControl(f, upper(f), group) : control(f, group, section.key, index));
+  const basic = shown.filter((f) => !f.advanced && !f.range_of), adv = shown.filter((f) => f.advanced && !f.range_of);
   const open = store(`fa.adv.${section.key}`);
-  return [...basic.map((f) => control(f, group, section.key, index)),
+  return [...basic.map(one),
     adv.length ? el("details", { class: "advanced", open: !!open, ontoggle: (e) => store(`fa.adv.${section.key}`, e.target.open) },
-      el("summary", { textContent: "Advanced" }), adv.map((f) => control(f, group, section.key, index))) : null];
+      el("summary", { textContent: "Advanced" }), adv.map(one)) : null];
 }
 const ESTIMATE_HELP = "Estimate the foci size and threshold of this channel from the shown image (after Analyze this image), "
   + "as a starting point. Size: the median width at half height of the 300 brightest peaks in the cells. Threshold: the number "
   + "of foci is counted at many thresholds; where that number levels off (a plateau between the noise and the foci) the "
   + "threshold is taken there; without such a plateau, Otsu's method splits the peak heights into a low (noise) and a high "
-  + "(foci) group. Check the result in the image, for example with Filtered (key R).";
+  + "(foci) group. Multi-scale: the filter runs over a wide range of sizes, the threshold is found in the same way, and the "
+  + "size range spans the sizes of most foci above it (10th to 90th percentile, one filter step wider on both ends). "
+  + "Check the result in the image, for example with Filtered (key R).";
 const estimates = {};
 async function estimateFoci(i) {
   if (!V.id || !V.preview) { status("Press Analyze this image first: the estimate uses the cells it found", true); return; }
@@ -210,10 +245,11 @@ async function estimateFoci(i) {
     const r = await (await api("/api/estimate", { path: V.id, t: V.t, index: i })).json();
     const g = S.settings.foci[i];
     g.size = r.size;
+    if (r.size_max !== undefined) g.size_max = r.size_max;
     if (g.threshold_scope === "fixed value") g.fixed_threshold = Math.round(r.threshold * r.noise * 100) / 100; else g.sensitivity = r.threshold;
     // the note under the channel stays while these values are kept (the status bar is taken by the analysis)
-    estimates[i] = { size: g.size, sensitivity: g.sensitivity, fixed: g.fixed_threshold,
-      text: `Estimated: ${r.size} µm, threshold ${r.threshold} × noise (${r.how === "plateau" ? "where the number of foci levels off" : "Otsu: no plateau in the number of foci"}), about ${r.foci} foci. A starting point: check it in the image.` };
+    estimates[i] = { size: g.size, size_max: g.size_max, sensitivity: g.sensitivity, fixed: g.fixed_threshold,
+      text: `Estimated: ${r.size_max !== undefined ? `${r.size}–${r.size_max}` : r.size} µm, threshold ${r.threshold} × noise (${r.how === "plateau" ? "where the number of foci levels off" : "Otsu: no plateau in the number of foci"}), about ${r.foci} foci. A starting point: check it in the image.` };
     renderSettings(); settingsChanged(0);
     status(estimates[i].text);
   } catch (e) { status(e.message, true); }
@@ -238,10 +274,10 @@ function renderSettings() {
       list.push(g); renderSettings(); settingsChanged(); } })));
     list.forEach((g, i) => div.append(el("div", sec.key === "foci" ? { class: "group tinted", style: `--g:${hex(OUTLINE[i % OUTLINE.length])}` } : { class: "group" },
       el("div", { class: "group-head" }, `${sec.title} ${i + 1}`,
-        sec.key === "foci" && g.method === "watershed" ? el("span", { class: "estimate" }, el("button", { class: "small-btn", textContent: "Estimate", onclick: () => estimateFoci(i) }), helpIcon(ESTIMATE_HELP)) : null,
+        sec.key === "foci" && (g.method === "watershed" || g.method === "multi-scale") ? el("span", { class: "estimate" }, el("button", { class: "small-btn", textContent: "Estimate", onclick: () => estimateFoci(i) }), helpIcon(ESTIMATE_HELP)) : null,
         list.length > 1 ? el("button", { class: "link", textContent: "Remove", onclick: () => { list.splice(i, 1); renderSettings(); settingsChanged(); } }) : null),
       ...fieldsOf(sec, g, i).filter(Boolean),
-      sec.key === "foci" && estimates[i] && estimates[i].size === g.size && estimates[i].sensitivity === g.sensitivity && estimates[i].fixed === g.fixed_threshold
+      sec.key === "foci" && estimates[i] && estimates[i].size === g.size && estimates[i].size_max === g.size_max && estimates[i].sensitivity === g.sensitivity && estimates[i].fixed === g.fixed_threshold
         ? el("div", { class: "sub", textContent: estimates[i].text }) : null)));
     box.append(div);
   }

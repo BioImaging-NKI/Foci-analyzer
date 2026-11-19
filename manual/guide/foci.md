@@ -12,20 +12,21 @@ them; [How the analysis works](../reference/analysis.md#3-foci) has the steps in
 and the threshold with its slider. The advanced settings are under <b>Advanced</b>.</figcaption>
 </figure>
 
-## Two methods
+## Three methods
 
-| | **watershed** | **spotiflow** |
-|---|---|---|
-| How spots are found | a filter makes spots of the *Foci size* stand out; every local maximum higher than *Threshold* × the noise is a focus | the neural network [Spotiflow](https://weigertlab.org/spotiflow/) finds spots and gives each a probability; those above *Spotiflow probability* are foci |
-| You set | *Foci size*, *Threshold* (and the filter) | *Spotiflow probability*, the model; *Foci size* only sets the scale |
-| Needs | nothing extra | Spotiflow installed (Settings page) |
-| Strong in | foci of a known size, also large or irregular ones; full control; 3D | small, round, diffraction-limited spots (FISH-like); uneven background; little tuning |
-| Weaker in | very uneven background, spots of very different sizes | large or irregular foci, which are not what it was trained on |
-| Extent of a focus | grown from its peak (see *Focus extent*) | the same way, on the filtered image at the *Foci size* |
+| | **watershed** | **multi-scale** | **spotiflow** |
+|---|---|---|---|
+| How spots are found | a filter makes spots of the *Foci size* stand out; every local maximum higher than *Threshold* × the noise is a focus | the same at several sizes in a range; each focus is found at the size where it stands out most | the neural network [Spotiflow](https://weigertlab.org/spotiflow/) finds spots and gives each a probability; those above *Spotiflow probability* are foci |
+| You set | *Foci size*, *Threshold* (and the filter) | *Foci size range*, *Threshold* | *Spotiflow probability*, the model; *Foci size* only sets the scale |
+| Needs | nothing extra | nothing extra; about 3 to 5 times the time of watershed | Spotiflow installed (Settings page) |
+| Strong in | foci of one typical size, also large or irregular ones; full control; 3D | foci of very different sizes in one image: one focus per large focus, and the small ones still found; a size per focus | small, round, diffraction-limited spots (FISH-like); uneven background; little tuning |
+| Weaker in | very uneven background, spots of very different sizes | long or irregular foci (only fairly round peaks count); slower on large stacks | large or irregular foci, which are not what it was trained on |
+| Extent of a focus | grown from its peak (see *Focus extent*) | grown from its peak down to half of its own height above the background | the same way, on the filtered image at the *Foci size* |
 
-Start with **watershed**: it works on almost every image and its two numbers are easy to understand. Try
-**spotiflow** when the foci are small spots and the watershed finds too many noise peaks or misses spots on a
-bright background.
+Start with **watershed**: it works on almost every image and its two numbers are easy to understand. Choose
+**multi-scale** when the foci differ much in size, so that with one *Foci size* the large foci fall apart into
+several, or the small ones are missed. Try **spotiflow** when the foci are small spots and the watershed finds
+too many noise peaks or misses spots on a bright background.
 
 ## The watershed method
 
@@ -89,6 +90,35 @@ The status bar says which of the two was used and about how many foci it gives. 
 value`, the estimate fills in the *Fixed threshold* instead. Check the result in the image: the estimate does
 not know which spots you want to count. It works less well when there are many small faint spots that should
 not count; a larger *Foci size*, then **Estimate** again, usually helps.
+
+## The multi-scale method
+
+**Foci size range** (two numbers, and a slider with two ends): the smallest and the largest foci, as full
+width at half maximum (default 0.5 to 2.5 µm). The image is filtered at sizes from the one to the other, each
+about 1.35 times the previous (at most 8 sizes). How it works:
+
+1. At every size, the image is filtered with a Laplacian of Gaussian, *scale-normalized* (Lindeberg) so that
+   the sizes can be compared. Each point keeps the size at which it stands out most: a focus of 1 µm stands
+   out most at about 1 µm. In a stack the sizes vary in X and Y only; in Z the filter keeps the width of the
+   smallest size, because in Z foci are mostly as large as the microscope makes them.
+2. **Threshold**: the noise is measured at every size separately (finer sizes are noisier), and a peak is a
+   focus when it is *Threshold* times the noise *at its own size*. So the threshold means the same as with
+   the watershed method, and the *Filtered* view and *Noise from* work as there.
+3. **Round peaks only**: a peak counts when the image curves down in both directions around it. A focus does;
+   the edge of a bright nucleus, which also stands out at large sizes, curves in one direction only. Foci up to
+   about 2.4 times as long as wide are kept.
+4. **One focus per focus**: from the highest peak down, every focus removes the lower peaks within its own
+   radius. A large focus is then one focus, while two small foci side by side stay apart.
+5. **Extent**: every focus grows from its peak down to half of its own height above the background, so its
+   size follows the focus itself. The size at which it was found is in the column `detected_size` of
+   `foci.tsv`.
+
+**Estimate** for this method filters the image over a wide range of sizes, finds the threshold as described
+above, and takes the range from the sizes of most foci above it (the 10th to the 90th percentile, the upper end
+one size step wider).
+
+A wider range costs time (each size is one more filtering): set it no wider than the foci need. When all foci
+are about the same size, the watershed method is as good and faster.
 
 ## The Spotiflow method
 
@@ -193,7 +223,7 @@ Some signs and what to do:
 |---|---|
 | Markers on the background between foci | a higher *Threshold* (or *Probability*) |
 | Faint but real foci without a marker | a lower *Threshold*; for small foci on a bright nucleus also `wavelet` |
-| One large focus with two or more markers | a larger *Foci size* |
+| One large focus with two or more markers | a larger *Foci size*; when there are small foci too, the *multi-scale* method |
 | Two foci close together with one marker | a smaller *Foci size*, or `LoG` |
 | Foci counted in nucleoli or debris | a lower *Largest focus*, or a higher *Threshold* |
 | Very different foci counts in cells that look alike, while the background differs | *Noise from* `per cell` |
