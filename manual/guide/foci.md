@@ -95,7 +95,17 @@ not count; a larger *Foci size*, then **Estimate** again, usually helps.
 
 **Foci size range** (two numbers, and a slider with two ends): the smallest and the largest foci, as full
 width at half maximum (default 0.5 to 2.5 µm). The image is filtered at sizes from the one to the other, each
-about 1.35 times the previous (at most 8 sizes). How it works:
+about 1.35 times the previous (at most 8 sizes).
+
+<figure markdown>
+![Watershed at two sizes against multi-scale](../images/multiscale_compare.png)
+<figcaption>Foci of very different sizes (γH2AX-like foci, 63× confocal stack, maximum projection; scale bars 5 µm).
+With a small foci size (left) the large focus falls apart into many; with a large one (middle) the small foci are
+missed. Multi-scale (right) finds the large focus once and the small ones as well; each circle is as wide as the
+size at which the focus was found.</figcaption>
+</figure>
+
+How it works:
 
 1. At every size, the image is filtered with a Laplacian of Gaussian, *scale-normalized* (Lindeberg) so that
    the sizes can be compared. Each point keeps the size at which it stands out most: a focus of 1 µm stands

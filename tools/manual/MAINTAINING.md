@@ -79,6 +79,7 @@ print(c.groupby("image").size().to_dict(), c.groupby("image")[["foci_ch2", "foci
 | `logo.png` | copy of `src/foci_analyzer/static/logo.png` |
 | `logo-320.png` | `installer/logo-512.png` made smaller, for the home page |
 | `home_experiment.png`, `home_results.png` | 16:10 crops of `experiment.png` and `results.png` for the cards of the home page (`home_crop` in the script) |
+| `multiscale_compare.png` | watershed 0.3 and 1.0 µm against multi-scale 0.3–2.5 µm, two crops chosen by the script; made by `tools/manual/multiscale_figure.py "TestData/Hi-res 3D/ZT_CO_8Y_AP_63x_1.tif"` (not by the refresh: the image is not in the example; the user allowed its use) |
 | `foci_channel.png` | foci channel 1 with **Estimate** and its **?** (`guide/foci.md`) |
 | `foci_raw.png`, `foci_filtered.png`, `foci_low.png` | foci channel 2 only, markers only, on the nucleus nearest the middle of foci_1: raw at threshold 8, Filtered, and raw at threshold 3 (`guide/foci.md`) |
 
