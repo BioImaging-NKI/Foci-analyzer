@@ -99,7 +99,7 @@ about 1.35 times the previous (at most 8 sizes).
 
 <figure markdown>
 ![Watershed at two sizes against multi-scale](../images/multiscale_compare.png)
-<figcaption>Foci of very different sizes (γH2AX-like foci, 63× confocal stack, maximum projection; scale bars 5 µm).
+<figcaption>Foci of very different sizes (a 63× stack, maximum projection; scale bars 5 µm).
 With a small foci size (left) the large focus falls apart into many; with a large one (middle) the small foci are
 missed. Multi-scale (right) finds the large focus once and the small ones as well; each circle is as wide as the
 size at which the focus was found.</figcaption>
