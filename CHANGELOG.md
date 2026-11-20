@@ -2,6 +2,13 @@
 
 Every entry says whether results change.
 
+## 2.0.0b3 (2026-11-20)
+
+- Windows setup: the installation stopped at *[1/4] The program* with *Failed to create Python minor version
+  link directory ... untrusted mount point (os error 448)*. Inno Setup 6.7 passes Windows' RedirectionGuard
+  on to the installation, which then cannot use the link uv makes in the Python folder; the setup now turns it
+  off. Results do not change.
+
 ## 2.0.0b2 (2026-11-19)
 
 - New foci method **multi-scale**, for foci of very different sizes: the filter at several sizes between the
@@ -12,10 +19,6 @@ Every entry says whether results change.
 - Watershed: **Round foci only** (Advanced, off by default) leaves out peaks that are not round, such as the
   edge of a bright nucleus or a side peak of a larger focus (1 to 8 % of the foci on test images). Results
   change only when it is turned on.
-- Windows setup: the installation stopped at *[1/4] The program* with *Failed to create Python minor version
-  link directory ... untrusted mount point (os error 448)*. Inno Setup 6.7 passes Windows' RedirectionGuard
-  on to the installation, which then cannot use the link uv makes in the Python folder; the setup now turns it
-  off. Results do not change.
 - The starting page shows how far the start is: a ring around the logo and the current step, timed as at the
   last start.
 - Spotiflow works with any *Foci size* and with the 3D models: the image is now resized by Foci Analyzer

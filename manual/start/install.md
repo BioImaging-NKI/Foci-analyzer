@@ -15,7 +15,7 @@ Mac; StarDist runs on the processor.
 Everything is on the [latest release](https://github.com/BioImaging-NKI/Foci-analyzer/releases/latest) page
 on GitHub. Under **Assets** at the bottom:
 
-- **Windows**: `FociAnalyzer-Setup-<version>.exe` (for example `FociAnalyzer-Setup-2.0.0b2.exe`).
+- **Windows**: `FociAnalyzer-Setup-<version>.exe` (for example `FociAnalyzer-Setup-2.0.0b3.exe`).
 - **macOS and Linux**: **Source code (zip)** or **Source code (tar.gz)**; unpack it.
 
 Older versions are under **Releases** on the [GitHub page](https://github.com/BioImaging-NKI/Foci-analyzer).

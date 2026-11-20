@@ -1,6 +1,6 @@
 """Foci Analyzer: foci in nuclei and cells, with a browser window."""
 
-__version__ = "2.0.0b2"
+__version__ = "2.0.0b3"
 
 
 def build() -> str:
