@@ -28,14 +28,16 @@ STARTING = """<!doctype html><html><head><meta charset="utf-8"><title>Foci Analy
 body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;font:16px system-ui,sans-serif;
 background:#f4f5f7;color:#333}@media(prefers-color-scheme:dark){body{background:#1d1f23;color:#ddd}}
 div.box{text-align:center}.logo{position:relative;width:168px;height:168px;margin:0 auto}
-.logo img{position:absolute;left:20px;top:20px;width:128px;height:128px;animation:p 1.6s ease-in-out infinite}
+.logo img{position:absolute;left:27px;top:19px;width:128px;height:128px;animation:p 1.6s ease-in-out infinite}
 .logo svg{position:absolute;left:0;top:0;transform:rotate(-90deg)}
-.logo circle{fill:none;stroke-width:5}.logo .track{stroke:rgba(127,127,127,.18)}
-.logo .ring{stroke:#1f7a4d;stroke-linecap:round;transition:stroke-dashoffset .35s linear}
-@media(prefers-color-scheme:dark){.logo .ring{stroke:#4fb783}}
+.logo circle{fill:none;stroke-width:8}.logo .track{stroke:rgba(127,127,127,.18)}
+.logo .ring{stroke:#fff;stroke-linecap:round;transition:stroke-dashoffset .35s linear}
+.logo .grad{width:168px;height:168px;background:conic-gradient(from 84deg,#2f9463 2%,#2f80c8 55%,#d81b7a 98%)}
+@media(prefers-color-scheme:dark){.logo .grad{background:conic-gradient(from 84deg,#4fb783 2%,#6cb2ee 55%,#ff5ca8 98%)}}
 @keyframes p{50%{opacity:.45}}p{margin:14px 0 0}small{opacity:.7}</style></head>
-<body data-starting><div class="box"><div class="logo"><svg width="168" height="168"><circle class="track" cx="84" cy="84" r="80"/>
-<circle class="ring" id="ring" cx="84" cy="84" r="80" stroke-dasharray="502.7" stroke-dashoffset="502.7"/></svg>
+<body data-starting><div class="box"><div class="logo"><svg width="168" height="168"><circle class="track" cx="84" cy="84" r="79"/>
+<mask id="m"><circle class="ring" id="ring" cx="84" cy="84" r="79" stroke-dasharray="496.4" stroke-dashoffset="496.4"/></mask>
+<foreignObject width="168" height="168" mask="url(#m)"><div xmlns="http://www.w3.org/1999/xhtml" class="grad"></div></foreignObject></svg>
 <img src="/static/logo.png" alt=""></div><p>Starting Foci Analyzer&hellip;</p>
 <small id="step">The window opens here in a moment.</small></div><script>
 // reloads once the answer is no longer this page (the window, or the error); the page must not contain the
@@ -45,7 +47,7 @@ if(t.indexOf("data-starting")<0)location.reload();else setTimeout(poll,400);})
 .catch(()=>setTimeout(poll,1000));})();
 // the ring around the logo: how far the start is (the steps, timed as at the last start)
 (function step(){fetch("/starting.json",{cache:"no-store"}).then(r=>r.json()).then(s=>{
-document.getElementById("ring").style.strokeDashoffset=String(502.7*(1-s.fraction));
+document.getElementById("ring").style.strokeDashoffset=String(496.4*(1-s.fraction));
 if(s.text)document.getElementById("step").textContent=s.text+"…";setTimeout(step,150);})
 .catch(()=>setTimeout(step,500));})();</script></body></html>"""
 
