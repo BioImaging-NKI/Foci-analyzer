@@ -35,6 +35,10 @@ UninstallDisplayIcon={app}\program\installer\FociAnalyzer.ico
 UninstallDisplayName=Foci Analyzer
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+; Inno Setup 6.7+ enables Windows' RedirectionGuard, and the programs Setup starts inherit it. uv links
+; python\cpython-3.12-... to the patch version with a junction made without administrator rights, which
+; RedirectionGuard refuses to follow: "untrusted mount point (os error 448)". So it stays off.
+RedirectionGuard=no
 
 [Tasks]
 Name: "desktopicon"; Description: "Put a shortcut on the desktop"; GroupDescription: "Shortcuts:"
