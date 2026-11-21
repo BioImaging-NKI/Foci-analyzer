@@ -78,18 +78,25 @@ another channel.
 The **Estimate** button in the head of a watershed foci channel fills in *Foci size* and *Threshold* from the
 image in the viewer, as a starting point. It needs the cells, so press **Analyze this image** first.
 
-- **Size**: the median width at half height of the 300 brightest peaks in the cells, measured in eight
-  directions around each peak, and corrected for the slight smoothing used to find them.
-- **Threshold**: with that size, the foci are counted at many thresholds. Low thresholds count the many peaks
-  of the noise, high thresholds only the foci; in between, the number often hardly changes (a *plateau*, as in
-  the TrueSpot method). If there is such a plateau, the threshold is taken
+- **Threshold**: the image is filtered at a foci size, and the foci are counted at many thresholds. Low
+  thresholds count the many peaks of the noise, high thresholds only the foci; in between, the number often
+  hardly changes (a *plateau*, as in the TrueSpot method). If there is such a plateau, the threshold is taken
   where it is flattest. If not, *Otsu's method* splits the peak heights (on a log scale) into a low group, the
   noise, and a high group, the foci, and takes the threshold between them.
+- **Size**: measured on the foci above that threshold: the width at half height in eight directions around
+  each focus, the median over the foci, corrected for the slight smoothing used. With more than 500 foci, 500
+  are chosen at random, at most 10 from one cell (more when there are few cells), so that a few bright cells
+  or clusters do not decide the size. Foci that cannot be measured cleanly are left out: merged with a
+  brighter neighbor, with a saturated top, or much wider one way than another.
 
-The status bar says which of the two was used and about how many foci it gives. With *Noise from* `fixed
-value`, the estimate fills in the *Fixed threshold* instead. Check the result in the image: the estimate does
-not know which spots you want to count. It works less well when there are many small faint spots that should
-not count; a larger *Foci size*, then **Estimate** again, usually helps.
+Size and threshold depend on each other, so the two steps are repeated: it starts at a small size (0.4 µm, at
+least 3 pixels), at which foci of every size stand out, and filters again at the measured size until the size
+no longer changes. This works for an image with ten foci as well as for a tiled image with thousands.
+
+The status bar says which threshold method was used, about how many foci it gives, and on how many the size
+was measured. With *Noise from* `fixed value`, the estimate fills in the *Fixed threshold* instead. Check the
+result in the image: the estimate does not know which spots you want to count. When it counts many small
+faint spots that should not count, raise the *Threshold* by hand.
 
 ## The multi-scale method
 

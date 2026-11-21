@@ -665,34 +665,65 @@ def chance_colocalization(xyz_a: np.ndarray, radius: np.ndarray, n_b: int, cell_
 
 
 # ---------------------------------------------------------------- estimating the foci size and threshold
-def estimate_size(img2d: np.ndarray, mask: np.ndarray, pixel_size: float, n: int = 300) -> float:
-    """The typical foci diameter (FWHM, µm): the median width at half height (above the local background) of
-    the n brightest peaks in the mask, measured in 8 directions, corrected for the light smoothing used."""
+_DIRECTIONS = ((0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (-1, -1), (1, -1), (-1, 1))
+
+
+def measure_size(img2d: np.ndarray, ys: np.ndarray, xs: np.ndarray, pixel_size: float) -> tuple[float, int]:
+    """The typical diameter (FWHM, µm) of the foci at (ys, xs) and how many were measured: per focus the median
+    width at half height above the local background in 8 directions, the median over the foci, corrected for
+    the light smoothing used. Left out: foci near the edge, with a flat saturated top, with a brighter neighbor
+    before half height (merged foci), with fewer than 6 directions that reach half height within 2 µm, or more
+    than 2.5 times wider one way than another."""
+    R = int(np.clip(round(2.0 / pixel_size), 8, 40))
     sm = ndi.gaussian_filter(img2d.astype(np.float32), 1.0)
-    bg = ndi.minimum_filter(sm, 15)
-    peaks = (sm == ndi.maximum_filter(sm, 7)) & mask
-    ys, xs = np.nonzero(peaks)
-    order = np.argsort(sm[ys, xs] - bg[ys, xs])[::-1][:n]
-    R, widths = 10, []
-    for y, x in zip(ys[order], xs[order], strict=True):
-        if y < R or x < R or y >= img2d.shape[0] - R or x >= img2d.shape[1] - R:
-            continue
-        half = bg[y, x] + (sm[y, x] - bg[y, x]) / 2
-        reach = []
-        for dy, dx in ((0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (-1, -1), (1, -1), (-1, 1)):
-            step = np.hypot(dy, dx)
-            for k in range(1, R):
-                v = sm[y + k * dy, x + k * dx]
-                if v <= half:
-                    prev = sm[y + (k - 1) * dy, x + (k - 1) * dx]
-                    reach.append((k - 1 + ((prev - half) / (prev - v) if prev > v else 0)) * step)
-                    break
-        if len(reach) >= 6:
-            widths.append(2 * np.median(reach))
-    if not widths:
-        return float("nan")
+    bg = ndi.minimum_filter(sm, 2 * R + 1)
+    ys, xs = np.asarray(ys, int), np.asarray(xs, int)
+    H, W = sm.shape
+    ok = (ys >= R) & (xs >= R) & (ys < H - R) & (xs < W - R)
+    flat_top = ndi.uniform_filter((img2d >= img2d.max()).astype(np.float32), 3) > 1.5 / 9
+    ok[ok] &= ~flat_top[ys[ok], xs[ok]]
+    ys, xs = ys[ok], xs[ok]
+    if len(ys) == 0:
+        return float("nan"), 0
+    peak, base = sm[ys, xs], bg[ys, xs]
+    half = base + (peak - base) / 2
+    k = np.arange(R)
+    reach = np.full((len(ys), len(_DIRECTIONS)), np.nan)
+    for j, (dy, dx) in enumerate(_DIRECTIONS):
+        prof = sm[ys[:, None] + k * dy, xs[:, None] + k * dx]
+        below = prof <= half[:, None]
+        first = np.argmax(below, 1)
+        hit = below.any(1) & (first > 0)
+        brighter = ((prof > peak[:, None]) & (k < first[:, None])).any(1)
+        i = np.flatnonzero(hit & ~brighter)
+        prev, v = prof[i, first[i] - 1], prof[i, first[i]]
+        frac = np.where(prev > v, (prev - half[i]) / np.where(prev > v, prev - v, 1), 0)
+        reach[i, j] = (first[i] - 1 + frac) * np.hypot(dy, dx)
+    reach = reach[np.isfinite(reach).sum(1) >= 6]
+    reach = reach[np.nanmax(reach, 1) <= 2.5 * np.maximum(np.nanmin(reach, 1), 0.5)] if len(reach) else reach
+    if not len(reach):
+        return float("nan"), 0
+    widths = 2 * np.nanmedian(reach, 1)
     s = np.median(widths) / FWHM
-    return float(np.sqrt(max(s * s - 1.0, 0.25)) * FWHM * pixel_size)
+    return float(np.sqrt(max(s * s - 1.0, 0.25)) * FWHM * pixel_size), len(reach)
+
+
+def spread_sample(cells: np.ndarray, n: int = 500, per_cell: int = 10, seed: int = 0) -> np.ndarray:
+    """Indices of at most n of the foci, chosen at random with at most per_cell from one cell (when there are
+    more than n; with few cells more per cell, to still reach n): many foci in a few bright cells or clusters
+    then do not decide the size."""
+    cells = np.asarray(cells)
+    if len(cells) <= n:
+        return np.arange(len(cells))
+    per_cell = max(per_cell, -(-n // len(np.unique(cells))))
+    rng = np.random.default_rng(seed)
+    order = rng.permutation(len(cells))
+    order = order[np.argsort(cells[order], kind="stable")]
+    c = cells[order]
+    start = np.r_[0, np.flatnonzero(np.diff(c)) + 1]
+    rank = np.arange(len(c)) - np.repeat(start, np.diff(np.r_[start, len(c)]))
+    pick = order[rank < per_cell]
+    return np.sort(rng.choice(pick, n, replace=False) if len(pick) > n else pick)
 
 
 def estimate_threshold(heights: np.ndarray) -> tuple[float, str]:
@@ -755,17 +786,36 @@ def estimate_foci(stack: np.ndarray, labels: np.ndarray, cal: Calibration, gener
         raise ValueError("no cells to estimate in")
     if fc.method == "multi-scale":
         return estimate_multiscale(raw, labels, cellmap, cal, general)
-    size = estimate_size(raw.max(0), mask, cal.pixel_size)
-    if not np.isfinite(size):
-        raise ValueError("no clear foci to measure the size of")
-    size = max(0.05, round(size / 0.05) * 0.05)
-    sigma = sigma_px(size, cal, raw.shape[0], general.z_elongation)
-    F = spot_filter(raw, sigma, fc.filter)
+    return estimate_watershed(raw, cellmap, cal, general, fc)
+
+
+def estimate_watershed(raw: np.ndarray, cellmap: np.ndarray, cal: Calibration, general, fc, passes: int = 4) -> dict:
+    """Size and threshold for the watershed method, found together: the image is filtered at a size, the
+    threshold estimated from the peak heights, and the size measured on the foci above that threshold (at most
+    500, spread over the cells); then again at the measured size, until the size stays the same. It starts at a
+    small size (0.4 µm, at least 3 pixels), at which foci of every size give a peak."""
+    img2d = raw.max(0)
     scope = "per image" if fc.threshold_scope == "fixed value" else fc.threshold_scope
-    unit, noise = noise_unit(F, cellmap, scope)
-    _, h, _ = find_candidates(F / unit, sigma, 1.0, cellmap, True)
-    t, how = estimate_threshold(h)
-    if not np.isfinite(t):
-        raise ValueError("too few peaks to estimate a threshold")
+    size, used = max(0.4, round(3 * cal.pixel_size / 0.05) * 0.05), 0
+    for i in range(passes):
+        sigma = sigma_px(size, cal, raw.shape[0], general.z_elongation)
+        F = spot_filter(raw, sigma, fc.filter)
+        unit, noise = noise_unit(F, cellmap, scope)
+        pos, h, cells = find_candidates(F / unit, sigma, 1.0, cellmap, True)
+        t, how = estimate_threshold(h)
+        if not np.isfinite(t):
+            raise ValueError("too few peaks to estimate a threshold")
+        if i == passes - 1:
+            break
+        foci = np.flatnonzero(h >= t)
+        pick = foci[spread_sample(cells[foci])]
+        measured, used = measure_size(img2d, pos[pick, 1], pos[pick, 2], cal.pixel_size)
+        if used < 8 or not np.isfinite(measured):
+            raise ValueError("too few clear foci to measure the size of")
+        measured = max(0.05, round(measured / 0.05) * 0.05)
+        if abs(measured - size) < 0.025:
+            break
+        size = measured
     t = float(min(50.0, max(1.0, round(t, 1))))
-    return {"size": round(size, 2), "threshold": t, "how": how, "noise": float(noise), "foci": int((h >= t).sum())}
+    return {"size": round(size, 2), "threshold": t, "how": how, "noise": float(noise), "foci": int((h >= t).sum()),
+            "measured": used}

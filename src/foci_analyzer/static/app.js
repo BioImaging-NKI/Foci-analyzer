@@ -231,10 +231,11 @@ function fieldsOf(section, group, index) {
       el("summary", { textContent: "Advanced" }), adv.map(one)) : null];
 }
 const ESTIMATE_HELP = "Estimate the foci size and threshold of this channel from the shown image (after Analyze this image), "
-  + "as a starting point. Size: the median width at half height of the 300 brightest peaks in the cells. Threshold: the number "
+  + "as a starting point. Threshold: the number "
   + "of foci is counted at many thresholds; where that number levels off (a plateau between the noise and the foci) the "
   + "threshold is taken there; without such a plateau, Otsu's method splits the peak heights into a low (noise) and a high "
-  + "(foci) group. Multi-scale: the filter runs over a wide range of sizes, the threshold is found in the same way, and the "
+  + "(foci) group. Size: the median width at half height of the foci above that threshold (at most 500, spread over the "
+  + "cells); the filter then runs again at that size, until the size stays the same. Multi-scale: the filter runs over a wide range of sizes, the threshold is found in the same way, and the "
   + "size range spans the sizes of most foci above it (10th to 90th percentile, one filter step wider on both ends). "
   + "Check the result in the image, for example with Filtered (key R).";
 const estimates = {};
@@ -249,7 +250,7 @@ async function estimateFoci(i) {
     if (g.threshold_scope === "fixed value") g.fixed_threshold = Math.round(r.threshold * r.noise * 100) / 100; else g.sensitivity = r.threshold;
     // the note under the channel stays while these values are kept (the status bar is taken by the analysis)
     estimates[i] = { size: g.size, size_max: g.size_max, sensitivity: g.sensitivity, fixed: g.fixed_threshold,
-      text: `Estimated: ${r.size_max !== undefined ? `${r.size}–${r.size_max}` : r.size} µm, threshold ${r.threshold} × noise (${r.how === "plateau" ? "where the number of foci levels off" : "Otsu: no plateau in the number of foci"}), about ${r.foci} foci. A starting point: check it in the image.` };
+      text: `Estimated: ${r.size_max !== undefined ? `${r.size}–${r.size_max}` : r.size} µm, threshold ${r.threshold} × noise (${r.how === "plateau" ? "where the number of foci levels off" : "Otsu: no plateau in the number of foci"}), about ${r.foci} foci${r.measured !== undefined ? ` (size measured on ${r.measured})` : ""}. A starting point: check it in the image.` };
     renderSettings(); settingsChanged(0);
     status(estimates[i].text);
   } catch (e) { status(e.message, true); }

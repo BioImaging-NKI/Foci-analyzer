@@ -32,8 +32,8 @@ div.box{text-align:center}.logo{position:relative;width:168px;height:168px;margi
 .logo svg{position:absolute;left:0;top:0;transform:rotate(-90deg)}
 .logo circle{fill:none;stroke-width:8}.logo .track{stroke:rgba(127,127,127,.18)}
 .logo .ring{stroke:#fff;stroke-linecap:round;transition:stroke-dashoffset .35s linear}
-.logo .grad{width:168px;height:168px;background:conic-gradient(from 84deg,#2f9463 2%,#2f80c8 55%,#d81b7a 98%)}
-@media(prefers-color-scheme:dark){.logo .grad{background:conic-gradient(from 84deg,#4fb783 2%,#6cb2ee 55%,#ff5ca8 98%)}}
+.logo .grad{width:168px;height:168px;background:conic-gradient(from 87deg,#2f9463,#2f80c8 55%,#d81b7a 99%)}
+@media(prefers-color-scheme:dark){.logo .grad{background:conic-gradient(from 87deg,#4fb783,#6cb2ee 55%,#ff5ca8 99%)}}
 @keyframes p{50%{opacity:.45}}p{margin:14px 0 0}small{opacity:.7}</style></head>
 <body data-starting><div class="box"><div class="logo"><svg width="168" height="168"><circle class="track" cx="84" cy="84" r="79"/>
 <mask id="m"><circle class="ring" id="ring" cx="84" cy="84" r="79" stroke-dasharray="496.4" stroke-dashoffset="496.4"/></mask>
