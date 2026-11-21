@@ -332,6 +332,7 @@ export class Viewer {
         ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, 6.2832);
         if (p[o + 5] === 2 && s >= 1.5) { /* only when zoomed in: at a distance the rings would hide the image */ rings.moveTo(x + r + 1.3, y); rings.arc(x, y, r + 1.3, 0, 6.2832); }  // colocalizes
       }
+      ctx.strokeStyle = "rgba(0,0,0,.7)"; ctx.lineWidth = 1.5; ctx.stroke();  /* a dark edge: the dots have the color of their channel */
       ctx.fill(); ctx.strokeStyle = "#000"; ctx.lineWidth = 2.4; ctx.stroke(rings); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke(rings);
     }
     if (this.box) {  // the analyzed part of a large image

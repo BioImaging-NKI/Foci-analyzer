@@ -123,8 +123,13 @@ def _segment(data: np.ndarray, cal: an.Calibration, s: Settings, name: str) -> n
 
 
 def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: ImageInfo, s: Settings,
-                  only_candidates: bool = False) -> FrameResult:
-    """Analyze one frame (`data`: C, Z, Y, X). `image_key` names the pixels (path, change time and frame)."""
+                  only_candidates: bool = False, segment_only: bool = False,
+                  labels: np.ndarray | None = None) -> FrameResult:
+    """Analyze one frame (`data`: C, Z, Y, X). `image_key` names the pixels (path, change time and frame).
+
+    segment_only: the cells only, without foci (channels and the table of foci empty). labels: the cells as an
+    earlier segmentation found them (a part of it, in the coordinates of the prepared image), used instead of
+    segmenting again."""
     remarks: list[str] = []
     if info.slices > 1 and info.z_spacing is None and info.unit == "µm":
         remarks.append("no Z spacing in the file: taken equal to the pixel size")
@@ -132,15 +137,27 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
         # cells in 3D and foci on a projection do not fit together: a projected focus has no slice to be in
         s = replace(s, foci_general=replace(s.foci_general, dimension="3D"))
         remarks.append("the cells are segmented in 3D, so the foci are detected in 3D as well")
-    steps = 2 + 3 * len(s.foci) + (0 if only_candidates else 2)
+    steps = 3 if segment_only else 2 + 3 * len(s.foci) + (0 if only_candidates else 2)
     k_prep, (data, cal, border) = cache.run("prepare", asdict(s.image) | {"k": "p"}, (image_key,),
                                             lambda: _prepare(data, info, s), "Preparing the image", (1, steps))
     seg_params = asdict(s.segmentation) | {"n": s.image.nuclei_channel, "c": s.image.cell_channel}
     what = "cells" if s.image.cell_channel else "nuclei"
-    k_seg, labels = cache.run("segment", seg_params, (k_prep,), lambda: _segment(data, cal, s, info.name),
+    known = labels
+    k_seg, labels = cache.run("segment", seg_params, (k_prep,),
+                              lambda: _segment(data, cal, s, info.name) if known is None
+                              or not (s.image.cell_channel or s.image.nuclei_channel) else an.filter_labels(
+                                  known, cal, s.segmentation.min_diameter, s.segmentation.max_diameter,
+                                  s.segmentation.exclude_on_edges),
                               f"Finding the {what} ({s.segmentation.method})", (2, steps))
     n_cells = int(labels.max())
     general = s.foci_general
+
+    if segment_only:
+        _, (cells, _) = cache.run("cells", {"pairs": [], "dim": "", "only": True}, (k_seg,),
+                                  lambda: _cell_base(data, labels, n_cells, cal, [], []),
+                                  f"Measuring the {what}", (3, steps))
+        cells = cells[cells["area"] > 0].reset_index(drop=True)
+        return FrameResult(k_seg, cal, s.image.xy_binning, border, labels, [], cells, pd.DataFrame(), remarks)
 
     for fc in s.foci:
         if fc.channel > data.shape[0]:

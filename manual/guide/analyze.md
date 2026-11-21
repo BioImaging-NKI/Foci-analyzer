@@ -49,10 +49,18 @@ There are two ways to analyze, and they do different things:
 | Result | shown in the viewer | tables in the results folder, then the Results page |
 | Writes files | no | yes |
 
-**Live**: after the first analysis of an image, every change of a setting analyzes it again.
+**Segment nuclei** (**Segment cells** with a cell channel; ++s++), left of **Analyze this image**, finds only
+the nuclei or cells, without the foci. Use it to try the segmentation settings quickly. **Estimate** in a
+foci channel works on these cells too, and **Analyze this image** afterwards does not segment again.
 
-**Visible part only** appears for large images (from 6 megapixels): the preview then analyzes only the part
-that is visible in the viewer (a dashed frame), which is much faster. The numbers can differ a little from
+**Live**: after the first analysis of an image, every change of a setting analyzes it again (segments it
+again, when it was segmented only).
+
+**Visible part only** appears for large images (from 6 megapixels), right of **Analyze this image**: the
+preview then segments or analyzes only the part that is visible in the viewer (a dashed frame), which is much
+faster. The nuclei or cells found are kept: as long as the segmentation settings stay the same, a part that
+lies inside a part segmented before takes its cells from there instead of segmenting again (cells cut by the
+edge of the new part are left out, as with *Remove objects on the image edge*). The numbers can differ a little from
 those of the whole image, because the noise is estimated in that part only. **Analyze all images** always
 uses whole images.
 

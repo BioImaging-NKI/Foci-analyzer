@@ -121,11 +121,12 @@ function adoptSettings(server) {
   }
   if (redraw) renderSettings();
 }
-function settingsChanged(delay = 300) {
+function settingsChanged(delay = 300, full = false) {
   clearTimeout(changeTimer);
   changeTimer = setTimeout(async () => {
-    updateChannelColors(); renderOverlays(); syncMode();
-    if (V.id && V.preview && $("live").checked) return runPreview();  // the preview request also saves the settings
+    updateChannelColors(); renderOverlays(); syncMode(); segmentLabel();
+    // the preview request also saves the settings; Live repeats what was done last (segmenting only, or all)
+    if (V.id && V.preview && $("live").checked) return runPreview(!full && !!V.preview.segment_only);
     try {
       adoptSettings(await (await api("/api/settings", { settings: S.settings })).json());
       status(V.id ? "Settings saved · press Analyze this image (A) to see their effect" : "Settings saved");
@@ -240,7 +241,7 @@ const ESTIMATE_HELP = "Estimate the foci size and threshold of this channel from
   + "Check the result in the image, for example with Filtered (key R).";
 const estimates = {};
 async function estimateFoci(i) {
-  if (!V.id || !V.preview) { status("Press Analyze this image first: the estimate uses the cells it found", true); return; }
+  if (!V.id || !V.preview) { status(`Press ${$("segment-label").textContent} (S) or Analyze this image (A) first: the estimate uses the cells found`, true); return; }
   status(`Estimating the foci size and threshold of foci channel ${i + 1}…`, false, -1);
   try {
     const r = await (await api("/api/estimate", { path: V.id, t: V.t, index: i })).json();
@@ -251,7 +252,7 @@ async function estimateFoci(i) {
     // the note under the channel stays while these values are kept (the status bar is taken by the analysis)
     estimates[i] = { size: g.size, size_max: g.size_max, sensitivity: g.sensitivity, fixed: g.fixed_threshold,
       text: `Estimated: ${r.size_max !== undefined ? `${r.size}–${r.size_max}` : r.size} µm, threshold ${r.threshold} × noise (${r.how === "plateau" ? "where the number of foci levels off" : "Otsu: no plateau in the number of foci"}), about ${r.foci} foci${r.measured !== undefined ? ` (size measured on ${r.measured})` : ""}. A starting point: check it in the image.` };
-    renderSettings(); settingsChanged(0);
+    renderSettings(); settingsChanged(0, true);
     status(estimates[i].text);
   } catch (e) { status(e.message, true); }
 }
@@ -264,7 +265,7 @@ function sizeThumbs() {
 }
 new ResizeObserver(sizeThumbs).observe($("dims"));
 function renderSettings() {
-  const box = $("settings"); box.replaceChildren();
+  const box = $("settings"); box.replaceChildren(); segmentLabel();
   for (const sec of S.schema) {
     const div = el("div", { class: "section" });
     if (!sec.repeat) { div.append(el("h3", { textContent: sec.title }), ...fieldsOf(sec, S.settings[sec.key], 0).filter(Boolean)); box.append(div); continue; }
@@ -273,7 +274,7 @@ function renderSettings() {
       const g = Object.fromEntries(sec.fields.map((f) => [f.key, f.default]));
       if ("channel" in g) g.channel = Math.max(...list.map((x) => x.channel)) + 1;
       list.push(g); renderSettings(); settingsChanged(); } })));
-    list.forEach((g, i) => div.append(el("div", sec.key === "foci" ? { class: "group tinted", style: `--g:${hex(OUTLINE[i % OUTLINE.length])}` } : { class: "group" },
+    list.forEach((g, i) => div.append(el("div", sec.key === "foci" ? { class: "group tinted", style: `--g:${hex(fociColor(g.channel))}` } : { class: "group" },
       el("div", { class: "group-head" }, `${sec.title} ${i + 1}`,
         sec.key === "foci" && (g.method === "watershed" || g.method === "multi-scale") ? el("span", { class: "estimate" }, el("button", { class: "small-btn", textContent: "Estimate", onclick: () => estimateFoci(i) }), helpIcon(ESTIMATE_HELP)) : null,
         list.length > 1 ? el("button", { class: "link", textContent: "Remove", onclick: () => { list.splice(i, 1); renderSettings(); settingsChanged(); } }) : null),
@@ -292,8 +293,9 @@ const V = { id: "", info: null, mode: "mip", z: 0, t: 0, ch: [], preview: null, 
 const rgba = (c, a) => `rgba(${c.map((v) => Math.round(v * 255)).join(",")},${a})`;
 // the projection the foci are detected on, when it is not the max projection: [name in a request, name on the button]
 const DET = { "extended depth of focus": ["edf", "EDF"], "sum projection": ["sum", "Sum"] };
-const NUCLEI = [0, 0.5, 1], CELLS = [1, 0.5, 0], OTHER = [[0, 1, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]];
-const OUTLINE = [[1, 0.88, 0.3], [0.3, 0.88, 1], [1, 0.6, 0.2], [0.8, 0.6, 1]];  // foci channel 1, 2, …
+const NUCLEI = [0, 0.5, 1], CELLS = [1, 0.5, 0], OTHER = [[0, 1, 0], [1, 0, 1], [1, 1, 0], [0, 1, 1], [1, 1, 1]];
+// the foci of a channel are drawn in the color of that channel (with a dark edge, so they show on their own signal)
+const fociColor = (channel) => (V.ch[channel - 1] ? V.ch[channel - 1].color : channelColor(channel - 1));
 const hex = (c) => `#${c.map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("")}`;
 const unhex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
 
@@ -399,10 +401,11 @@ function syncLayers() {
     layers.push({ type: "labels", key, prevKey: slot("cells", key), url: region("/api/overlay?kind=cells"),
       color: [1, 1, 1, 0.85], fill: 0, on: $("show-cells").checked && !smooth });
     V.preview.channels.forEach((ch, i) => {
-      const col = OUTLINE[i % OUTLINE.length], shown = V.fociOn[ch.channel] !== false;
+      const col = fociColor(ch.channel), shown = V.fociOn[ch.channel] !== false, on = $("show-foci").checked && shown && !smooth;
       key = `l|foci${ch.channel}|${z}|${k}`;
-      layers.push({ type: "labels", key, prevKey: slot(`foci${ch.channel}`, key), url: region(`/api/overlay?kind=foci&ch=${ch.channel}`),
-        color: [...col, 1], fill: 0.35, on: $("show-foci").checked && shown && !smooth });
+      const url = region(`/api/overlay?kind=foci&ch=${ch.channel}`);
+      layers.push({ type: "labels", key, prevKey: slot(`foci${ch.channel}`, key), url, color: [0, 0, 0, 0.75], width: 2.6, fill: 0, on });  // the dark edge,
+      layers.push({ type: "labels", key, prevKey: slot(`foci${ch.channel}`, key), url, color: [...col, 1], fill: 0.35, on });  // the outline in the channel color
       viewer.markers.push({ pts: V.cand[i], color: hex(col), threshold: ch.live ?? ch.threshold, on: $("show-markers").checked && shown });
     });
     if ((V.preview.coloc || []).length) {  // the colocalization map, on top
@@ -441,13 +444,14 @@ function syncShapes() {
   const p = V.preview;
   if (!p || !V.info) { viewer.shapes = []; viewer.numbers = null; viewer.requestDraw(); return; }
   const smooth = $("smooth").checked, cellsOn = $("show-cells").checked, removed = new Set(p.removed || []);
-  const cells = polys("cells"), sh = [];
-  if (p.outside !== 0 && cellsOn) sh.push({ polys: polys("reach"), stroke: "rgba(215,215,215,.8)", width: 1, dash: [4, 3], on: true });
+  // smooth: the nuclei or cells as splines (their steps rounded off), the foci along their pixels, smoothed
+  const cells = smooth ? polys("cells", "&spline=1") : polys("cells"), sh = [];
+  if (p.outside !== 0 && cellsOn) sh.push({ polys: polys("reach", smooth ? "&spline=1" : ""), stroke: "rgba(215,215,215,.8)", width: 1, dash: [4, 3], on: true });
   if (smooth) {
     sh.push({ polys: cells, stroke: "rgba(255,255,255,.85)", width: 1.3, on: cellsOn });
-    p.channels.forEach((ch, i) => {
-      const col = OUTLINE[i % OUTLINE.length];
-      sh.push({ polys: polys("foci", `&ch=${ch.channel}`), stroke: hex(col), width: 1.2, fill: rgba(col, 0.35),
+    p.channels.forEach((ch) => {
+      const col = fociColor(ch.channel);
+      sh.push({ polys: polys("foci", `&ch=${ch.channel}`), stroke: hex(col), width: 1.2, halo: 1.4, fill: rgba(col, 0.35),
         on: $("show-foci").checked && V.fociOn[ch.channel] !== false });
     });
     if ((p.coloc || []).length) sh.push({ polys: polys("coloc"), stroke: "#fff", width: 1, halo: 1.6, on: $("show-coloc").checked });
@@ -477,11 +481,14 @@ function visiblePart() {
 }
 
 // ---- preview: the analysis of the shown image with the current settings
-let previewBusy = false, previewAgain = false;
-async function runPreview() {
+let previewBusy = false, previewAgain = null;
+function segmentLabel() {  // the button names what is segmented
+  if (S.settings && S.settings.image) $("segment-label").textContent = S.settings.image.cell_channel ? "Segment cells" : "Segment nuclei";
+}
+async function runPreview(segment = false) {
   if (!V.id) { status("Choose an image first", true); return; }
-  if (previewBusy) { previewAgain = true; return; }
-  previewBusy = true; status("Analyzing the shown image…", false, -1, true);
+  if (previewBusy) { previewAgain = segment; return; }
+  previewBusy = true; status(segment ? "Segmenting the shown image…" : "Analyzing the shown image…", false, -1, true);
   const id = V.id, t = V.t, start = performance.now();
   let best = 0;  // stages of several channels run side by side: the bar only moves forward
   // what the server is doing, asked a few times per second while it works
@@ -495,7 +502,7 @@ async function runPreview() {
     } catch { /* the answer of the analysis itself reports problems */ }
   }, 300);
   try {
-    const r = await (await api("/api/preview", { path: id, t, settings: S.settings, box: visiblePart() })).json();
+    const r = await (await api("/api/preview", { path: id, t, settings: S.settings, box: visiblePart(), segment })).json();
     const cand = await Promise.all(r.channels.map(async (ch) =>
       new Float32Array(await (await api(`/api/candidates?path=${encodeURIComponent(id)}&t=${t}&ch=${ch.channel}`)).arrayBuffer())));
     viewed[id] = JSON.stringify(S.settings);
@@ -506,16 +513,16 @@ async function runPreview() {
       V.lastDim = r.dimension;
       if (V.filtered) renderChannels(); renderCellColor(); syncMode(); syncLayers(); previewInfo(); selectCell(V.sel, V.selPt);
       const secs = (performance.now() - start) / 1000;
-      status(`Ready · ${r.cells} ${r.cells === 1 ? "cell" : "cells"}, ${r.channels.map((c) => `${c.foci} foci in channel ${c.channel}`).join(", ")}`
-        + ` · analyzed in ${secs < 10 ? secs.toFixed(1) : Math.round(secs)} s`);
+      status(`Ready · ${r.cells} ${r.cells === 1 ? "cell" : "cells"}${r.channels.map((c) => `, ${c.foci} foci in channel ${c.channel}`).join("")}`
+        + ` · ${r.segment_only ? "segmented" : "analyzed"} in ${secs < 10 ? secs.toFixed(1) : Math.round(secs)} s`);
     } else status("");
   } catch (e) {
-    if (e.message === "stopped") { previewAgain = false; status("Stopped"); } else status(e.message, true);
+    if (e.message === "stopped") { previewAgain = null; status("Stopped"); } else status(e.message, true);
   }
   clearInterval(watch);
   previewBusy = false;
   refreshAnalyzed();
-  if (previewAgain) { previewAgain = false; runPreview(); }
+  if (previewAgain !== null) { const seg = previewAgain; previewAgain = null; runPreview(seg); }
 }
 function liveCount(pts, thr, removed) {  // foci above the threshold, not in a removed cell
   let n = countAbove(pts, thr);
@@ -536,7 +543,7 @@ function previewInfo() {
     const live = ch.live !== undefined, n = live ? liveCount(V.cand[i], ch.live, new Set(p.removed || [])) : ch.foci;
     const thr = ch.height_unit === "× noise" ? `noise ${fmt(ch.noise)}, threshold ${fmt((ch.live ?? ch.threshold) * ch.noise)}`
       : ch.height_unit === "filtered" ? `threshold ${fmt(ch.threshold)} (noise ${fmt(ch.noise)})` : `probability ≥ ${fmt(ch.live ?? ch.threshold)}`;
-    lines.push(el("div", {}, el("span", { class: "dot", style: `background:${hex(OUTLINE[i % OUTLINE.length])}` }),
+    lines.push(el("div", {}, el("span", { class: "dot", style: `background:${hex(fociColor(ch.channel))}` }),
       el("b", { textContent: `Channel ${ch.channel}: ${live ? "≈ " : ""}${n} foci` }),
       el("div", { class: "sub", textContent: `${fmt(n / Math.max(1, p.cells))} per cell · ${thr}` })));
   });
@@ -728,10 +735,10 @@ function setZ(z) { if (!V.info) return; V.z = Math.min(V.info.slices - 1, Math.m
 function setT(t) {
   if (!V.info) return;
   t = Math.min(V.info.frames - 1, Math.max(0, t)); if (t === V.t) return;
-  const had = !!V.preview;
+  const had = V.preview && { segment_only: !!V.preview.segment_only };
   V.t = t; $("t").value = t; V.preview = null; V.cand = []; V.sel = 0; V.multi.clear(); if (V.filtered) renderChannels(); renderCellColor(); syncMode(); syncLayers(); previewInfo(); selectCell(0, null);
   // with Live on, a frame of an image that was analyzed in the viewer is analyzed too (unless a batch run has it)
-  if (had && $("live").checked) runPreview();
+  if (had && $("live").checked) runPreview(had.segment_only);
   else loadStored().then((ok) => { if (!ok && t === V.t && !V.preview && $("live").checked && viewed[V.id]) runPreview(); });
 }
 $("mode").addEventListener("click", (e) => { if (e.target.dataset.mode) setMode(e.target.dataset.mode); });
@@ -751,6 +758,8 @@ $("t-play").onclick = () => play(!playing);
 $("fit").onclick = () => viewer.fit();
 $("image-select").onchange = (e) => openImage(e.target.value);
 $("analyze-now").onclick = () => runPreview();
+$("segment-now").onclick = () => runPreview(true);
+segmentLabel();
 for (const id of ["show-cells", "show-foci", "show-markers", "show-coloc"]) $(id).onchange = syncLayers;
 for (const id of ["show-numbers", "smooth"]) {
   $(id).checked = store(`fa.${id}`) === true;
@@ -794,7 +803,7 @@ function renderChannels() {
       el("div", { class: "channel-head" },
         el("input", { type: "checkbox", id: `ch${c}`, checked: raw.on, title: `Show channel ${c + 1} (key ${c + 1})`, onchange: (e) => { raw.on = e.target.checked; syncLayers(); } }),
         el("input", { type: "color", value: hex(raw.color), title: "Color of this channel", "aria-label": `Color of channel ${c + 1}`,
-          oninput: (e) => { raw.color = unhex(e.target.value); store("fa.colors", { ...(store("fa.colors") || {}), [c]: e.target.value }); syncLayers(); } }),
+          oninput: (e) => { raw.color = unhex(e.target.value); store("fa.colors", { ...(store("fa.colors") || {}), [c]: e.target.value }); syncLayers(); renderOverlays(); previewInfo(); } }),
         el("label", { htmlFor: `ch${c}`, textContent: pct ? `Ch ${c + 1} filtered` : `Ch ${c + 1}` }), c < 9 ? el("kbd", { textContent: c + 1 }) : null, values,
         el("button", { textContent: "Auto", title: "Contrast from the image (0.1 to 99.9 percentile)",
           onclick: () => { [ch.lo, ch.hi] = ch.auto; lo.value = ch.lo; hi.value = ch.hi; show(); syncLayers(); } })),
@@ -805,7 +814,7 @@ function renderChannels() {
 function renderOverlays() {
   $("foci-toggles").replaceChildren(...((S.settings.foci || []).length > 1 ? S.settings.foci : []).map((f, i) => el("label", {},
     el("input", { type: "checkbox", checked: V.fociOn[f.channel] !== false, onchange: (e) => { V.fociOn[f.channel] = e.target.checked; syncLayers(); } }),
-    " ", el("span", { class: "dot", style: `background:${hex(OUTLINE[i % OUTLINE.length])}` }), `channel ${f.channel}`)));
+    " ", el("span", { class: "dot", style: `background:${hex(fociColor(f.channel))}` }), `channel ${f.channel}`)));
 }
 
 document.addEventListener("keydown", (e) => {
@@ -820,7 +829,8 @@ document.addEventListener("keydown", (e) => {
   else if (k === "c") toggle("show-cells"); else if (k === "f") toggle("show-foci"); else if (k === "m") toggle("show-markers");
   else if (k === "o") toggle("show-coloc"); else if (k === "l") toggle("live"); else if (k === "p") nextMode(); else if (k === "a") runPreview();
   else if (k === "r") setFiltered(!V.filtered);
-  else if (k === "n") toggle("show-numbers"); else if (k === "s") toggle("smooth"); else if (k === "x") toggleCell();
+  else if (k === "n") toggle("show-numbers"); else if (k === "e") toggle("smooth"); else if (k === "s") runPreview(true);
+  else if (k === "x") toggleCell();
   else if (k === "," || (k === "[" && !frames)) stepZ(-1); else if (k === "." || (k === "]" && !frames)) stepZ(1);
   else if (k === "[") setT(V.t - 1); else if (k === "]") setT(V.t + 1); else if (k === "0") viewer.fit();
   else return;
@@ -886,7 +896,8 @@ $("load-settings").onclick = async () => {
     if (r.canceled) return;
     S.settings = r.settings; renderSettings(); updateChannelColors();
     status(`Settings loaded from ${r.path}`);
-    if (V.id && V.preview && $("live").checked) runPreview();
+    segmentLabel();
+    if (V.id && V.preview && $("live").checked) runPreview(!!V.preview.segment_only);
   } catch (e) { status(e.message, true); }
 };
 $("save-settings").onclick = () => saved("the settings", () => api("/api/settings/save", { settings: S.settings }));

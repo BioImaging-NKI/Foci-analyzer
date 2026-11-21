@@ -18,6 +18,7 @@ import threading
 import time
 import urllib.parse
 from collections import OrderedDict
+from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from pathlib import Path
@@ -113,6 +114,8 @@ class App:
         self._removed: tuple[str, object] | None = None  # (results folder, table of removed cells)
         self.removed_version = 0
         self._contours: OrderedDict[tuple, bytes] = OrderedDict()
+        # the cells of parts of images segmented before: (image, frame, settings, x, y) -> (labels, border, binning)
+        self._segs: OrderedDict[tuple, tuple] = OrderedDict()
         self.install = {"network": "", "running": False, "lines": [], "ok": None}
         self.updates = updates.Preferences(home() / "updates.json")
         self.updating = {"state": "", "done": 0, "total": 0, "error": ""}  # "", downloading, restarting, failed
@@ -451,14 +454,18 @@ class App:
         return self._crop(im.plane(t, c, z, level), q)
 
     # ---- analysis of the image in the viewer
-    def frame(self, image_id: str, t: int, only_candidates: bool = False, box: list | None = None) -> pipeline.FrameResult:
-        """Analyze frame t of an image; `box` (x0, y0, x1, y1 in pixels) limits it to a part, for the preview."""
+    def frame(self, image_id: str, t: int, only_candidates: bool = False, box: list | None = None,
+              segment_only: bool = False) -> pipeline.FrameResult:
+        """Analyze frame t of an image; `box` (x0, y0, x1, y1 in pixels) limits it to a part, for the preview.
+        segment_only: the cells only. A part inside a part segmented before with the same settings takes its
+        cells from there instead of segmenting again."""
         im = self.image(image_id)
         if not 0 <= t < im.info.frames:
             raise ApiError("outside the image")
         with self.lock:
             settings = self.settings
         data, key, offset = im.data[t], f"{image_id}|{t}", (0, 0)
+        x0, y0, x1, y1 = 0, 0, im.info.width, im.info.height
         if box:
             try:
                 x0, y0, x1, y1 = (int(v) for v in box)
@@ -467,14 +474,23 @@ class App:
             x0, y0, x1, y1 = max(0, x0), max(0, y0), min(im.info.width, x1), min(im.info.height, y1)
             if x1 - x0 < 32 or y1 - y0 < 32:
                 raise ApiError("the visible part of the image is too small to analyze")
-            if (x0, y0, x1, y1) != (0, 0, im.info.width, im.info.height):
-                data, key, offset = data[:, :, y0:y1, x0:x1], f"{key}|{x0},{y0},{x1},{y1}", (x0, y0)
+        seg_key = (image_id, t, json.dumps(asdict(settings.segmentation) | asdict(settings.image), sort_keys=True,
+                                           default=str))
+        known, (x0, y0) = self._known_cells(seg_key, x0, y0, x1, y1, im.info, settings)
+        if (x0, y0, x1, y1) != (0, 0, im.info.width, im.info.height):
+            data, key, offset = data[:, :, y0:y1, x0:x1], f"{key}|{x0},{y0},{x1},{y1}", (x0, y0)
         try:
             with self.compute_lock:
-                r = pipeline.analyze_frame(self.cache, key, data, im.info, settings, only_candidates)
+                r = pipeline.analyze_frame(self.cache, key, data, im.info, settings, only_candidates, segment_only,
+                                           known)
         except ValueError as e:
             raise ApiError("stopped" if self.cache.canceled else str(e)) from e
         r.offset = offset
+        if known is None:
+            with self.lock:
+                self._segs[seg_key + (x0, y0)] = (r.labels, r.border, r.binning)
+                while len(self._segs) > 8:
+                    self._segs.popitem(last=False)
         if not only_candidates:
             with self.lock:
                 self.last[(image_id, t)] = r
@@ -482,6 +498,25 @@ class App:
                 while len(self.last) > 3:
                     self.last.popitem(last=False)
         return r
+
+    def _known_cells(self, seg_key: tuple, x0: int, y0: int, x1: int, y1: int, info, s) -> tuple:
+        """The cells of the part (x0, y0, x1, y1) cut from a part segmented before with the same settings, and the
+        corner of the part, moved left and up by less than the binning so that the pixels line up; or None and
+        the corner unchanged."""
+        n, b = s.image.xy_binning, s.image.crop_border
+        with self.lock:
+            found = [(k[-2:], v) for k, v in self._segs.items() if k[:-2] == seg_key]
+        for (sx, sy), (lab, sb, _) in reversed(found):
+            px, py = sx + sb, sy + sb  # where the prepared image of that part starts
+            ax, ay = x0 - (x0 + b - px) % n, y0 - (y0 + b - py) % n
+            bb = b if b and min(x1 - ax, y1 - ay) > 2 * b + 8 else 0
+            if bb != b:
+                continue
+            w, h = (x1 - ax - 2 * b) // n, (y1 - ay - 2 * b) // n
+            i, j = (ay + b - py) // n, (ax + b - px) // n
+            if ax >= 0 and ay >= 0 and i >= 0 and j >= 0 and i + h <= lab.shape[1] and j + w <= lab.shape[2]:
+                return lab[:, i:i + h, j:j + w].copy(), (ax, ay)
+        return None, (x0, y0)
 
     def shown(self, image_id: str, t: int) -> pipeline.FrameResult:
         """The last finished analysis of this frame: overlays never start an analysis themselves."""
@@ -621,7 +656,7 @@ class App:
                 while len(self.last) > 3:
                     self.last.popitem(last=False)
         else:
-            self.frame(image_id, t, box=body.get("box"))
+            self.frame(image_id, t, box=body.get("box"), segment_only=bool(body.get("segment")))
         return self._payload(self.last_result(image_id, t), bool(body.get("stored")), bool(body.get("box")))
 
     def _payload(self, r: pipeline.FrameResult, stored: bool, box: bool = False) -> dict:
@@ -645,7 +680,7 @@ class App:
                 "outside": 0 if self.settings.foci_general.whole_image else self.settings.foci_general.outside_distance,
                 "remarks": r.remarks, "pixel_size": r.cal.pixel_size, "binning": r.binning, "border": r.border,
                 "table": _columns(r.cells), "coloc": coloc, "dimension": self.settings.foci_general.dimension, "offset": list(r.offset),
-                "stored": stored,
+                "stored": stored, "segment_only": not r.channels and "focus" not in r.foci,
                 "part": [r.offset[0], r.offset[1], r.labels.shape[2] * r.binning + 2 * r.border,
                          r.labels.shape[1] * r.binning + 2 * r.border] if r.offset != (0, 0) or box else None}
 
@@ -734,7 +769,8 @@ class App:
         kind = q.get("kind", "cells")
         if kind == "reach":
             q = {**q, "d": an.reach(self.settings.foci_general)}
-        key = (r.key, kind, q.get("ch"), q.get("d"), z)
+        spline = kind in ("cells", "reach") and q.get("spline") == "1"
+        key = (r.key, kind, q.get("ch"), q.get("d"), z, spline)
         with self.lock:
             out = self._contours.get(key)
         if out is None:
@@ -747,6 +783,8 @@ class App:
                 raise ApiError("too many objects for smooth outlines", 413)
             parts, shift = [], np.array([r.offset[0] + r.border, r.offset[1] + r.border], np.float32)
             for i, pts in export._contours(small):
+                if spline:
+                    pts = export.spline_outline(pts)
                 xy = ((pts + 0.5) * r.binning + shift).astype(np.float32)
                 parts += [np.array([i, len(xy)], np.float32), xy.ravel()]
             out = np.concatenate(parts).astype("<f4").tobytes() if parts else b""
@@ -871,10 +909,10 @@ class App:
             H, W = im.info.height, im.info.width
             if o.get("cells"):
                 overlays.append({"labels": export.full_plane(r, r.labels, zi, H, W), "color": (255, 255, 255)})
-            for k, ch in enumerate(r.channels):
+            for ch in r.channels:
                 if ch.channel in (o.get("foci") or []) and ch.labels is not None:
-                    overlays.append({"labels": export.full_plane(r, ch.labels, zi, H, W),
-                                     "color": export.OUTLINE[k % len(export.OUTLINE)], "fill": 0.35})
+                    overlays.append({"labels": export.full_plane(r, ch.labels, zi, H, W), "fill": 0.35, "halo": True,
+                                     "color": tuple(display[ch.channel - 1].get("color") or (255, 255, 255))})
             if o.get("coloc"):
                 lab = self._overlay_labels(r, "coloc", {})
                 overlays.append({"labels": export.full_plane(r, lab, zi, H, W), "color": (255, 255, 255), "halo": True})

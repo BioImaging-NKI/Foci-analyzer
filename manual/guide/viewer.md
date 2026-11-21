@@ -45,13 +45,17 @@ image with the same channels.
 - **Cells** (++c++): the outlines of the nuclei or cells. When *Cell border shift* is set, a thin dashed gray
   line shows the border within which foci count for a cell: outside the outline when the shift is positive,
   inside it when it is negative.
-- **Foci outlines** (++f++): the detected foci, lightly filled, in the color of their foci channel; per
-  channel they can be switched off.
-- **Foci markers** (++m++): a dot on every focus. The dots follow the threshold slider at once; the outlines
+- **Foci outlines** (++f++): the detected foci, lightly filled, in the color of their channel (the color
+  chosen under *Channels*), with a thin dark edge so that they show on their own signal; per channel they can
+  be switched off.
+- **Foci markers** (++m++): a dot on every focus, in the color of its channel. The dots follow the threshold slider at once; the outlines
   when the analysis has been repeated. When zoomed in, a ring with a black and white edge marks a focus that
   colocalizes with a focus of another channel.
 - **Numbers** (++n++): the number of every cell, as in the tables, when it is large enough on the screen.
-- **Smooth outlines** (++s++): outlines as smooth lines instead of along the pixel edges.
+- **Smooth outlines** (++e++): outlines as smooth lines instead of along the pixel edges. The nuclei or cells
+  become splines: a neural network segments at a scale of its own, so their outlines often show the steps of
+  a coarser grid, which the spline rounds off (it keeps the area of the outline). The saved overlays for Fiji
+  always have these spline outlines. Only the drawing changes: the measurements use the pixels as segmented.
 - **Colocalization** (++o++): colocalizing foci get a white outline with a black edge; where foci of two
   channels lie on top of each other is hatched.
 - **Color cells by**: fills every cell with a color for one of its numbers (for example the number of

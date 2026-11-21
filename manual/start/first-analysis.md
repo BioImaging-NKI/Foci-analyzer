@@ -41,7 +41,7 @@ Click **Analyze this image** (or press ++a++). The status bar at the bottom show
 first time, starting the neural network takes up to a minute; after that, a change of a setting gives a new
 result in seconds. For the first example image: 21 nuclei, 1675 foci in channel 2 and 1028 in channel 3.
 
-![The analyzed image: nuclei outlined in white, foci of channel 2 in yellow and of channel 3 in cyan](../images/analyze.png)
+![The analyzed image: nuclei outlined in white, foci of channel 2 in green and of channel 3 in magenta, the colors of their channels](../images/analyze.png)
 
 Zoom in with the mouse wheel and look whether the nuclei and foci are found well. With **Live** on, every
 change of a setting analyzes the image again. Move the *Threshold* slider of a foci channel: the markers

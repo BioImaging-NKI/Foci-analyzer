@@ -76,7 +76,8 @@ another channel.
 ### Estimate
 
 The **Estimate** button in the head of a watershed foci channel fills in *Foci size* and *Threshold* from the
-image in the viewer, as a starting point. It needs the cells, so press **Analyze this image** first.
+image in the viewer, as a starting point. It needs the cells, so press **Segment nuclei** (++s++) or
+**Analyze this image** first.
 
 - **Threshold**: the image is filtered at a foci size, and the foci are counted at many thresholds. Low
   thresholds count the many peaks of the noise, high thresholds only the foci; in between, the number often

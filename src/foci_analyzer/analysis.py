@@ -726,12 +726,13 @@ def spread_sample(cells: np.ndarray, n: int = 500, per_cell: int = 10, seed: int
     return np.sort(rng.choice(pick, n, replace=False) if len(pick) > n else pick)
 
 
-def estimate_threshold(heights: np.ndarray) -> tuple[float, str]:
+def estimate_threshold(heights: np.ndarray, plateau: bool = True) -> tuple[float, str]:
     """A threshold (in the units of the heights) and how it was found.
 
     plateau: the number of foci against the threshold (on a log scale) flattens between the many low peaks of
-    the noise and the foci (as TrueSpot does); the flattest point is taken. otsu: when there is no such plateau,
-    Otsu's method on the logarithm of the heights splits them into a low (noise) and a high (foci) group."""
+    the noise and the foci (as TrueSpot does); the flattest point is taken. otsu: when there is no such plateau
+    (or `plateau` is False), Otsu's method on the logarithm of the heights splits them into a low (noise) and a
+    high (foci) group."""
     h = np.asarray(heights, float)
     h = h[h > 0]
     if len(h) < 10:
@@ -739,7 +740,7 @@ def estimate_threshold(heights: np.ndarray) -> tuple[float, str]:
     ts = np.geomspace(1.5, max(h.max(), 3.0), 120)
     n = np.array([(h >= t).sum() for t in ts], float)
     ok = n >= 5
-    if ok.sum() >= 10:
+    if plateau and ok.sum() >= 10:
         slope = ndi.gaussian_filter1d(np.gradient(np.log(n[ok]), np.log(ts[ok])), 3)
         start = int(np.argmax(slope > slope[0] / 2)) if slope[0] < 0 else 0
         t = float(ts[ok][start + int(np.argmax(slope[start:]))])
@@ -793,7 +794,8 @@ def estimate_watershed(raw: np.ndarray, cellmap: np.ndarray, cal: Calibration, g
     """Size and threshold for the watershed method, found together: the image is filtered at a size, the
     threshold estimated from the peak heights, and the size measured on the foci above that threshold (at most
     500, spread over the cells); then again at the measured size, until the size stays the same. It starts at a
-    small size (0.4 µm, at least 3 pixels), at which foci of every size give a peak."""
+    small size (0.4 µm, at least 3 pixels), at which foci of every size give a peak. A plateau that leaves too
+    few foci to measure (a few very bright outliers) gives way to Otsu's method."""
     img2d = raw.max(0)
     scope = "per image" if fc.threshold_scope == "fixed value" else fc.threshold_scope
     size, used = max(0.4, round(3 * cal.pixel_size / 0.05) * 0.05), 0
@@ -802,14 +804,17 @@ def estimate_watershed(raw: np.ndarray, cellmap: np.ndarray, cal: Calibration, g
         F = spot_filter(raw, sigma, fc.filter)
         unit, noise = noise_unit(F, cellmap, scope)
         pos, h, cells = find_candidates(F / unit, sigma, 1.0, cellmap, True)
-        t, how = estimate_threshold(h)
-        if not np.isfinite(t):
-            raise ValueError("too few peaks to estimate a threshold")
+        for plateau in (True, False):
+            t, how = estimate_threshold(h, plateau)
+            if not np.isfinite(t):
+                raise ValueError("too few peaks to estimate a threshold")
+            foci = np.flatnonzero(h >= t)
+            pick = foci[spread_sample(cells[foci])]
+            measured, used = measure_size(img2d, pos[pick, 1], pos[pick, 2], cal.pixel_size)
+            if (used >= 8 and np.isfinite(measured)) or how != "plateau":
+                break
         if i == passes - 1:
             break
-        foci = np.flatnonzero(h >= t)
-        pick = foci[spread_sample(cells[foci])]
-        measured, used = measure_size(img2d, pos[pick, 1], pos[pick, 2], cal.pixel_size)
         if used < 8 or not np.isfinite(measured):
             raise ValueError("too few clear foci to measure the size of")
         measured = max(0.05, round(measured / 0.05) * 0.05)

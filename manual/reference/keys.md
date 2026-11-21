@@ -4,6 +4,7 @@ On the **Analyze** page, when no text box has the focus. The keys are also shown
 
 | Key | What it does |
 |---|---|
+| ++s++ | Segment nuclei (or Segment cells): the nuclei or cells only, without the foci |
 | ++a++ | Analyze this image |
 | ++l++ | Live on or off |
 | ++1++ … ++9++ | show or hide channel 1 to 9 |
@@ -11,7 +12,7 @@ On the **Analyze** page, when no text box has the focus. The keys are also shown
 | ++f++ | Foci outlines |
 | ++m++ | Foci markers |
 | ++n++ | Numbers |
-| ++s++ | Smooth outlines |
+| ++e++ | Smooth outlines |
 | ++o++ | Colocalization map |
 | ++p++ | Slice, Max projection (and the projection the foci are detected on) |
 | ++r++ | Raw or Filtered image of the foci channels |

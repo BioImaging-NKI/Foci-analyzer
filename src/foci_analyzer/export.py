@@ -23,8 +23,7 @@ from . import analysis as an
 from .pipeline import ChannelResult, FrameResult
 
 NUCLEI, CELLS = (0, 128, 255), (255, 128, 0)
-OTHER = [(0, 255, 0), (255, 0, 255), (255, 255, 0), (255, 255, 255)]
-OUTLINE = [(255, 224, 77), (77, 224, 255), (255, 153, 51), (204, 153, 255)]  # foci channel 1, 2, … (as the viewer)
+OTHER = [(0, 255, 0), (255, 0, 255), (255, 255, 0), (0, 255, 255), (255, 255, 255)]
 META_COLUMNS = ["condition", "image", "folder", "path", "frame"]
 
 
@@ -183,20 +182,60 @@ def render_rgb(planes: list[np.ndarray], display: list[dict], overlays: list[dic
 
 # ---------------------------------------------------------------- ImageJ TIFF with overlays
 def _contours(lab2d: np.ndarray, ids: np.ndarray | None = None):
-    """Per label: the longest outline as (n, 2) x, y points in pixel centers of this plane."""
+    """Per label: the outer outline of every separate piece (a label can lie in pieces in a plane: a 3D object
+    in a projection, a cell cut by the analyzed part) as (n, 2) x, y points in pixel centers of this plane."""
     for i, sl in enumerate(ndi.find_objects(lab2d), start=1):
         if sl is None or (ids is not None and i not in ids):
             continue
         y0, x0 = sl[0].start - 1, sl[1].start - 1
         mask = np.pad(lab2d[sl] == i, 1)
-        cs = measure.find_contours(mask.astype(np.uint8), 0.5)
-        if cs:
-            c = max(cs, key=len)
-            yield i, np.column_stack([c[:, 1] + x0, c[:, 0] + y0])
+        pieces, n = ndi.label(mask, structure=np.ones((3, 3)))
+        for k in range(1, n + 1):
+            cs = measure.find_contours((pieces == k).astype(np.uint8), 0.5)
+            if cs:
+                c = max(cs, key=len)  # the outer one; the others are holes
+                yield i, np.column_stack([c[:, 1] + x0, c[:, 0] + y0])
 
 
-def frame_rois(r: FrameResult, t: int, frames: int, slices: int, colocalizing: dict | None = None) -> list:
-    """ImageJ overlay outlines of one frame: the cells (white) and the foci per channel (their color).
+def spline_outline(pts: np.ndarray) -> np.ndarray:
+    """A closed outline (n, 2) as a periodic smoothing spline. Networks segment at a scale of their own, so the
+    outlines of nuclei and cells often show the steps of a coarser grid; the spline may deviate about 4 % of the
+    radius (at least half a pixel) from the outline, which rounds such steps off but keeps the shape."""
+    from scipy.interpolate import splev, splprep
+    p = np.asarray(pts, float)
+    if len(p) > 1 and np.allclose(p[0], p[-1]):
+        p = p[:-1]
+    step = np.hypot(*np.diff(np.vstack([p, p[:1]]), axis=0).T)
+    p, step = p[step > 1e-6], step[step > 1e-6]
+    if len(p) < 6:
+        return np.asarray(pts, float)
+    perimeter = float(step.sum())
+    dev = max(0.5, 0.04 * perimeter / (2 * np.pi))
+    closed = np.vstack([p, p[:1]])
+    try:
+        tck, _ = splprep(closed.T, s=len(p) * dev * dev, per=1, quiet=2)
+        u = np.linspace(0, 1, int(np.clip(perimeter / 1.5, 12, 4000)), endpoint=False)
+        x, y = splev(u, tck)
+    except (ValueError, TypeError, SystemError):
+        return np.asarray(pts, float)
+    out = np.column_stack([x, y])
+    if not np.isfinite(out).all():
+        return np.asarray(pts, float)
+
+    def area(q):
+        return 0.5 * abs(np.dot(q[:, 0], np.roll(q[:, 1], 1)) - np.dot(q[:, 1], np.roll(q[:, 0], 1)))
+
+    a0, a1 = area(p), area(out)
+    if a0 > 0 and a1 > 0:  # rounding off the corners shrinks a shape a little: keep the area of the outline
+        c = out.mean(0)
+        out = c + (out - c) * float(np.clip(np.sqrt(a0 / a1), 0.9, 1.1))
+    return out
+
+
+def frame_rois(r: FrameResult, t: int, frames: int, slices: int, colocalizing: dict | None = None,
+               colors: list | None = None) -> list:
+    """ImageJ overlay outlines of one frame: the cells (white, as splines) and the foci per channel (in the color
+    of their channel, `colors`: 0-255 per channel).
 
     2D labels (2D segmentation, or foci found on a projection) are shown in every slice; 3D labels slice by
     slice. Positions are 1-based; 0 means all.
@@ -207,10 +246,12 @@ def frame_rois(r: FrameResult, t: int, frames: int, slices: int, colocalizing: d
     out = []
     tpos = t + 1 if frames > 1 else 0
 
-    def add(lab, name, color):
+    def add(lab, name, color, spline=False):
         for z in range(lab.shape[0]):
             zpos = z + 1 if lab.shape[0] > 1 and slices > 1 else 0
             for i, pts in _contours(lab[z]):
+                if spline:
+                    pts = spline_outline(pts)
                 pts = (pts + 0.5) * r.binning + r.border + np.asarray(r.offset)  # to image pixels (corners)
                 roi = ImagejRoi.frompoints(pts, name=name(i))
                 roi.position, roi.c_position, roi.z_position, roi.t_position = 0, 0, zpos, tpos  # 0 = all
@@ -218,13 +259,14 @@ def frame_rois(r: FrameResult, t: int, frames: int, slices: int, colocalizing: d
                 roi.options &= no_labels  # no number or name drawn at every outline
                 out.append(roi)
 
-    add(r.labels, lambda i: f"cell {i}" + (f" t{t + 1}" if frames > 1 else ""), (255, 255, 255))
+    add(r.labels, lambda i: f"cell {i}" + (f" t{t + 1}" if frames > 1 else ""), (255, 255, 255), spline=True)
     for k, ch in enumerate(r.channels):
         if ch.labels is None:
             continue
         with_ = colocalizing.get(ch.channel, set()) if colocalizing else set()
+        color = colors[ch.channel - 1] if colors and ch.channel <= len(colors) else OTHER[k % len(OTHER)]
         add(ch.labels, lambda i, c=ch.channel, w=with_: f"ch{c} focus {i}" + (" coloc" if i in w else ""),
-            OUTLINE[k % len(OUTLINE)])
+            tuple(int(v) for v in color))
     return out
 
 
@@ -250,7 +292,7 @@ def write_imagej(path: Path, data: np.ndarray, info, frames: dict[int, FrameResu
     T, Z = data.shape[0], data.shape[2]
     rois = []
     for t, r in sorted(frames.items()):
-        rois += frame_rois(r, t, T, Z, colocalizing_foci(r))
+        rois += frame_rois(r, t, T, Z, colocalizing_foci(r), colors)
     stack = np.ascontiguousarray(data.transpose(0, 2, 1, 3, 4))  # ImageJ order: T, Z, C, Y, X
     if stack.dtype not in (np.uint8, np.uint16, np.float32):
         stack = stack.astype(np.float32)
