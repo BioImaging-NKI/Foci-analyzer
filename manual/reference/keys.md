@@ -20,7 +20,8 @@ On the **Analyze** page, when no text box has the focus. The keys are also shown
 | ++bracket-left++ ++bracket-right++ | previous and next time frame; in an image without frames, previous and next slice |
 | ++x++ | remove the selected cell (or cells) from the analysis, or put them back |
 | ++0++ | Fit: the whole image |
-| ++esc++ | close a help text; clear a selection of several cells |
+| ++esc++ | close a help text; clear a selection of several cells; leave full screen |
+| ++f11++ | Full screen on or off (on every page; also the button **Full screen** at the top right) |
 
 Mouse: wheel to zoom, drag to move, click a cell to select it. **Ctrl** + wheel: Z slice; **Alt** + wheel: time
 frame. **Ctrl** + click: add a cell to the selection or drop it; **Shift** + drag: select the cells in a box.

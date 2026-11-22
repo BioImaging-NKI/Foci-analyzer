@@ -16,6 +16,7 @@ Every entry says whether results change.
 - Smooth outlines of nuclei and cells are fitted with a spline (in the viewer and in the Fiji overlays); a
   nucleus or cell in several pieces now shows all of them (one piece could vanish). Foci are drawn in the
   color of their channel. Results do not change.
+- **Full screen** at the top right (or F11) uses the whole screen; Esc or F11 goes back.
 - Only the newest browser tab of Foci Analyzer works; older tabs say so and can take over again.
 - The starting page: a thicker progress ring in the colors of the manual's title, the logo centered in it.
 

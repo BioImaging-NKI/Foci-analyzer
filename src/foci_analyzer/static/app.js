@@ -1011,6 +1011,17 @@ if ("BroadcastChannel" in window) {
   tabs.postMessage("here");
 }
 
+// Full screen: the button and F11 use the page's full screen (the browser's own F11 looks the same).
+function toggleFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else document.documentElement.requestFullscreen().catch((e) => status(`Full screen is not possible here: ${e.message}`, true));
+}
+$("fullscreen").onclick = toggleFullscreen;
+document.addEventListener("fullscreenchange", () => { $("fullscreen").textContent = document.fullscreenElement ? "Exit full screen" : "Full screen"; });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "F11" && !otherTab && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); toggleFullscreen(); }
+});
+
 $("quit").onclick = async () => {
   if (S.batch.running && !window.confirm("An analysis is running. Stop Foci Analyzer anyway?")) return;
   leaving = true;

@@ -38,7 +38,7 @@ header { display: flex; align-items: center; gap: 18px; padding: 8px 16px; backg
 #settings-files button, #save-buttons button { flex: 1; }
 nav button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 4px; margin-right: 10px; }
 nav button.on { border-bottom-color: var(--accent); font-weight: 600; }
-#theme { margin-left: auto; }
+#fullscreen { margin-left: auto; }
 #statusbar { display: flex; align-items: center; gap: 12px; padding: 4px 16px; min-height: 28px; font-size: 13px;
   background: var(--panel); border-top: 1px solid var(--line); }
 #status { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
@@ -50,7 +50,7 @@ nav button.on { border-bottom-color: var(--accent); font-weight: 600; }
 @keyframes busy { from { margin-left: -35%; } to { margin-left: 100%; } }
 kbd { font: 11px/1 ui-monospace, Consolas, monospace; color: var(--muted); border: 1px solid var(--line);
   border-bottom-width: 2px; border-radius: 4px; padding: 1px 4px; margin-left: 2px; background: var(--bg); }
-#theme, #quit { font-size: 12.5px; padding: 3px 9px; }
+#fullscreen, #theme, #quit { font-size: 12.5px; padding: 3px 9px; }
 
 .page { flex: 1; min-height: 0; overflow: auto; padding: 16px; }
 .page[hidden] { display: none; }
