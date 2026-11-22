@@ -465,8 +465,10 @@ function syncShapes() {
 }
 viewer.onview = () => {
   const i = V.info; if (!i) return;
+  const z = viewer.zoom() * 100, zt = `${z < 9.95 ? z.toFixed(1) : Math.round(z)}%`;
+  if ($("zoom").textContent !== zt) { $("zoom").textContent = zt; $("zoom-wrap").hidden = false; }
   const cal = i.pixel_size ? ` · ${fmt(i.pixel_size)} ${i.unit}/px` : " · not calibrated";
-  $("canvas").title = ""; $("image-select").title = `${i.width} × ${i.height} px · ${i.channels} channels · ${i.slices} slices${cal} · zoom ${Math.round(viewer.view.s * 100)} %`;
+  $("canvas").title = ""; $("image-select").title = `${i.width} × ${i.height} px · ${i.channels} channels · ${i.slices} slices${cal} · zoom ${zt}`;
 };
 
 // For a large image the preview can be limited to what is visible (the part is fixed when the analysis starts).
@@ -756,6 +758,7 @@ function play(on) {
 }
 $("t-play").onclick = () => play(!playing);
 $("fit").onclick = () => viewer.fit();
+$("zoom100").onclick = () => viewer.zoomTo(1);
 $("image-select").onchange = (e) => openImage(e.target.value);
 $("analyze-now").onclick = () => runPreview();
 $("segment-now").onclick = () => runPreview(true);

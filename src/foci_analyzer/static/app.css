@@ -227,3 +227,4 @@ button.small-btn:hover { background: var(--accent); color: #fff; }
 .dialog-box .row { flex-wrap: wrap; gap: 8px; }
 
 #upd-info .links { margin-top: 6px; }
+#zoom-wrap { font-size: 12.5px; } #zoom { font-variant-numeric: tabular-nums; min-width: 3.2em; display: inline-block; }

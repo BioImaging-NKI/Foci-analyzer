@@ -2,6 +2,11 @@
 
 Every entry says whether results change.
 
+## Not released yet
+
+- The viewer shows its zoom (*Zoom 66%*), and **100%** next to **Fit** shows one image pixel on one screen
+  pixel. Results do not change.
+
 ## 2.0.0b4 (2026-11-22)
 
 - **Segment nuclei** / **Segment cells** (key S, left of **Analyze this image**) finds only the nuclei or

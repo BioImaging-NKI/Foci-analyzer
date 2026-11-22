@@ -129,6 +129,12 @@ export class Viewer {
     const [w, h] = this.size(), s = Math.min(40, Math.min(w, h) / widthPx);
     this.view = { s, tx: w / 2 - x * s, ty: h / 2 - y * s }; this.requestDraw();
   }
+  zoom() { return this.view.s * (window.devicePixelRatio || 1); }  // 1: one image pixel on one screen pixel
+  zoomTo(z) {  // around the center of the view
+    if (!this.W) return;
+    const [w, h] = this.size(), now = this.glide ? this.glide.s : this.view.s;
+    this.zoomAt(w / 2, h / 2, z / (window.devicePixelRatio || 1) / now);
+  }
   zoomAt(px, py, factor) {  // glides to its target around the cursor, so a wheel notch does not jump
     if (!this.W) return;
     const [w, h] = this.size(), smin = Math.min(w / this.W, h / this.H) / 2;

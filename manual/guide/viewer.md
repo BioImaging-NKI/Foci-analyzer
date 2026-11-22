@@ -7,7 +7,8 @@ resolution that the zoom needs.
 
 ## Moving around
 
-- **Mouse wheel**: zoom; **drag**: move; **Fit** (++0++): the whole image.
+- **Mouse wheel**: zoom; **drag**: move; **Fit** (++0++): the whole image; **100%**: one image pixel on one
+  screen pixel. *Zoom*, left of these buttons, shows the current zoom.
 - **Ctrl** + wheel: the next or previous Z slice; **Alt** + wheel: the next or previous time frame.
 - **Slice** and **Max projection** (++p++ switches): one Z slice or the brightest value over Z. When the foci
   are detected on another projection (extended depth of focus or sum), a third button shows that one.

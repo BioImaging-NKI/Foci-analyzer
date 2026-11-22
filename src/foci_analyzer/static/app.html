@@ -83,7 +83,9 @@
       <span id="filter-wrap" title="Raw: the image as recorded. Filtered: the foci channels as the foci are found in them, after the filter, as a percentage of the threshold (100 = exactly at the threshold), with a contrast of their own. Needs Analyze this image (key R)">
         <span class="seg" id="filter-mode"><button data-f="raw" class="on">Raw</button><button data-f="filtered">Filtered</button></span> <kbd>R</kbd>
       </span>
+      <span id="zoom-wrap" class="muted" hidden title="Zoom: 100% shows one image pixel on one screen pixel">Zoom <span id="zoom"></span></span>
       <button id="fit" title="Show the whole image (key 0)">Fit <kbd>0</kbd></button>
+      <button id="zoom100" title="One image pixel on one screen pixel, around the middle of the view">100%</button>
       <span class="help" data-help="Wheel: zoom. Ctrl + wheel: Z slice. Alt + wheel: time frame. Drag: move. Click a cell: its numbers on the right. Keys: S segment the nuclei or cells only, A analyze this image, L live, 1-9 channels on/off, C cells, F foci, M foci markers, P slice or projection, R raw or filtered image, , and . previous and next slice, [ and ] previous and next frame (or slice, when there is no time-lapse), 0 fit. The viewer loads large images in tiles at the resolution that is needed."></span>
     </div>
     <div id="canvas-wrap">
