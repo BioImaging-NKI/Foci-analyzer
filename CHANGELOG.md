@@ -6,6 +6,8 @@ Every entry says whether results change.
 
 - The viewer shows its zoom (*Zoom 66%*), and **100%** next to **Fit** shows one image pixel on one screen
   pixel. Results do not change.
+- Smooth outlines follow the nuclei and cells more closely (the spline cut the corners of elongated and
+  dented nuclei). Results do not change.
 
 ## 2.0.0b4 (2026-11-22)
 

@@ -63,19 +63,21 @@ def test_every_piece_of_a_cell_has_an_outline():
     assert sorted(found) == [3, 3, 4]
 
 
-def test_spline_rounds_off_the_steps_of_a_coarse_segmentation():
-    yy, xx = np.mgrid[:30, :30]
-    coarse = ((yy - 14.5) ** 2 + (xx - 14.5) ** 2 < 12**2).astype(np.int32)
-    lab = np.kron(coarse, np.ones((4, 4), np.int32))  # segmented at a 4 times coarser scale
+def test_spline_rounds_off_the_pixel_steps_but_keeps_the_shape():
+    yy, xx = np.mgrid[:120, :120]
+    lab = ((yy - 59.5) ** 2 + (xx - 59.5) ** 2 < 48**2).astype(np.int32)
+    lab[50:70, 100:] = 0  # a dent, which the outline must follow
     (_, pts), = list(export._contours(lab))
     smooth = export.spline_outline(pts)
+    from scipy.spatial import cKDTree
+    assert cKDTree(pts).query(smooth)[0].max() < 2.0  # no corner cut off
 
-    def turning(p):  # total turning angle in full turns: 1 for a smooth convex outline, more for steps
+    def turning(p):  # total turning angle in full turns: 1 for a smooth convex outline, more for steps and dents
         d = np.diff(np.vstack([p, p[:1]]), axis=0)
         a = np.arctan2(d[:, 1], d[:, 0])
         return np.abs((np.diff(np.r_[a, a[:1]]) + np.pi) % (2 * np.pi) - np.pi).sum() / (2 * np.pi)
 
-    assert turning(pts) > 1.8 and turning(smooth) < 1.15
+    assert turning(pts) > 5 and turning(smooth) < 2.3  # the dent adds one turn of its own corners
 
     def area(p):
         return 0.5 * abs(np.dot(p[:, 0], np.roll(p[:, 1], 1)) - np.dot(p[:, 1], np.roll(p[:, 0], 1)))

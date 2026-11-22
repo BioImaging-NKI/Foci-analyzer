@@ -198,9 +198,10 @@ def _contours(lab2d: np.ndarray, ids: np.ndarray | None = None):
 
 
 def spline_outline(pts: np.ndarray) -> np.ndarray:
-    """A closed outline (n, 2) as a periodic smoothing spline. Networks segment at a scale of their own, so the
-    outlines of nuclei and cells often show the steps of a coarser grid; the spline may deviate about 4 % of the
-    radius (at least half a pixel) from the outline, which rounds such steps off but keeps the shape."""
+    """A closed outline (n, 2) as a periodic smoothing spline, in the pixels of the grid the cells were found in
+    (after binning), so its steps are one pixel. The spline may deviate from the outline by 1 % of the radius,
+    at least half a pixel: that rounds the pixel steps off but keeps the shape (4 % of the radius cut the corners
+    of elongated and dented nuclei)."""
     from scipy.interpolate import splev, splprep
     p = np.asarray(pts, float)
     if len(p) > 1 and np.allclose(p[0], p[-1]):
@@ -210,7 +211,7 @@ def spline_outline(pts: np.ndarray) -> np.ndarray:
     if len(p) < 6:
         return np.asarray(pts, float)
     perimeter = float(step.sum())
-    dev = max(0.5, 0.04 * perimeter / (2 * np.pi))
+    dev = max(0.5, 0.01 * perimeter / (2 * np.pi))
     closed = np.vstack([p, p[:1]])
     try:
         tck, _ = splprep(closed.T, s=len(p) * dev * dev, per=1, quiet=2)
