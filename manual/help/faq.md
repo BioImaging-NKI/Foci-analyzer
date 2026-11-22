@@ -3,7 +3,12 @@
 ## Foci Analyzer does not open in the browser
 
 Open `http://127.0.0.1:8770/` yourself. Foci Analyzer keeps running when you close the browser tab; **Quit**
-at the top right stops it. Started a second time, it shows the window that is already running.
+at the top right stops it. Started a second time, it opens the window that is already running in a new tab.
+
+## Foci Analyzer is open in another tab
+
+Only one tab of Foci Analyzer works at a time: the one opened last. Older tabs say *Foci Analyzer is open in
+another tab*; close them, or click **Use this tab** to work there again (the other tab then waits).
 
 ## The first analysis takes long
 

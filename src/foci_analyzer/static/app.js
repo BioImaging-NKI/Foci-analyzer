@@ -818,7 +818,7 @@ function renderOverlays() {
 }
 
 document.addEventListener("keydown", (e) => {
-  if ($("page-analyze").hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (otherTab || $("page-analyze").hidden || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === "Escape" && V.multi.size) { V.multi.clear(); selectCell(0, null); return; }
   const tag = e.target.tagName, type = e.target.type;
   if (tag === "SELECT" || tag === "TEXTAREA" || (tag === "INPUT" && !["checkbox", "range", "color"].includes(type))) return;
@@ -994,6 +994,22 @@ setInterval(() => {
     back();
   });
 }, 3000);
+
+// One working tab: a page cannot bring an open tab to the front, so a start that finds Foci Analyzer running opens a
+// new tab, and that newest tab takes over. The older ones wait behind a notice (all tabs share one analysis).
+let otherTab = false;
+if ("BroadcastChannel" in window) {
+  const tabs = new BroadcastChannel("foci-analyzer");
+  tabs.onmessage = (e) => {
+    if (e.data !== "here" || otherTab || leaving) return;
+    otherTab = true;
+    document.body.append(el("div", { class: "dialog", id: "other-tab" }, el("div", { class: "dialog-box" },
+      el("h2", { textContent: "Foci Analyzer is open in another tab" }),
+      el("p", { textContent: "Only one tab works at a time. Close this one, or use it here instead (the other tab then waits)." }),
+      el("div", { class: "row" }, el("button", { class: "primary", textContent: "Use this tab", onclick: () => location.reload() })))));
+  };
+  tabs.postMessage("here");
+}
 
 $("quit").onclick = async () => {
   if (S.batch.running && !window.confirm("An analysis is running. Stop Foci Analyzer anyway?")) return;

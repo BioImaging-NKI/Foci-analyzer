@@ -2,6 +2,23 @@
 
 Every entry says whether results change.
 
+## 2.0.0b4 (2026-11-22)
+
+- **Segment nuclei** / **Segment cells** (key S, left of **Analyze this image**) finds only the nuclei or
+  cells, to try the segmentation settings quickly. **Estimate** works on them, and **Analyze this image**
+  afterwards does not segment again. **Smooth outlines** moved to key E.
+- **Visible part only** sits right of **Analyze this image** and works for segmenting too. Nuclei and cells
+  found in a visible part are kept: as long as the segmentation settings stay the same, a part inside an
+  earlier one takes its cells from there instead of segmenting again.
+- **Estimate** (watershed) measures the foci size on the foci above a threshold it finds itself, sampled
+  over all cells, instead of on the 300 brightest peaks: it now works for images with few foci and for large
+  tiled images with many. Results change only when **Estimate** is used.
+- Smooth outlines of nuclei and cells are fitted with a spline (in the viewer and in the Fiji overlays); a
+  nucleus or cell in several pieces now shows all of them (one piece could vanish). Foci are drawn in the
+  color of their channel. Results do not change.
+- Only the newest browser tab of Foci Analyzer works; older tabs say so and can take over again.
+- The starting page: a thicker progress ring in the colors of the manual's title, the logo centered in it.
+
 ## 2.0.0b3 (2026-11-20)
 
 - Windows setup: the installation stopped at *[1/4] The program* with *Failed to create Python minor version
