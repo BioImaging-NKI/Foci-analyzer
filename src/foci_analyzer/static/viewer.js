@@ -16,19 +16,15 @@ void main() {
 }`;
 const FS_LABELS = `#version 300 es
 precision highp float; precision highp usampler2D;
-uniform usampler2D tex; uniform vec2 d; uniform vec4 color; uniform float fill; uniform float hatch; in vec2 uv; out vec4 o;
+uniform usampler2D tex; uniform vec2 d; uniform vec4 color; uniform float fill; uniform float even; in vec2 uv; out vec4 o;
 void main() {
   uint c = texture(tex, uv).r;
   if (c == 0u) discard;
   bool edge = texture(tex, uv + vec2(d.x, 0.0)).r != c || texture(tex, uv - vec2(d.x, 0.0)).r != c
            || texture(tex, uv + vec2(0.0, d.y)).r != c || texture(tex, uv - vec2(0.0, d.y)).r != c;
   if (!edge && fill <= 0.0) discard;
-  if (!edge && hatch > 0.0) {  // black and white stripes: visible on any color
-    float s = mod(floor((gl_FragCoord.x + gl_FragCoord.y) / hatch), 2.0);
-    o = vec4(vec3(s), fill);
-    return;
-  }
-  o = edge ? color : vec4(color.rgb, color.a * fill);  // the inside lightly filled, the outline solid
+  // the inside lightly filled, the outline solid; even: all of it lightly filled, without an outline
+  o = edge && even < 0.5 ? color : vec4(color.rgb, color.a * fill);
 }`;
 
 // cells colored by a measure: values 1..65535 through a color map (dark blue, teal, yellow), stretched
@@ -238,7 +234,7 @@ export class Viewer {
       const x1 = Math.min(Math.ceil(lw / TILE) - 1, Math.floor((cw - tx) / s / f / TILE));
       const y1 = Math.min(Math.ceil(lh / TILE) - 1, Math.floor((ch - ty) / s / f / TILE));
       for (const layer of this.layers) {
-        if (!layer.on) continue;
+        if (!layer.on || (layer.minZoom && this.zoom() < layer.minZoom)) continue;  // minZoom: only when zoomed in
         const image = layer.type === "image", value = layer.type === "value", pr = image ? this.pImage : value ? this.pValue : this.pLabels;
         gl.useProgram(pr.p); gl.uniform1i(pr.u.tex, 0);
         if (image) { gl.blendFunc(gl.ONE, gl.ONE); gl.uniform2f(pr.u.range, layer.lo, layer.hi); gl.uniform3fv(pr.u.color, layer.color); }
@@ -246,7 +242,7 @@ export class Viewer {
           gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.uniform1f(pr.u.alpha, layer.alpha ?? 0.6);
           gl.uniform2fv(pr.u.vrange, layer.range || [0, 1]); gl.uniform1f(pr.u.cat, layer.cat ? 1 : 0);
         }
-        else { gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.uniform4fv(pr.u.color, layer.color); gl.uniform1f(pr.u.fill, layer.fill || 0); gl.uniform1f(pr.u.hatch, (layer.hatch || 0) * dpr); }
+        else { gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.uniform4fv(pr.u.color, layer.color); gl.uniform1f(pr.u.fill, layer.fill || 0); gl.uniform1f(pr.u.even, layer.even ? 1 : 0); }
         this._tile(layer, layer.key, this.maxLevel, 0, 0);  // the coarsest level is always kept as a stand-in
         for (let ty_ = y0; ty_ <= y1; ty_++) for (let tx_ = x0; tx_ <= x1; tx_++) {
           const tw = Math.min(TILE, lw - tx_ * TILE), th = Math.min(TILE, lh - ty_ * TILE);

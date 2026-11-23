@@ -710,7 +710,7 @@ class App:
         """The label image (Z, Y, X) behind an overlay.
 
         cells, foci (of channel `ch`); coloc: only the foci that colocalize with a focus of another channel;
-        overlap: 1 where foci of two channels lie on top of each other; value: the cells, numbered 1 to 65535
+        overlap: 1 where foci of two channels (of the pair `pair`, "a,b") lie on top of each other; value: the cells, numbered 1 to 65535
         by the measure `col` (lowest to highest), for the color map; reach: the cells grown by the distance
         outside cells.
         """
@@ -728,7 +728,14 @@ class App:
             F, div = ch.filtered
             return np.clip(F / div / max(ch.threshold, 1e-12) * 100, 0, 65535).astype(np.uint16)
         if kind == "overlap":
-            n = sum((c.labels > 0).astype(np.uint8) for c in r.channels)
+            if q.get("pair"):  # the foci channels "a,b" only
+                want = {int(v) for v in str(q["pair"]).split(",") if v.strip().isdigit()}
+                chans = [c for c in r.channels if c.channel in want]
+                if len(chans) != 2:
+                    raise ApiError("no such pair of foci channels")
+            else:
+                chans = r.channels
+            n = sum((c.labels > 0).astype(np.uint8) for c in chans)
             return (n >= 2).astype(np.uint16)
         if kind == "coloc":
             cols = [c for c in r.foci.columns if c.startswith("with_ch")]
@@ -800,7 +807,7 @@ class App:
         t, z, level = self._plane_args(q, im.info)
         r = self.shown(q.get("path", ""), t)
         kind = q.get("kind", "cells")
-        key = (r.key, kind, q.get("ch"), q.get("col"), z)
+        key = (r.key, kind, q.get("ch"), q.get("col"), q.get("pair"), z)
         with self.lock:
             plane = self._planes.get(key)
         if plane is None:

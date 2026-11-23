@@ -70,7 +70,8 @@ choice.
   a coarser grid, which the spline rounds off (it keeps the area of the outline). The saved overlays for Fiji
   always have these spline outlines. Only the drawing changes: the measurements use the pixels as segmented.
 - **Colocalization** (++o++): colocalizing foci get a white outline with a black edge; where foci of two
-  channels lie on top of each other is hatched.
+  channels lie on top of each other is filled in the mix of their colors (green and red give yellow, as in a
+  merged image). That fill appears from a zoom of 150%: further out it would hide the foci.
 - **Color cells by**: fills every cell with a color for one of its numbers (for example the number of
   foci), from dark blue (lowest) to yellow (highest). The numbers are grouped: *Cell* (area, mean intensity
   per channel), *Foci in channel N* (number of foci, their total and mean intensity and size), and

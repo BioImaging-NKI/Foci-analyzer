@@ -14,6 +14,8 @@ Every entry says whether results change.
   changes the colors. Foci are drawn in a lighter tint of their channel color,
   which stands out on their own signal (also in the saved pictures and Fiji overlays). The colored bars of
   the foci channels in the settings follow a change of channel. Results do not change.
+- Colocalization map: where foci of two channels overlap is filled in the mix of their colors (green and red
+  give yellow) instead of black and white stripes, and only from a zoom of 150%. Results do not change.
 
 ## 2.0.0b4 (2026-11-22)
 

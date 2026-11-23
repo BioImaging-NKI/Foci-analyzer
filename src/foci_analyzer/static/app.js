@@ -437,8 +437,15 @@ function syncLayers() {
       const prev = slot("coloc", key), url = region("/api/overlay?kind=coloc");
       layers.push({ type: "labels", key, prevKey: prev, url, color: [0, 0, 0, 1], width: 2.6, on: line });  // the black edge,
       layers.push({ type: "labels", key, prevKey: slot("coloc", key), url, color: [1, 1, 1, 1], width: 1, on: line });  // the white line on it
-      key = `l|overlap|${z}|${k}`;
-      layers.push({ type: "labels", key, prevKey: slot("overlap", key), url: region("/api/overlay?kind=overlap"), color: [0, 0, 0, 1], fill: 0.75, hatch: 3, on });
+      // where foci of two channels lie on top of each other: a soft fill in the mix of their colors (green and red
+      // give yellow, as in a merged image), only when zoomed in: at a distance it would hide the foci
+      const chs = V.preview.channels.map((c) => c.channel);
+      chs.forEach((a, i) => chs.slice(i + 1).forEach((b) => {
+        const mix = tint([0, 1, 2].map((j) => Math.min(1, V.ch[a - 1].color[j] + V.ch[b - 1].color[j])));
+        const pk = `l|overlap${a}-${b}|${z}|${k}`;
+        layers.push({ type: "labels", key: pk, prevKey: slot(`overlap${a}-${b}`, pk), url: region(`/api/overlay?kind=overlap&pair=${a},${b}`),
+          color: [...mix, 1], fill: 0.55, even: true, minZoom: 1.5, on: on && V.fociOn[a] !== false && V.fociOn[b] !== false });
+      }));
     }
   }
   viewer.box = V.preview && V.preview.part ? V.preview.part : null;
@@ -574,7 +581,7 @@ function previewInfo() {
   for (const c of p.coloc || []) lines.push(el("div", {}, `Channel ${c.a} foci on a channel ${c.b} focus: `,
     el("b", { textContent: `${c.with} of ${c.n} (${Math.round(100 * c.with / c.n)} %)` }),
     c.chance !== null ? el("div", { class: "sub", textContent: `by chance about ${Math.round(100 * c.chance)} %` }) : null));
-  if ((p.coloc || []).length) lines.push(el("div", { class: "sub", textContent: "Map (key O): white outline with a black edge = colocalizing focus; hatched = where foci of two channels overlap." }));
+  if ((p.coloc || []).length) lines.push(el("div", { class: "sub", textContent: "Map (key O): white outline with a black edge = colocalizing focus; filled in the mix of both colors (when zoomed in) = where foci of two channels overlap." }));
   else if (p.channels.length > 1 && !S.settings.colocalization.enabled) lines.push(el("div", { class: "sub", textContent: "Colocalization is switched off (see the settings on the left)." }));
   if ((p.removed || []).length) lines.push(el("div", { class: "sub", style: "margin-left:0", textContent: `${p.removed.length} ${p.removed.length === 1 ? "cell" : "cells"} removed by hand (red outline), not counted` }));
   for (const r of p.remarks) lines.push(el("div", { textContent: r }));
