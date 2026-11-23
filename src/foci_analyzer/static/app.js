@@ -274,7 +274,7 @@ function renderSettings() {
       const g = Object.fromEntries(sec.fields.map((f) => [f.key, f.default]));
       if ("channel" in g) g.channel = Math.max(...list.map((x) => x.channel)) + 1;
       list.push(g); renderSettings(); settingsChanged(); } })));
-    list.forEach((g, i) => div.append(el("div", sec.key === "foci" ? { class: "group tinted", style: `--g:${hex(fociColor(g.channel))}` } : { class: "group" },
+    list.forEach((g, i) => div.append(el("div", sec.key === "foci" ? { class: "group tinted", "data-foci": i, style: `--g:${hex(fociColor(g.channel))}` } : { class: "group" },
       el("div", { class: "group-head" }, `${sec.title} ${i + 1}`,
         sec.key === "foci" && (g.method === "watershed" || g.method === "multi-scale") ? el("span", { class: "estimate" }, el("button", { class: "small-btn", textContent: "Estimate", onclick: () => estimateFoci(i) }), helpIcon(ESTIMATE_HELP)) : null,
         list.length > 1 ? el("button", { class: "link", textContent: "Remove", onclick: () => { list.splice(i, 1); renderSettings(); settingsChanged(); } }) : null),
@@ -310,7 +310,14 @@ function channelColor(c) {
   const rest = [...Array(n).keys()].filter((x) => !special.includes(x) && !foci.includes(x));
   return OTHER[Math.max(0, [...foci, ...rest].indexOf(c)) % OTHER.length];
 }
-function updateChannelColors() { V.ch.forEach((ch, c) => { ch.color = channelColor(c); }); renderChannels(); syncLayers(); }
+function updateChannelColors() {
+  V.ch.forEach((ch, c) => { ch.color = channelColor(c); }); renderChannels(); syncLayers(); paintFociBars();
+}
+function paintFociBars() {  /* the bar of each foci channel in the settings panel shows the color of its channel */
+  document.querySelectorAll(".group.tinted[data-foci]").forEach((g) => {
+    const f = S.settings.foci[+g.dataset.foci]; if (f) g.style.setProperty("--g", hex(fociColor(f.channel)));
+  });
+}
 
 async function openImage(id, analyze = false) {
   const load = ++V.load;
@@ -806,7 +813,7 @@ function renderChannels() {
       el("div", { class: "channel-head" },
         el("input", { type: "checkbox", id: `ch${c}`, checked: raw.on, title: `Show channel ${c + 1} (key ${c + 1})`, onchange: (e) => { raw.on = e.target.checked; syncLayers(); } }),
         el("input", { type: "color", value: hex(raw.color), title: "Color of this channel", "aria-label": `Color of channel ${c + 1}`,
-          oninput: (e) => { raw.color = unhex(e.target.value); store("fa.colors", { ...(store("fa.colors") || {}), [c]: e.target.value }); syncLayers(); renderOverlays(); previewInfo(); } }),
+          oninput: (e) => { raw.color = unhex(e.target.value); store("fa.colors", { ...(store("fa.colors") || {}), [c]: e.target.value }); syncLayers(); renderOverlays(); previewInfo(); paintFociBars(); } }),
         el("label", { htmlFor: `ch${c}`, textContent: pct ? `Ch ${c + 1} filtered` : `Ch ${c + 1}` }), c < 9 ? el("kbd", { textContent: c + 1 }) : null, values,
         el("button", { textContent: "Auto", title: "Contrast from the image (0.1 to 99.9 percentile)",
           onclick: () => { [ch.lo, ch.hi] = ch.auto; lo.value = ch.lo; hi.value = ch.hi; show(); syncLayers(); } })),
