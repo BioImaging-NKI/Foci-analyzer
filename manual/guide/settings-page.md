@@ -37,9 +37,9 @@ settings and experiment).
 
 ## Updates
 
-Foci Analyzer can look on GitHub whether there is a newer version: when it starts (at most once a day, in
-the background) if **Look for a newer version when Foci Analyzer starts** is on, and at once with **Check for
-updates**. Only the question goes to GitHub; nothing about you or your images.
+Foci Analyzer can look on GitHub whether there is a newer version: in the background when it starts and
+while it runs (at most every 6 hours) if **Look for a newer version by itself** is on, and at once with
+**Check for updates**. Only the question goes to GitHub; nothing about you or your images.
 
 A newer version is offered in a window with its release notes:
 

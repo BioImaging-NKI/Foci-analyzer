@@ -1147,5 +1147,6 @@ initResults({
     renderConditions(); renderImages(); renderSettings(); syncMode(); showProgress(S.batch);
     if (S.batch.running) poll();
   } catch (e) { status(e.message, true); }
-  loadUpdate(); setTimeout(loadUpdate, 20000);  /* the check at start runs in the background */
+  /* the check runs in the background on the server (at start, and when asked here, at most every 6 hours) */
+  loadUpdate(); setTimeout(loadUpdate, 20000); setInterval(loadUpdate, 3600 * 1000);
 })();

@@ -4,6 +4,8 @@ Every entry says whether results change.
 
 ## 2.0.0b5 (2026-11-23)
 
+- The update check in the background runs every 6 hours instead of once a day, also while Foci Analyzer
+  stays open, so a new version shows up without **Check for updates**.
 - The viewer shows its zoom (*Zoom 66%*), and **100%** next to **Fit** shows one image pixel on one screen
   pixel. Results do not change.
 - Smooth outlines follow the nuclei and cells more closely (the spline cut the corners of elongated and

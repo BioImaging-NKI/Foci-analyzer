@@ -304,9 +304,19 @@ class App:
         return self.update_info()
 
     def check_updates_soon(self) -> None:
-        """At start, in the background, at most once a day."""
-        if self.updates.due():
-            threading.Thread(target=self.check_updates, kwargs={"quiet": True}, daemon=True).start()
+        """In the background, at most every 6 hours: at start, and whenever the window asks (every hour), so
+        a program that keeps running still hears of a new version."""
+        with self.updates.lock:
+            if not self.updates.due() or getattr(self, "_checking", False):
+                return
+            self._checking = True
+
+        def check():
+            try:
+                self.check_updates(quiet=True)
+            finally:
+                self._checking = False
+        threading.Thread(target=check, daemon=True).start()
 
     def update_choice(self, body: dict) -> dict:
         d = self.updates.data
@@ -1079,7 +1089,7 @@ def make_handler(app: App):
                 "/api/analyzed": lambda: self._json(app.analyzed()),
                 "/api/program/install": lambda: self._json(app.install),
                 "/api/program": lambda: self._json(app.program_info()),
-                "/api/update": lambda: self._json(app.update_info()),
+                "/api/update": lambda: (app.check_updates_soon(), self._json(app.update_info()))[1],
                 "/api/activity": lambda: self._json(app.activity()),
                 "/api/batch": lambda: self._json(app.progress.to_dict()),
                 "/api/results": lambda: self._send(200, app.results_json(), "application/json"),

@@ -1,7 +1,7 @@
 """Updates: is there a newer version on GitHub, and installing it.
 
-The check asks the GitHub API for the releases of the repository (nothing else is sent) at most once a day,
-in the background, and on the Settings page. The repository also holds the releases of the Fiji macro, so
+The check asks the GitHub API for the releases of the repository (nothing else is sent) at most every
+`CHECK_EVERY` seconds, in the background, and on the Settings page. The repository also holds the releases of the Fiji macro, so
 only releases with the Windows setup attached (`FociAnalyzer-Setup-*.exe`) count.
 
 The update downloads the release's source archive into the installation folder and runs its
@@ -32,6 +32,7 @@ from . import __version__
 REPOSITORY = "BioImaging-NKI/Foci-analyzer"
 ASSET = re.compile(r"FociAnalyzer-Setup-.+\.exe$")
 DAY = 24 * 3600
+CHECK_EVERY = 6 * 3600  # the background check: at start, and while the program runs
 
 
 def releases_url() -> str:
@@ -163,7 +164,7 @@ class Preferences:
             pass
 
     def due(self) -> bool:
-        return bool(self.data["check"]) and time.time() - float(self.data.get("last_check") or 0) > DAY
+        return bool(self.data["check"]) and time.time() - float(self.data.get("last_check") or 0) > CHECK_EVERY
 
     def show(self) -> bool:
         """Whether the window should offer the newer version now (not skipped, not snoozed)."""
