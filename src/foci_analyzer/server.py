@@ -832,7 +832,9 @@ class App:
         self.progress.running = True
         threading.Thread(target=batch.run, daemon=True, args=(
             images, self.settings, self.results_folder(), self.results, self.progress, self.compute_lock,
-            bool(body.get("labels")), bool(body.get("images_overlay")))).start()
+            bool(body.get("labels")),
+            # images with overlays: "fa" for the Foci Analyzer channel colors, else those of the image files
+            (body.get("color_mode") or "image") if body.get("images_overlay") else False)).start()
         return self.progress.to_dict()
 
     def results_json(self) -> bytes:
@@ -912,7 +914,7 @@ class App:
             for ch in r.channels:
                 if ch.channel in (o.get("foci") or []) and ch.labels is not None:
                     overlays.append({"labels": export.full_plane(r, ch.labels, zi, H, W), "fill": 0.35, "halo": True,
-                                     "color": tuple(display[ch.channel - 1].get("color") or (255, 255, 255))})
+                                     "color": export.foci_color(display[ch.channel - 1].get("color") or (255, 255, 255))})
             if o.get("coloc"):
                 lab = self._overlay_labels(r, "coloc", {})
                 overlays.append({"labels": export.full_plane(r, lab, zi, H, W), "color": (255, 255, 255), "halo": True})
@@ -943,8 +945,7 @@ class App:
         colors = [tuple(round(255 * v) for v in c) for c in (body.get("colors") or [])]
         if len(colors) != im.info.channels:
             s = self.settings
-            colors = export.default_colours(im.info.channels, s.image.nuclei_channel, s.image.cell_channel,
-                                             [f.channel for f in s.foci])
+            colors = export.default_colours(im.info.channels, s.image.nuclei_channel, s.image.cell_channel, im.info.colors)
         ranges = body.get("ranges")
         if ranges and len(ranges) == im.info.channels and im.scale != 1.0:
             ranges = [[v / im.scale for v in lohi] for lohi in ranges]

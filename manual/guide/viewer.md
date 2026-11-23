@@ -41,15 +41,26 @@ two ends of the slider set the darkest and brightest value shown. **Auto** sets 
 This changes the display only, never the measurements. The display stays the same when you open another
 image with the same channels.
 
+**Colors** chooses where the channel colors come from:
+
+- *From the image*: the colors stored in the image file by the microscope or Fiji (ImageJ TIFF, OME-TIFF, CZI,
+  LIF). A channel without a color there, or a gray one, gets the Foci Analyzer color.
+- *Foci Analyzer*: blue for the nuclei channel, orange for the cell channel, and green, magenta, yellow, cyan
+  and white for the other channels, in the order of their numbers.
+
+Either way, changing the foci channels never changes a color. A color picked with the square overrides both;
+switching **Colors** starts those over. The images with overlays of **Analyze all images** use the same
+choice.
+
 ## Overlays
 
 - **Cells** (++c++): the outlines of the nuclei or cells. When *Cell border shift* is set, a thin dashed gray
   line shows the border within which foci count for a cell: outside the outline when the shift is positive,
   inside it when it is negative.
-- **Foci outlines** (++f++): the detected foci, lightly filled, in the color of their channel (the color
-  chosen under *Channels*), with a thin dark edge so that they show on their own signal; per channel they can
-  be switched off.
-- **Foci markers** (++m++): a dot on every focus, in the color of its channel. The dots follow the threshold slider at once; the outlines
+- **Foci outlines** (++f++): the detected foci, lightly filled, in a lighter tint of the color of their
+  channel, with a thin dark edge: a focus lies on the brightest signal of its own channel, which shows in the
+  full channel color, and the lighter tint stands out from it. Per channel they can be switched off.
+- **Foci markers** (++m++): a dot on every focus, in the same lighter tint. The dots follow the threshold slider at once; the outlines
   when the analysis has been repeated. When zoomed in, a ring with a black and white edge marks a focus that
   colocalizes with a focus of another channel.
 - **Numbers** (++n++): the number of every cell, as in the tables, when it is large enough on the screen.

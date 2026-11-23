@@ -48,7 +48,7 @@ def _replace(path: Path, write) -> None:
 
 
 def analyze_image(entry: ImageEntry, s: config.Settings, compute_lock: threading.Lock | None = None,
-                  folder: str | None = None, labels: bool = False, images: bool = False):
+                  folder: str | None = None, labels: bool = False, images: bool | str = False):
     """The tables of one image (all frames), with the columns that say where a row comes from.
 
     With a results `folder`: the label images and candidates go to its store (`.viewer`), so the viewer can show
@@ -100,7 +100,7 @@ def analyze_image(entry: ImageEntry, s: config.Settings, compute_lock: threading
             for t, rr in enumerate(results):
                 rr.foci = foci_rows[t]
             colors = export.default_colours(info.channels, s.image.nuclei_channel, s.image.cell_channel,
-                                             [f.channel for f in s.foci])
+                                             info.colors if images != "fa" else None)
             export.write_imagej(Path(folder) / "images" / f"{base}.zip", data, info, dict(enumerate(results)), colors)
     meta = {"unit": info.unit, "pixel_size": r.cal.pixel_size, "frames": info.frames, "slices": info.slices,
             "frame_interval": info.frame_interval, "remark": remark}
@@ -138,7 +138,7 @@ class Results:
 
 
 def run(images: list[ImageEntry], s: config.Settings, folder: str, results: Results, progress: Progress,
-        compute_lock: threading.Lock, labels: bool = False, save_images: bool = False) -> None:
+        compute_lock: threading.Lock, labels: bool = False, save_images: bool | str = False) -> None:
     """Analyze the images one after another (meant for a thread); an image that fails is reported and skipped."""
     progress.running, progress.done, progress.total, progress.errors, progress.stop = True, 0, len(images), [], False
     cells, foci, per_image = [], [], {}

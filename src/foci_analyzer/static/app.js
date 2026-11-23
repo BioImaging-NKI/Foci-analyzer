@@ -294,22 +294,37 @@ const rgba = (c, a) => `rgba(${c.map((v) => Math.round(v * 255)).join(",")},${a}
 // the projection the foci are detected on, when it is not the max projection: [name in a request, name on the button]
 const DET = { "extended depth of focus": ["edf", "EDF"], "sum projection": ["sum", "Sum"] };
 const NUCLEI = [0, 0.5, 1], CELLS = [1, 0.5, 0], OTHER = [[0, 1, 0], [1, 0, 1], [1, 1, 0], [0, 1, 1], [1, 1, 1]];
-// the foci of a channel are drawn in the color of that channel (with a dark edge, so they show on their own signal)
-const fociColor = (channel) => (V.ch[channel - 1] ? V.ch[channel - 1].color : channelColor(channel - 1));
+// the foci of a channel are drawn in a lighter tint of the color of that channel, with a dark edge
+const fociColor = (channel) => tint(V.ch[channel - 1] ? V.ch[channel - 1].color : channelColor(channel - 1));
 const hex = (c) => `#${c.map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("")}`;
 const unhex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
 
 function channelColor(c) {
   const saved = (store("fa.colors") || {})[c];
   if (saved) return unhex(saved);
+  const given = colorMode() === "image" && V.info && V.info.colors ? V.info.colors[c] : null;
+  if (given) return unhex(given);  /* the color the file gives the channel (gray counts as none) */
   if (c + 1 === S.settings.image.nuclei_channel) return NUCLEI;
   if (c + 1 === S.settings.image.cell_channel) return CELLS;
-  // the foci channels first, then the rest, each the next color: no two channels alike while colors last
-  const n = V.info ? V.info.channels : c + 1, special = [S.settings.image.nuclei_channel - 1, S.settings.image.cell_channel - 1];
-  const foci = [...new Set(S.settings.foci.map((f) => f.channel - 1))].filter((x) => !special.includes(x));
-  const rest = [...Array(n).keys()].filter((x) => !special.includes(x) && !foci.includes(x));
-  return OTHER[Math.max(0, [...foci, ...rest].indexOf(c)) % OTHER.length];
+  // the others by channel number, so changing the foci channels never changes a color
+  const special = [S.settings.image.nuclei_channel - 1, S.settings.image.cell_channel - 1];
+  return OTHER[[...Array(c).keys()].filter((x) => !special.includes(x)).length % OTHER.length];
 }
+const colorMode = () => store("fa.colorMode") || "image";  /* "image": the colors of the file, "fa": Foci Analyzer's */
+// a focus lies on the brightest signal of its own channel, shown in the full channel color: a lighter tint of
+// that color stands out from it and from the dark background (the same tint as export.foci_color)
+const FOCI_TINT = 0.5;
+const tint = (col) => col.map((v) => v + (1 - v) * FOCI_TINT);
+function renderColorMode() {
+  const has = !!(V.info && V.info.colors);
+  $("color-mode").value = colorMode();
+  $("color-mode").options[0].disabled = !has;
+  $("color-mode").title = has ? "" : "This image file has no channel colors: Foci Analyzer colors are used";
+}
+$("color-mode").onchange = (e) => {
+  store("fa.colorMode", e.target.value); store("fa.colors", {});  /* colors picked by hand start over */
+  updateChannelColors(); renderOverlays(); previewInfo();
+};
 function updateChannelColors() {
   V.ch.forEach((ch, c) => { ch.color = channelColor(c); }); renderChannels(); syncLayers(); paintFociBars();
 }
@@ -343,7 +358,7 @@ async function openImage(id, analyze = false) {
     const large = info.width * info.height >= LARGE;
     $("part-wrap").hidden = !large; $("part").checked = large;
     viewer.setImage(info.width, info.height); viewer.pixelSize = info.pixel_size; viewer.unit = info.unit;
-    renderCellColor(); renderChannels(); syncMode(); syncLayers(); viewer.fit(); status("");
+    renderCellColor(); renderColorMode(); renderChannels(); syncMode(); syncLayers(); viewer.fit(); status("");
     previewInfo();
     if (analyze) runPreview();  // otherwise the user first checks the settings and presses Analyze this image,
     else await loadStored();  // unless the last batch run already analyzed it with these settings
@@ -352,7 +367,7 @@ async function openImage(id, analyze = false) {
 function closeImage() {
   V.load++; Object.assign(V, { id: "", info: null, preview: null, cand: [], ch: [], slots: {}, polys: {}, polysPrev: {}, sel: 0, selPt: null });
   viewer.setImage(0, 0); $("viewer-empty").hidden = false; $("image-select").value = "";
-  renderCellColor(); renderChannels(); syncMode(); syncLayers(); previewInfo(); showCell(null);
+  renderCellColor(); renderColorMode(); renderChannels(); syncMode(); syncLayers(); previewInfo(); showCell(null);
 }
 // The tiles shown before in this place stay until the new ones are there, so nothing flickers.
 function slot(name, key) {
@@ -871,7 +886,7 @@ async function poll() {
   } catch (e) { status(e.message, true); }
 }
 async function run(images) {
-  try { showProgress(await (await api("/api/batch/start", { settings: S.settings, images, labels: $("save-labels").checked, images_overlay: $("save-images").checked })).json()); poll(); }
+  try { showProgress(await (await api("/api/batch/start", { settings: S.settings, images, labels: $("save-labels").checked, images_overlay: $("save-images").checked, color_mode: colorMode() })).json()); poll(); }
   catch (e) { status(e.message, true); }
 }
 $("save-labels").checked = store("fa.labels") === true;

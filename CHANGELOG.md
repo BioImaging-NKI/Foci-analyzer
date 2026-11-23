@@ -8,6 +8,11 @@ Every entry says whether results change.
   pixel. Results do not change.
 - Smooth outlines follow the nuclei and cells more closely (the spline cut the corners of elongated and
   dented nuclei). Results do not change.
+- Channel colors: **Colors** above the channels takes the colors stored in the image file (ImageJ TIFF,
+  OME-TIFF, CZI, LIF), or Foci Analyzer's own. Foci Analyzer's colors now go by channel number, so changing
+  the foci channels no longer changes the colors. Foci are drawn in a lighter tint of their channel color,
+  which stands out on their own signal (also in the saved pictures and Fiji overlays). The colored bars of
+  the foci channels in the settings follow a change of channel. Results do not change.
 
 ## 2.0.0b4 (2026-11-22)
 

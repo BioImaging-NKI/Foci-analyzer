@@ -40,6 +40,7 @@ class ImageInfo:
     unit: str  # "µm" or "px"
     series: int = 0
     frame_interval: float | None = None  # seconds
+    colors: list | None = None  # per channel the color the file gives it ("#rrggbb"), None for gray or unknown
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -61,6 +62,39 @@ def _info(path: Path, name: str, arr: np.ndarray, px, z, series=0, interval=None
     return ImageInfo(path=str(path), name=name, frames=t, channels=c, slices=nz, height=h, width=w,
                      dtype=str(arr.dtype), pixel_size=px or None, z_spacing=float(z) if (px and z and nz > 1) else None,
                      unit="µm" if px else "px", series=series, frame_interval=interval)
+
+
+# ---- channel colors as the microscope or Fiji stored them; gray counts as no color
+_NAMED = {"red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255), "cyan": (0, 255, 255),
+          "magenta": (255, 0, 255), "yellow": (255, 255, 0)}
+
+
+def _hex(rgb) -> str | None:
+    r, g, b = (int(v) for v in rgb)
+    return None if r == g == b else f"#{r:02x}{g:02x}{b:02x}"
+
+
+def _colors(found: list, channels: int) -> list | None:
+    out = [found[c] if c < len(found) else None for c in range(channels)]
+    return out if any(out) else None
+
+
+def _tiff_colors(tf, channels: int) -> list | None:
+    try:
+        luts = (tf.imagej_metadata or {}).get("LUTs")
+        if luts is not None:
+            return _colors([_hex(np.asarray(lut)[:, -1]) for lut in luts], channels)
+        if tf.is_ome:
+            import re
+            found = []
+            for m in re.finditer(r"<(?:\w+:)?Channel\b[^>]*>", tf.ome_metadata or ""):
+                c = re.search(r'\bColor="(-?\d+)"', m.group(0))
+                v = int(c.group(1)) & 0xFFFFFFFF if c else None  # RGBA as a signed 32-bit number
+                found.append(_hex(((v >> 24) & 255, (v >> 16) & 255, (v >> 8) & 255)) if v is not None else None)
+            return _colors(found, channels)
+    except (ValueError, TypeError, KeyError, IndexError, AttributeError):  # colors never stop an image opening
+        return None
+    return None
 
 
 def list_series(path: str | Path) -> list[str]:
@@ -91,7 +125,9 @@ def _read_tiff(path: Path):
                 px = den / num
         if str(ij.get("unit", "")).strip().lower() not in _MICRON:
             px = None
-        return arr, _info(path, path.stem, arr, px, ij.get("spacing"), 0, ij.get("finterval"))
+        info = _info(path, path.stem, arr, px, ij.get("spacing"), 0, ij.get("finterval"))
+        info.colors = _tiff_colors(tf, info.channels)
+        return arr, info
 
 
 def _read_czi(path: Path, series: int):
@@ -116,13 +152,23 @@ def _read_czi(path: Path, series: int):
             scale = {d["@Id"]: float(d["Value"]) * 1e6 for d in (items if isinstance(items, list) else [items])}
         except (KeyError, TypeError, ValueError):
             scale = {}
+        try:  # "#AARRGGBB" per channel
+            chans = doc.metadata["ImageDocument"]["Metadata"]["DisplaySetting"]["Channels"]["Channel"]
+            chans = chans if isinstance(chans, list) else [chans]
+            found = [_hex(int(str(c.get("Color"))[-6:][i:i + 2], 16) for i in (0, 2, 4)) if c.get("Color") else None
+                     for c in chans]
+        except (KeyError, TypeError, ValueError, AttributeError):
+            found = []
     name = path.stem + (f" scene {series + 1}" if len(scenes) > 1 else "")
-    return arr, _info(path, name, arr, scale.get("X"), scale.get("Z"), series)
+    info = _info(path, name, arr, scale.get("X"), scale.get("Z"), series)
+    info.colors = _colors(found, info.channels)
+    return arr, info
 
 
 def _read_lif(path: Path, series: int):
     from readlif.reader import LifFile
-    im = LifFile(str(path)).get_image(series)
+    lif = LifFile(str(path))
+    im = lif.get_image(series)
     d = im.dims
     arr = None
     for t in range(d.t):
@@ -133,8 +179,17 @@ def _read_lif(path: Path, series: int):
                     arr = np.zeros((d.t, im.channels, d.z, *plane.shape), plane.dtype)
                 arr[t, c, z] = plane
     sx, _, sz, st = (list(im.scale) + [None] * 4)[:4]
-    return arr, _info(path, f"{path.stem} {im.name}", arr, 1 / sx if sx else None, 1 / abs(sz) if sz else None,
-                      series, 1 / st if st else None)
+    info = _info(path, f"{path.stem} {im.name}", arr, 1 / sx if sx else None, 1 / abs(sz) if sz else None,
+                 series, 1 / st if st else None)
+    try:  # the LUT names of the channels of this image (the n-th image of that name in the file)
+        same = [e for e in lif.xml_root.iter("Element") if e.find("Data/Image") is not None and e.get("Name") == im.name]
+        nth = [x["name"] for x in lif.image_list[:series]].count(im.name)
+        found = [_hex(_NAMED[n]) if (n := ch.get("LUTName", "").lower()) in _NAMED else None
+                 for ch in same[nth].iter("ChannelDescription")]
+        info.colors = _colors(found, info.channels)
+    except (IndexError, AttributeError):
+        pass
+    return arr, info
 
 
 def read_image(path: str | Path, series: int = 0) -> tuple[np.ndarray, ImageInfo]:

@@ -102,6 +102,10 @@
   <aside id="display">
     <div class="section">
       <h3>Channels <span class="help" data-help="Per channel: show or hide (keys 1-9), the color (click the square), and the darkest and brightest value shown (drag the two ends of the slider). Auto sets the contrast from the image. This changes the display only, never the measurements."></span></h3>
+      <label class="color-mode">Colors
+        <select id="color-mode"><option value="image">From the image</option><option value="fa">Foci Analyzer</option></select>
+        <span class="help" data-help="From the image: the channel colors stored in the image file (by the microscope or Fiji); channels without a color there, or gray, get the Foci Analyzer color. Foci Analyzer: blue for the nuclei, orange for the cells, the other channels green, magenta, yellow, cyan and white by channel number. A color picked with the square overrides both; switching here starts those over. Foci are drawn in a lighter tint of the color of their channel, so they stand out on their own signal."></span>
+      </label>
       <div id="channels"></div>
     </div>
     <div class="section">

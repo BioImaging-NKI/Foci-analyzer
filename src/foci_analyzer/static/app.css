@@ -228,3 +228,4 @@ button.small-btn:hover { background: var(--accent); color: #fff; }
 
 #upd-info .links { margin-top: 6px; }
 #zoom-wrap { font-size: 12.5px; } #zoom { font-variant-numeric: tabular-nums; min-width: 3.2em; display: inline-block; }
+.color-mode { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 12.5px; color: var(--muted); } .color-mode select { flex: 1; }

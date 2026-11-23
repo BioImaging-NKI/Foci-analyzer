@@ -31,15 +31,29 @@ def safe_name(text: str) -> str:
     return re.sub(r"[^\w.-]+", "_", text).strip("_") or "image"
 
 
-def default_colours(n_channels: int, nuclei: int, cell: int, foci: list[int]) -> list[tuple[int, int, int]]:
-    """The channel colors of the viewer when the user did not choose any."""
+FOCI_TINT = 0.5  # foci are drawn this far from their channel color toward white
+
+
+def default_colours(n_channels: int, nuclei: int, cell: int, image_colors: list | None = None) -> list[tuple[int, int, int]]:
+    """The channel colors of the viewer when the user did not choose any: the colors of the image file where it
+    has them (`image_colors`, "#rrggbb" or None per channel), else blue for the nuclei, orange for the cells
+    and the others by channel number, so a change of the foci channels never changes a color."""
     special = [nuclei - 1, cell - 1]
-    order = [c - 1 for c in dict.fromkeys(foci) if c - 1 not in special]
-    order += [c for c in range(n_channels) if c not in special and c not in order]
+    order = [c for c in range(n_channels) if c not in special]
     out = []
     for c in range(n_channels):
-        out.append(NUCLEI if c == nuclei - 1 else CELLS if c == cell - 1 else OTHER[order.index(c) % len(OTHER)])
+        given = image_colors[c] if image_colors and c < len(image_colors) else None
+        if given:
+            out.append(tuple(int(given[i:i + 2], 16) for i in (1, 3, 5)))
+        else:
+            out.append(NUCLEI if c == nuclei - 1 else CELLS if c == cell - 1 else OTHER[order.index(c) % len(OTHER)])
     return out
+
+
+def foci_color(color) -> tuple[int, int, int]:
+    """A focus sits on the brightest signal of its own channel, which shows in the full channel color: a lighter
+    tint of that color stands out from the signal and from the dark background, and still says which channel."""
+    return tuple(round(float(v) + (255 - float(v)) * FOCI_TINT) for v in color)
 
 
 # ---------------------------------------------------------------- the store the viewer reads back
@@ -267,7 +281,7 @@ def frame_rois(r: FrameResult, t: int, frames: int, slices: int, colocalizing: d
         with_ = colocalizing.get(ch.channel, set()) if colocalizing else set()
         color = colors[ch.channel - 1] if colors and ch.channel <= len(colors) else OTHER[k % len(OTHER)]
         add(ch.labels, lambda i, c=ch.channel, w=with_: f"ch{c} focus {i}" + (" coloc" if i in w else ""),
-            tuple(int(v) for v in color))
+            foci_color(color))
     return out
 
 
