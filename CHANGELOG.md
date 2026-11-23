@@ -2,7 +2,7 @@
 
 Every entry says whether results change.
 
-## Not released yet
+## 2.0.0b5 (2026-11-23)
 
 - The viewer shows its zoom (*Zoom 66%*), and **100%** next to **Fit** shows one image pixel on one screen
   pixel. Results do not change.
