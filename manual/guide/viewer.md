@@ -44,7 +44,8 @@ image with the same channels.
 **Colors** chooses where the channel colors come from:
 
 - *From the image*: the colors stored in the image file by the microscope or Fiji (ImageJ TIFF, OME-TIFF, CZI,
-  LIF). A channel without a color there, or a gray one, gets the Foci Analyzer color.
+  LIF). A channel without a color there, or a gray one, gets the Foci Analyzer color; a file that gives every
+  channel the same color (some LIF files: all blue) gets the Foci Analyzer colors.
 - *Foci Analyzer*: blue for the nuclei channel, orange for the cell channel, and green, magenta, yellow, cyan
   and white for the other channels, in the order of their numbers.
 

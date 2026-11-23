@@ -16,6 +16,9 @@ def test_imagej_luts_are_read_and_gray_counts_as_none(tmp_path):
     tifffile.imwrite(path, data, imagej=True, metadata={"axes": "CYX", "mode": "composite",
                                                         "LUTs": [_lut((0, 0, 255)), _lut((255, 255, 255)), _lut((255, 0, 255))]})
     assert io.read_image(path)[1].colors == ["#0000ff", None, "#ff00ff"]
+    blue = tmp_path / "blue.tif"  # every channel the same color: Foci Analyzer's colors instead
+    tifffile.imwrite(blue, data, imagej=True, metadata={"axes": "CYX", "mode": "composite", "LUTs": [_lut((0, 0, 255))] * 3})
+    assert io.read_image(blue)[1].colors is None
     plain = tmp_path / "plain.tif"
     tifffile.imwrite(plain, data)
     assert io.read_image(plain)[1].colors is None

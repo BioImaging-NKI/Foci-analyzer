@@ -76,6 +76,8 @@ def _hex(rgb) -> str | None:
 
 def _colors(found: list, channels: int) -> list | None:
     out = [found[c] if c < len(found) else None for c in range(channels)]
+    if channels > 1 and len(set(out)) == 1:  # every channel the same color (some LIF files: all blue): not a choice
+        return None
     return out if any(out) else None
 
 
