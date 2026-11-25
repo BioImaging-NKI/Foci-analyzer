@@ -12,8 +12,11 @@ Every entry says whether results change.
   µm settings apply as meant.
 - Color (RGB) CZI files open as three channels, red, green and blue (only the blue part was read). Results
   change for such files.
+- LIF files are read with liffile instead of readlif (no longer maintained). readlif mixed up the tiles and time
+  points of tile scans over time.
 - LIF tile scans that were not stitched on the microscope open as one image, every tile at its stage position
-  (only the first tile was read). Results change for such files.
+  (only the first tile was read), as Fiji's stitching places them. Raw FLIM data in a LIF file are left out of the
+  image list; the FLIM intensity and lifetime images stay. Results change for tile scans.
 - An image without a pixel size gets a remark that the µm settings are read as pixels.
 
 ## 2.0.0b5 (2026-11-23)
