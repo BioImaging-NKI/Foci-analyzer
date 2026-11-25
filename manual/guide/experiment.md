@@ -36,6 +36,16 @@ for example after you typed a folder name or copied new images into a folder.
 A CZI file with several scenes, or a LIF file with several series, gives one image per scene or series in
 the list (for example *DKO-2-11_0hR_Olap · Series008*). They are analyzed as separate images.
 
+A tile scan that was not stitched on the microscope opens as one image: every tile goes where the stage was
+when it was taken. Where tiles overlap, the later tile covers the earlier one; the tiles are not aligned on
+their content, so a cell on a seam can be off by a few pixels.
+
+## Images without a pixel size
+
+An image file without a pixel size is measured in pixels: the tables give sizes and positions in pixels, and
+the settings in µm (such as the foci size and the nucleus diameters) are read as pixels. The result of the
+preview says so. Set the pixel size in Fiji (*Image › Properties*) and save the image as TIFF to work in µm.
+
 ## The image list
 
 One row per image, with its condition and folder. A green ✓ means that **Analyze all images** analyzed

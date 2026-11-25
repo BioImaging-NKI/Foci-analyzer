@@ -131,6 +131,8 @@ def analyze_frame(cache: StageCache, image_key: str, data: np.ndarray, info: Ima
     earlier segmentation found them (a part of it, in the coordinates of the prepared image), used instead of
     segmenting again."""
     remarks: list[str] = []
+    if info.unit != "µm":
+        remarks.append("no pixel size in the file: the sizes in µm in the settings are read as pixels")
     if info.slices > 1 and info.z_spacing is None and info.unit == "µm":
         remarks.append("no Z spacing in the file: taken equal to the pixel size")
     if s.segmentation.dimension == "3D" and info.slices > 1 and s.foci_general.dimension != "3D":

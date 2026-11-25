@@ -197,29 +197,79 @@ def _read_czi(path: Path, series: int):
     return arr, info
 
 
+def tile_offsets(tiles: list[dict], step: float, w: int, h: int) -> np.ndarray:
+    """(n, 2) pixel offset (x, y) of every tile of a Leica tile scan, from its stage position.
+
+    tiles: the attributes of the Leica <Tile> elements (FieldX, FieldY: place in the grid; PosX, PosY: stage position
+    in m). step: the size of a pixel in µm. How the stage axes lie in the image differs per microscope (Leica stores
+    FlipX, FlipY and SwapXY for that); the grid places tell it here: each image axis takes the stage axis, and the
+    sign, that runs along with its grid place. Without stage positions the tiles go on the grid, without overlap."""
+    field = np.array([[float(t.get("FieldX", 0)), float(t.get("FieldY", 0))] for t in tiles])
+    try:
+        stage = np.array([[float(t["PosX"]), float(t["PosY"])] for t in tiles]) * 1e6 / step
+    except (KeyError, TypeError, ValueError):
+        stage = None
+    if stage is None or not np.isfinite(stage).all():
+        out = field * (w, h)
+    else:
+        def r(f, a):  # how closely stage axis a follows the grid place f
+            return np.corrcoef(f, stage[:, a])[0, 1] if np.ptp(f) and np.ptp(stage[:, a]) else 0.0
+
+        def along(f, a):
+            return a, -1.0 if r(f, a) < 0 else 1.0
+        fx, fy = field[:, 0], field[:, 1]
+        if abs(r(fx, 0)) + abs(r(fy, 1)) >= abs(r(fx, 1)) + abs(r(fy, 0)):
+            ax, ay = along(fx, 0), along(fy, 1)
+        else:
+            ax, ay = along(fx, 1), along(fy, 0)
+        out = np.column_stack([ax[1] * stage[:, ax[0]], ay[1] * stage[:, ay[0]]])
+    return np.rint(out - out.min(axis=0)).astype(int)
+
+
+def _lif_element(lif, series: int, name: str):
+    """The XML element of an image in a .lif file (the n-th image of that name)."""
+    same = [e for e in lif.xml_root.iter("Element") if e.find("Data/Image") is not None and e.get("Name") == name]
+    return same[[x["name"] for x in lif.image_list[:series]].count(name)]
+
+
 def _read_lif(path: Path, series: int):
     from readlif.reader import LifFile
     lif = LifFile(str(path))
     im = lif.get_image(series)
     d = im.dims
+    try:
+        element = _lif_element(lif, series, im.name)
+    except (IndexError, AttributeError):
+        element = None
+    sx, _, sz, st = (list(im.scale) + [None] * 4)[:4]
+    n = im.n_mosaic
+    if n > 1:  # a tile scan: every tile where the stage was (a later tile covers the overlap of an earlier one)
+        tiles = [t.attrib for t in element.findall("./Data/Image/Attachment/Tile")][:n] if element is not None else []
+        if len(tiles) != n:
+            tiles = [{"FieldX": i, "FieldY": 0} for i in range(n)]
+        # Leica's pixel size runs from the first to the last pixel center; the stage steps go by length / N
+        step = (1 / sx) * (d.x - 1) / d.x if sx else 1.0
+        offsets = tile_offsets(tiles, step, d.x, d.y)
+    else:
+        offsets = np.zeros((1, 2), int)
     arr = None
     for t in range(d.t):
         for c in range(im.channels):
             for z in range(d.z):
-                plane = np.asarray(im.get_frame(z=z, t=t, c=c))
-                if arr is None:
-                    arr = np.zeros((d.t, im.channels, d.z, *plane.shape), plane.dtype)
-                arr[t, c, z] = plane
-    sx, _, sz, st = (list(im.scale) + [None] * 4)[:4]
+                for m, (ox, oy) in enumerate(offsets):
+                    plane = np.asarray(im.get_frame(z=z, t=t, c=c, m=m))
+                    if arr is None:
+                        h, w = plane.shape
+                        size = (int(offsets[:, 1].max()) + h, int(offsets[:, 0].max()) + w)
+                        arr = np.zeros((d.t, im.channels, d.z, *size), plane.dtype)
+                    arr[t, c, z, oy:oy + plane.shape[0], ox:ox + plane.shape[1]] = plane
     info = _info(path, f"{path.stem} {im.name}", arr, 1 / sx if sx else None, 1 / abs(sz) if sz else None,
                  series, 1 / st if st else None)
-    try:  # the LUT names of the channels of this image (the n-th image of that name in the file)
-        same = [e for e in lif.xml_root.iter("Element") if e.find("Data/Image") is not None and e.get("Name") == im.name]
-        nth = [x["name"] for x in lif.image_list[:series]].count(im.name)
-        found = [_hex(_NAMED[n]) if (n := ch.get("LUTName", "").lower()) in _NAMED else None
-                 for ch in same[nth].iter("ChannelDescription")]
+    try:  # the LUT names of the channels of this image
+        found = [_hex(_NAMED[lut]) if (lut := ch.get("LUTName", "").lower()) in _NAMED else None
+                 for ch in element.iter("ChannelDescription")]
         info.colors = _colors(found, info.channels)
-    except (IndexError, AttributeError):
+    except AttributeError:
         pass
     return arr, info
 
