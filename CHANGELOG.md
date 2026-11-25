@@ -6,6 +6,7 @@ Every entry says whether results change.
 
 - The release notes in the update dialog wrap to the window, as a list (they broke at the line ends of the
   changelog). Results do not change.
+- Updating no longer opens an empty command window on Windows. Results do not change.
 
 ## 2.0.0b6 (2026-11-26)
 

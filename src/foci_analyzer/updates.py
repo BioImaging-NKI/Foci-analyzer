@@ -138,7 +138,8 @@ def start(info: dict, port: int, networks: list[str], progress) -> None:
     env.pop("VIRTUAL_ENV", None)
     out = (work / "update-output.log").open("wb")
     if where["windows"]:
-        flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+        # not DETACHED_PROCESS: without a console, the Python that uv starts opens a console window of its own
+        flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
         subprocess.Popen(cmd, cwd=str(work), env=env, stdout=out, stderr=subprocess.STDOUT,
                          stdin=subprocess.DEVNULL, creationflags=flags, close_fds=True)
     else:
