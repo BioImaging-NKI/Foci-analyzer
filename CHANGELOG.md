@@ -2,7 +2,7 @@
 
 Every entry says whether results change.
 
-## Not released yet
+## 2.0.0b6 (2026-11-26)
 
 - Updates: a failed update puts the version that was there back (the old program and its environment are set
   aside until the new ones are installed), and a release candidate now counts as newer than a beta of the
