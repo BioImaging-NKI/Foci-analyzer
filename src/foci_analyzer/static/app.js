@@ -1063,6 +1063,26 @@ $("quit").onclick = async () => {
 
 // ---------------------------------------------------------------- updates (updates.py)
 let U = null, updateLater = false;
+/* Release notes (Markdown as in CHANGELOG.md) as paragraphs and lists: lines that continue an item or a paragraph
+   join it, so the text wraps to the window instead of at the line ends of the file. */
+function releaseNotes(md) {
+  const out = [];
+  let list = null, last = null;
+  const plain = (s) => s.replace(/\*\*|`/g, "");
+  for (const raw of md.replace(/\r/g, "").replace(/^#+\s*v?[\d.]+[^\n]*\n+/, "").split("\n")) {
+    const line = raw.trim();
+    if (!line) { last = null; list = null; continue; }
+    const head = line.match(/^#+\s*(.*)/), item = line.match(/^[-*]\s+(.*)/);
+    if (head) { out.push(el("h3", { textContent: plain(head[1]) })); list = last = null; }
+    else if (item) {
+      if (!list) out.push(list = el("ul"));
+      list.append(last = el("li", { textContent: plain(item[1]) }));
+    } else if (last) last.textContent += " " + plain(line);
+    else { out.push(last = el("p", { textContent: plain(line) })); list = null; }
+  }
+  return out;
+}
+
 function renderUpdate(u) {
   U = u;
   $("upd-auto").checked = u.check;
@@ -1089,7 +1109,7 @@ function showUpdate(asked) {
     el("p", { class: "muted", textContent: `You have ${U.current}.${U.latest.date ? ` Released ${U.latest.date}.` : ""} ` + (U.can_update
       ? "Updating takes a few minutes; Foci Analyzer then starts again. Your settings, experiment, results and networks stay."
       : "This copy was not installed with the setup (a developer's copy): update it with git pull.") }),
-    el("div", { class: "notes", textContent: (U.latest.notes || "No release notes.").replace(/^#+\s*v?[\d.]+[^\n]*\n+/, "").replace(/^#+\s*/gm, "").replace(/\*\*/g, "") }),
+    el("div", { class: "notes" }, ...releaseNotes(U.latest.notes || "No release notes.")),
     el("div", { class: "row" }, go,
       el("button", { textContent: "Later", title: "Ask again the next time Foci Analyzer starts", onclick: () => choose("later") }),
       el("button", { textContent: "Not for a week", onclick: () => choose("week") }),

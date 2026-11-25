@@ -222,7 +222,11 @@ button.small-btn:hover { background: var(--accent); color: #fff; }
 .dialog-box { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px;
   width: min(640px, 100%); max-height: 85vh; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 10px 40px #0005; }
 .dialog-box h2 { margin: 0; }
-.dialog-box .notes { white-space: pre-wrap; overflow: auto; flex: 1; min-height: 60px; border: 1px solid var(--line); border-radius: 8px;
+.dialog-box .notes ul { margin: 0 0 8px; padding-left: 18px; }
+.dialog-box .notes li { margin-bottom: 4px; }
+.dialog-box .notes p, .dialog-box .notes h3 { margin: 0 0 8px; }
+.dialog-box .notes h3 { font-size: 13px; }
+.dialog-box .notes { overflow: auto; flex: 1; min-height: 60px; border: 1px solid var(--line); border-radius: 8px;
   padding: 10px 12px; font-size: 13px; background: var(--bg); }
 .dialog-box .row { flex-wrap: wrap; gap: 8px; }
 

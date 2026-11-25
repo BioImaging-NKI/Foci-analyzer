@@ -2,6 +2,11 @@
 
 Every entry says whether results change.
 
+## Not released yet
+
+- The release notes in the update dialog wrap to the window, as a list (they broke at the line ends of the
+  changelog). Results do not change.
+
 ## 2.0.0b6 (2026-11-26)
 
 - Updates: a failed update puts the version that was there back (the old program and its environment are set
