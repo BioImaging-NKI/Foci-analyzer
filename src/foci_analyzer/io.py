@@ -99,6 +99,28 @@ def _tiff_colors(tf, channels: int) -> list | None:
     return None
 
 
+_LENGTH = {"µm": 1.0, "um": 1.0, "nm": 1e-3, "mm": 1e3, "cm": 1e4, "m": 1e6, "Å": 1e-4}
+_TIME = {"s": 1.0, "ms": 1e-3, "µs": 1e-6, "us": 1e-6, "min": 60.0, "h": 3600.0}
+
+
+def _ome_calibration(xml: str) -> tuple[float | None, float | None, float | None]:
+    """Pixel size and Z spacing in µm and the frame interval in seconds, from the first image of OME-XML."""
+    import re
+    m = re.search(r"<(?:\w+:)?Pixels\b[^>]*>", xml)
+    if not m:
+        return None, None, None
+    tag = m.group(0)
+
+    def value(name, units, default):
+        v = re.search(rf'\b{name}="([^"]+)"', tag)
+        u = re.search(rf'\b{name}Unit="([^"]+)"', tag)
+        try:
+            return float(v.group(1)) * units[u.group(1) if u else default] if v else None
+        except (ValueError, KeyError):
+            return None
+    return value("PhysicalSizeX", _LENGTH, "µm"), value("PhysicalSizeZ", _LENGTH, "µm"), value("TimeIncrement", _TIME, "s")
+
+
 def list_series(path: str | Path) -> list[str]:
     """The names of the images in a file; one empty name for a file with a single image."""
     path = Path(path)
@@ -127,7 +149,10 @@ def _read_tiff(path: Path):
                 px = den / num
         if str(ij.get("unit", "")).strip().lower() not in _MICRON:
             px = None
-        info = _info(path, path.stem, arr, px, ij.get("spacing"), 0, ij.get("finterval"))
+        z, interval = ij.get("spacing"), ij.get("finterval")
+        if tf.is_ome and not ij:  # an OME-TIFF without ImageJ's description: the calibration from the OME data
+            px, z, interval = _ome_calibration(tf.ome_metadata or "")
+        info = _info(path, path.stem, arr, px, z, 0, interval)
         info.colors = _tiff_colors(tf, info.channels)
         return arr, info
 
@@ -142,13 +167,16 @@ def _read_czi(path: Path, series: int):
         nt, nc, nz = (box[a][1] - box[a][0] for a in "TCZ")
         first = doc.read(plane={"T": box["T"][0], "C": box["C"][0], "Z": box["Z"][0]}, scene=scene,
                          roi=(rect.x, rect.y, rect.w, rect.h))
-        arr = np.zeros((nt, nc, nz, rect.h, rect.w), first.dtype)
+        k = first.shape[-1] if first.ndim == 3 else 1  # 3 for a color (RGB) image: each color becomes a channel
+        arr = np.zeros((nt, nc * k, nz, rect.h, rect.w), first.dtype)
         for t in range(nt):
             for c in range(nc):
                 for z in range(nz):
                     plane = doc.read(plane={"T": box["T"][0] + t, "C": box["C"][0] + c, "Z": box["Z"][0] + z},
                                      scene=scene, roi=(rect.x, rect.y, rect.w, rect.h))
-                    arr[t, c, z] = plane[..., 0]
+                    plane = plane.reshape(rect.h, rect.w, -1)
+                    for j in range(k):  # the library gives the colors as blue, green, red
+                        arr[t, c * k + j, z] = plane[..., k - 1 - j]
         try:
             items = doc.metadata["ImageDocument"]["Metadata"]["Scaling"]["Items"]["Distance"]
             scale = {d["@Id"]: float(d["Value"]) * 1e6 for d in (items if isinstance(items, list) else [items])}
@@ -161,6 +189,8 @@ def _read_czi(path: Path, series: int):
                      for c in chans]
         except (KeyError, TypeError, ValueError, AttributeError):
             found = []
+        if k == 3:  # a color image: its own red, green and blue
+            found = ["#ff0000", "#00ff00", "#0000ff"] * nc
     name = path.stem + (f" scene {series + 1}" if len(scenes) > 1 else "")
     info = _info(path, name, arr, scale.get("X"), scale.get("Z"), series)
     info.colors = _colors(found, info.channels)

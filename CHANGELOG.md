@@ -2,6 +2,17 @@
 
 Every entry says whether results change.
 
+## Not released yet
+
+- Updates: a failed update puts the version that was there back (the old program and its environment are set
+  aside until the new ones are installed), and a release candidate now counts as newer than a beta of the
+  same version (`2.0.0rc1` after `2.0.0b5`).
+- OME-TIFF files without ImageJ metadata are calibrated: pixel size, Z spacing and frame interval from the
+  OME data (they opened in pixels). Results change for such files: sizes in µm instead of pixels, and the
+  µm settings apply as meant.
+- Color (RGB) CZI files open as three channels, red, green and blue (only the blue part was read). Results
+  change for such files.
+
 ## 2.0.0b5 (2026-11-23)
 
 - The update check in the background runs every 6 hours instead of once a day, also while Foci Analyzer

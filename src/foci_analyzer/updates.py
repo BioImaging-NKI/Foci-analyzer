@@ -41,11 +41,13 @@ def releases_url() -> str:
 
 
 def version_key(text: str) -> tuple:
-    """'v1.2.3' -> (1, 2, 3, 1, 0); a development version sorts before its release: '1.2.3.dev4' -> (1, 2, 3, 0, 4)."""
+    """'v1.2.3' -> (1, 2, 3, 4, 0); before a release come, in this order, its development versions, alphas, betas
+    and release candidates: '1.2.3.dev4' -> (1, 2, 3, 0, 4), '1.2.3b2' -> (1, 2, 3, 2, 2), '1.2.3rc1' -> (1, 2, 3, 3, 1)."""
     m = re.match(r"v?(\d+)\.(\d+)(?:\.(\d+))?(?:\.?(dev|a|b|rc)(\d*))?", str(text).strip())
     if not m:
         return (0,)
-    return (int(m[1]), int(m[2]), int(m[3] or 0), 0 if m[4] else 1, int(m[5] or 0))
+    stage = {"dev": 0, "a": 1, "b": 2, "rc": 3, None: 4}[m[4]]
+    return (int(m[1]), int(m[2]), int(m[3] or 0), stage, int(m[5] or 0))
 
 
 def latest(timeout: float = 15) -> dict | None:

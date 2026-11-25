@@ -464,6 +464,32 @@ def set_windows_version(version: str) -> None:
         pass  # installed with install.bat or install.sh
 
 
+def set_aside(target: Path, names: list[str]) -> list[str]:
+    """Rename these folders of the installation to NAME.old (an earlier NAME.old is removed first); all or none."""
+    done = []
+    for name in names:
+        if not (target / name).exists():
+            continue
+        shutil.rmtree(target / f"{name}.old", ignore_errors=True)
+        try:
+            (target / name).rename(target / f"{name}.old")
+        except OSError as e:
+            put_back(target, done)
+            raise SystemExit(f"{target / name} is still in use ({e}); close Foci Analyzer and try again") from e
+        done.append(name)
+    return done
+
+
+def put_back(target: Path, names: list[str]) -> None:
+    """Undo set_aside: the new, unfinished folders go, the old ones come back."""
+    for name in names:
+        shutil.rmtree(target / name, ignore_errors=True)
+        try:
+            (target / f"{name}.old").rename(target / name)
+        except OSError as e:
+            say(f"  {target / name} could not be put back ({e}); install Foci Analyzer again with its setup")
+
+
 def finish_update(target: Path, ok: bool) -> None:
     """Stop showing the progress and start Foci Analyzer (the new version, or after a failure the one that
     is there), on the same port; the browser tab reloads into it."""
@@ -552,10 +578,15 @@ def main(argv: list[str] | None = None) -> None:
         if args.wait:
             PROGRESS.status = "Waiting for Foci Analyzer to close"
             wait_for(args.wait)
-        if SOURCE != target / "program":  # the new version becomes the program folder (the setup's layout)
-            shutil.rmtree(target / "program", ignore_errors=True)
+        # The version that works stays until the new one is built: its program folder and environment are set
+        # aside (an environment cannot be moved afterwards: its programs hold its path) and come back on failure.
+        moving = SOURCE != target / "program"
+        aside = set_aside(target, ["program", ".venv"] if moving else [".venv"])
+        if moving:  # the new version becomes the program folder (the setup's layout)
             shutil.copytree(SOURCE, target / "program", ignore=shutil.ignore_patterns(".git", "__pycache__"))
             source = target / "program"
+    else:
+        aside = []
     say(f"Foci Analyzer: {'updating' if args.update else 'installing'} in {target} ({platform.system()} {platform.machine()})")
     if not args.networks_only:
         next_step("The program", "Python and the program")
@@ -564,8 +595,16 @@ def main(argv: list[str] | None = None) -> None:
             shutil.rmtree(target / ".venv", ignore_errors=True)
         # the program itself is always built again: uv keeps a built package of the same version number, so a
         # newer copy with an unchanged version (a development version) was not installed
-        run(args.uv, "sync", "--project", str(source), "--no-dev", "--frozen", "--no-editable", "--python", "3.12",
-            "--reinstall-package", "foci-analyzer", env={**env, "UV_PROJECT_ENVIRONMENT": str(target / ".venv")})
+        try:
+            run(args.uv, "sync", "--project", str(source), "--no-dev", "--frozen", "--no-editable", "--python", "3.12",
+                "--reinstall-package", "foci-analyzer", env={**env, "UV_PROJECT_ENVIRONMENT": str(target / ".venv")})
+        except BaseException:
+            if aside:
+                say("The new version could not be installed: the version that was there is put back")
+                put_back(target, aside)
+            raise
+        for name in aside:  # the new version works: the old one can go
+            shutil.rmtree(target / f"{name}.old", ignore_errors=True)
     index = [] if MAC else ["--index-url", "https://download.pytorch.org/whl/" + ("cu124" if gpu else "cpu"),
                             "--extra-index-url", "https://pypi.org/simple", "--index-strategy", "unsafe-best-match"]
 

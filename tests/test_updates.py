@@ -8,6 +8,7 @@ from foci_analyzer import updates
 def test_version_order():
     k = updates.version_key
     assert k("0.1.0.dev0") < k("0.1.0") < k("v0.1.1") < k("0.2.0") < k("1.0") < k("2.0.0rc1") < k("2.0.0")
+    assert k("2.0.0.dev3") < k("2.0.0a1") < k("2.0.0b2") < k("2.0.0b10") < k("2.0.0rc1") < k("2.0.0rc2") < k("2.0.0")
 
 
 def test_latest_skips_fiji_drafts_and_prereleases(tmp_path, monkeypatch):
